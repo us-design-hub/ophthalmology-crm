@@ -6,7 +6,8 @@ types.setTypeParser(1082, value => value);
 const globalDb = globalThis as unknown as { openeyesPool?: Pool; roleCheck?: Promise<void> };
 export function pool(): Pool {
   if (!globalDb.openeyesPool) {
-    globalDb.openeyesPool = new Pool({ connectionString: requiredEnv("DATABASE_URL"), max: 8, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30_000, application_name: "openeyes-web" });
+    const ca = process.env.DATABASE_SSL_CA_BASE64;
+    globalDb.openeyesPool = new Pool({ connectionString: requiredEnv("DATABASE_URL"), ...(ca ? { ssl: { ca: Buffer.from(ca, "base64").toString("utf8"), rejectUnauthorized: true } } : {}), max: 8, connectionTimeoutMillis: 5000, idleTimeoutMillis: 30_000, application_name: "openeyes-web" });
     globalDb.openeyesPool.on("error", () => console.error("Database connection error"));
   }
   return globalDb.openeyesPool;
