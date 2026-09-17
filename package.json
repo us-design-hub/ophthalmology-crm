@@ -1,0 +1,54 @@
+{
+  "name": "openeyes-demo",
+  "version": "0.5.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/anatomy.test.ts tests/patients.test.ts tests/intake.test.ts tests/clinical.test.ts tests/operations.test.ts",
+    "test:setup": "tsx scripts/test-setup.ts",
+    "test:db": "tsx --test tests/database.test.ts",
+    "test:e2e": "tsx scripts/run-e2e.ts",
+    "db:local:init": "tsx scripts/local-postgres.ts init",
+    "db:local:start": "tsx scripts/local-postgres.ts start",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "check": "npm run typecheck && npm test && npm run build",
+    "db:seed:intake": "tsx scripts/seed-intake.ts",
+    "db:seed:clinical": "tsx scripts/seed-clinical.ts",
+    "db:seed:operations": "tsx scripts/seed-operations.ts",
+    "db:seed:live": "tsx scripts/seed-live-operations.ts"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.2.1",
+    "@react-three/fiber": "^9.0.0",
+    "libphonenumber-js": "^1.13.13",
+    "lucide-react": "^0.468.0",
+    "next": "^16.0.0",
+    "pg": "^8.23.0",
+    "playwright-core": "^1.63.0",
+    "qrcode": "^1.5.4",
+    "react": "~19.2.0",
+    "react-dom": "~19.2.0",
+    "server-only": "^0.0.1",
+    "three": "^0.180.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@types/node": "^20.19.0",
+    "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.180.0",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

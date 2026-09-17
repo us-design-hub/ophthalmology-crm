@@ -1,0 +1,2 @@
+# Applied migrations are checksum-verified; preserve their exact bytes.
+db/migrations/*.sql -text

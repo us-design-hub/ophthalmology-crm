@@ -1,0 +1,288 @@
+/* ==========================================================================
+   OpenEyes design tokens
+   --------------------------------------------------------------------------
+   Two layers, deliberately separated:
+
+   1. PRIMITIVES  — raw ramps. Named for what they ARE (sage-500, burgundy-600).
+                    These never change per theme. Do not reference them
+                    directly from component CSS; use a semantic token.
+
+   2. SEMANTIC    — named for what they DO (--surface-panel, --text-muted).
+                    This is the only layer a theme overrides, so adding a dark
+                    theme later means re-pointing these and nothing else.
+
+   Ramps were derived from the 433 one-off colours the stylesheets previously
+   used, clustered in CIELAB. The palette resolved into five real families:
+   sage (olive neutral), stone (desaturated green-grey — the largest, 166
+   colours), brand (dark navy chrome), burgundy and amber (accents), plus the
+   od/os laterality pair which is held apart from all of them.
+   ========================================================================== */
+
+:root {
+  /* ---- Primitives: sage — the workhorse neutral ------------------------- *
+   * Olive-green, hue held near 85 across the whole ramp. The original
+   * stylesheets used 167 colours in this family; the dark end is genuinely
+   * olive (#4c6340, #657f4b), and stays distinct from the navy brand ramp.
+   * Keeping the two apart is what stops panels and chrome muddying together. */
+  --slate-50: #f3f5f8;   /* page ground; deliberately outside the sage ramp */
+  --sage-25:  #fafbf7;
+  --sage-50:  #f5f7f1;
+  --sage-100: #eef1e8;
+  --sage-200: #e4e8db;
+  --sage-300: #dce4d4;
+  --sage-400: #c6d0bb;
+  --sage-500: #a9ba96;
+  --sage-600: #8b9e78;
+  --sage-700: #72845f;
+  --sage-800: #5c7153;
+  --sage-900: #45603c;
+
+  /* ---- Primitives: stone — desaturated grey-green ----------------------- *
+   * The true neutral axis, and the single largest family in the original
+   * stylesheets: 166 of 460 colours. Borders, muted copy, icons, table
+   * chrome. Deliberately NOT sage — muted text reading olive rather than
+   * neutral grey was one of the palette's weaker points.                    */
+  --stone-200: #e3e8e1;
+  --stone-300: #ccd4c9;
+  --stone-400: #b2bcb0;
+  --stone-500: #9ca79a;
+  --stone-600: #879183;
+  --stone-700: #737d70;
+  --stone-800: #566a5f;
+  --stone-900: #43584c;
+
+  /* ---- Primitives: brand — dark chrome surfaces ------------------------- *
+   * Navy, hue 226. Sidebar, masthead, login identity panel, inverse chrome.
+   * Named --brand-* rather than by hue so a future palette change is a value
+   * edit here and nothing else.                                             */
+  --brand-400: #374fa0;
+  --brand-500: #2c4081;
+  --brand-600: #26376e;
+  --brand-700: #212f5f;
+  --brand-750: #1e2b57;
+  --brand-800: #1b2850;
+  --brand-900: #151e3d;
+  --brand-950: #0e152a;
+
+  /* ---- Primitives: burgundy — primary accent ---------------------------- */
+  --burgundy-50:  #fbf0f2;
+  --burgundy-100: #f2dde1;
+  --burgundy-200: #e8cdd2;
+  --burgundy-300: #d0a8b1;
+  --burgundy-400: #b8798a;
+  --burgundy-500: #a3536a;
+  --burgundy-600: #8f293a;
+  --burgundy-700: #762233;
+  --burgundy-800: #5e1b28;
+
+  /* ---- Primitives: amber — secondary accent, "demo/preview" signal ------ */
+  --amber-50:  #faf6ea;
+  --amber-100: #f4efe2;
+  --amber-200: #e9dec1;
+  --amber-300: #dbba7d;
+  --amber-400: #c8a65e;
+  --amber-500: #ac8c4f;
+  --amber-600: #8f7951;
+  --amber-700: #735b33;
+  --amber-800: #8b611d;   /* saturated brown-gold: warning/preview body copy */
+
+  /* ---- Primitives: laterality ------------------------------------------ *
+   * OD (right) and OS (left) are clinical identity, not decoration.
+   * They are intentionally kept outside the accent ramps so they can never
+   * collapse into burgundy/amber during a future palette change.           */
+  --od-50:  #eef5f6;
+  --od-200: #d5e5e8;
+  --od-400: #526d72;
+  --od-500: #277c91;
+  --od-700: #1d5e6e;
+  --od-900: #183d43;
+  --os-50:  #faf0f0;
+  --os-200: #ead7db;
+  --os-500: #a23e50;
+  --os-700: #7d2f3d;
+
+  /* ---- Primitives: status ---------------------------------------------- */
+  --danger-50:  #fbefef;
+  --danger-200: #ebcfd1;
+  --danger-600: #9a3945;
+  --warning-50:  #f9f4e4;
+  --warning-200: #e9dec1;
+  --warning-600: #8f7951;
+  --success-50:  #edf2e3;
+  --success-200: #dfe7d0;
+  --success-600: #5b7556;
+  --info-50:  #edf0f4;
+  --info-600: #637180;
+
+  --white: #ffffff;
+  --black: #000000;
+
+  /* ======================================================================
+     SEMANTIC LAYER — theme override point
+     ====================================================================== */
+
+  /* ---- Surfaces --------------------------------------------------------- */
+  --surface-page:     var(--slate-50);
+  --surface-panel:    var(--white);
+  --surface-sunken:   var(--sage-25);
+  --surface-subtle:   var(--sage-100);
+  --surface-raised:   var(--white);
+  --surface-inverse:  var(--brand-800);
+  --surface-inverse-deep: var(--brand-900);
+  --surface-scrim:    color-mix(in srgb, var(--brand-950) 42%, transparent);
+
+  /* ---- Text ------------------------------------------------------------- */
+  --text-primary:   #1b2438;
+  --text-secondary: var(--stone-800);
+  --text-muted:     var(--stone-700);
+  --text-subtle:    var(--stone-600);
+  --text-faint:     var(--stone-500);
+  --text-on-accent: var(--white);
+  --text-on-inverse:      #e6eaf3;
+  --text-on-inverse-muted: var(--sage-400);
+  --text-accent:    var(--burgundy-600);
+  --text-link:      var(--brand-800);
+
+  /* ---- Borders ---------------------------------------------------------- */
+  --border-subtle:  var(--stone-200);
+  --border-default: var(--sage-300);
+  --border-strong:  var(--sage-400);
+  --border-inverse: var(--brand-600);
+  --border-accent:  var(--burgundy-600);
+
+  /* ---- Interactive ------------------------------------------------------ */
+  --accent-bg:        var(--burgundy-600);
+  --accent-bg-hover:  var(--burgundy-700);
+  --accent-fg:        var(--white);
+  --accent-soft-bg:   var(--burgundy-50);
+  --accent-soft-fg:   var(--burgundy-600);
+
+  --control-bg:        var(--white);
+  --control-bg-hover:  var(--sage-100);
+  --control-border:    var(--border-subtle);
+  --control-fg:        var(--text-secondary);
+  --control-disabled-bg: #e9e5df;
+  --control-disabled-fg: #99958c;
+
+  --focus-ring: #ca9c51;
+  --focus-ring-strong: #b77b24;   /* on SVG strokes, where the ring needs more weight */
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 3px;
+
+  /* ======================================================================
+     TYPE SCALE
+     11px floor. The stylesheets previously shipped 31 distinct sizes with
+     30 declarations below 9px (down to 5.5px); those are not readable and
+     are gone. Every step below is a real, legible size.
+     ====================================================================== */
+  --text-xs:   11px;   /* was 5.5 / 6 / 6.7 / 7 / 8 */
+  --text-sm:   12px;   /* was 9  */
+  --text-base: 13px;   /* was 10 */
+  --text-md:   14px;   /* was 11 */
+  --text-lg:   15px;   /* was 12 */
+  --text-xl:   16px;   /* was 13 */
+  --text-2xl:  18px;   /* was 14 / 15 */
+  --text-3xl:  20px;   /* was 16 / 17 */
+  --text-4xl:  22px;   /* was 18 / 19 / 20 */
+
+  --display-sm: 26px;  /* was 22 / 23 / 24 */
+  --display-md: 30px;  /* was 26 / 27 / 28 / 29 / 30 */
+  --display-lg: 34px;  /* was 31 / 32 */
+  --display-xl: 40px;  /* was 38 */
+  --display-2xl: 60px; /* decorative only: the anatomy stage watermark */
+
+  /* ---- Line height & tracking ------------------------------------------ */
+  --leading-tight:   1.2;
+  --leading-snug:    1.4;
+  --leading-normal:  1.55;
+  --leading-relaxed: 1.7;
+
+  --tracking-label: 1.2px;  /* uppercase eyebrows / section labels */
+  --tracking-tight: -0.3px;
+  --tracking-display: -0.9px;
+
+  /* ---- Weight ----------------------------------------------------------- */
+  --weight-normal: 400;
+  --weight-medium: 550;
+  --weight-semi:   600;
+  --weight-bold:   650;
+
+  /* ---- Font families ---------------------------------------------------- */
+  /* Loaded and self-hosted by next/font in app/layout.tsx. The --font-plex-*
+     variables carry next/font's generated family plus its metric-matched
+     fallback, so the stacks below only need a final system safety net. */
+  --font-sans:   var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-serif:  var(--font-plex-serif), Georgia, "Times New Roman", serif;
+  --font-arabic: var(--font-plex-arabic), "Noto Naskh Arabic", "Segoe UI", Tahoma, sans-serif;
+
+  /* ======================================================================
+     SPACE — 4px base
+     ====================================================================== */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  28px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ======================================================================
+     RADIUS — was 15 distinct values
+     ====================================================================== */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-2xl:  20px;
+  --radius-full: 999px;
+
+  /* Legacy alias: component CSS referenced --radius before tokens existed. */
+  --radius: var(--radius-lg);
+
+  /* ======================================================================
+     ELEVATION
+     ====================================================================== */
+  --shadow-xs: 0 1px 4px color-mix(in srgb, var(--brand-800) 7%, transparent);
+  --shadow-sm: 0 3px 9px color-mix(in srgb, var(--brand-800) 8%, transparent);
+  --shadow-md: 0 4px 15px color-mix(in srgb, var(--brand-800) 6%, transparent);
+  --shadow-lg: 0 15px 65px color-mix(in srgb, var(--brand-800) 10%, transparent);
+  --shadow-xl: 0 20px 80px color-mix(in srgb, var(--brand-800) 22%, transparent);
+  --shadow-accent: 0 3px 6px color-mix(in srgb, var(--burgundy-600) 12%, transparent);
+
+  /* ======================================================================
+     MOTION
+     ====================================================================== */
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --duration-fast: 0.16s;
+  --duration-base: 0.2s;
+
+  /* ======================================================================
+     LAYOUT
+     Sidebar widths grew with the type scale: nav labels went 11px -> 14px.
+     ====================================================================== */
+  --sidebar-width: 248px;
+  --sidebar-width-md: 224px;
+  --sidebar-width-sm: 208px;
+  --topbar-height: 67px;
+  --content-max: 1550px;
+}
+
+/* --------------------------------------------------------------------------
+   Legacy aliases.
+   Short names the original stylesheets used directly. Kept as pointers into
+   the ramps so the remaining call sites can be migrated incrementally.
+   -------------------------------------------------------------------------- */
+:root {
+  --burgundy:    var(--burgundy-600);
+  --ink:         var(--text-primary);
+  --muted:       var(--text-muted);
+  --line:        var(--border-subtle);
+  --paper:       var(--surface-page);
+  --od:          var(--od-500);
+  --os:          var(--os-500);
+  --gold:        var(--amber-300);
+}

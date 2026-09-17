@@ -1,0 +1,27 @@
+"use client";
+import { useEffect, useState } from "react";
+import { ArrowLeft, ArrowRight, CircleAlert, RefreshCw, ShieldCheck } from "lucide-react";
+import { useLocale } from "./locale-provider";
+import { api } from "@/lib/api-client";
+import { en, type MessageKey } from "@/lib/messages";
+import { errorKey } from "./patients/patient-registration";
+import { formatDate } from "./patients/patients-workspace";
+
+type AuditData = { events: { id: string; action: string; entityType: string; entityId: string | null; at: string; actor: string | null; metadata: { contentHash?: string; warningReason?: string; sampleReceipt?: string; returnedRows?: number; candidateCount?: number; duplicateReason?: string; permission?: string; synthetic?: boolean; from?: string; to?: string; reason?: string; version?: number; count?: number } }[]; total: number; page: number; pageSize: number };
+export function AuditWorkspace() {
+  const { t } = useLocale(); const [group, setGroup] = useState("all"); const [page, setPage] = useState(1); const [refresh, setRefresh] = useState(0); const [data, setData] = useState<AuditData | null>(null); const [error, setError] = useState<MessageKey | null>(null); const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const controller = new AbortController(); setError(null); setLoading(true);
+    api<AuditData>(`/api/audit?page=${page}&group=${group}`, undefined, { signal: controller.signal }).then(setData).catch(error => { if (!controller.signal.aborted) setError(errorKey(error)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [page, refresh, group]);
+  return <section className="panel audit-panel"><div className="registry-heading"><div><ShieldCheck size={21}/><h2>{t("auditLog")}</h2></div><button className="secondary-button" type="button" onClick={() => setRefresh(value => value + 1)}><RefreshCw size={14}/>{t("refresh")}</button></div><p className="registry-info">{t("auditDataNote")}</p>
+    <div className="ops-audit-filters"><label htmlFor="audit-group">{t("opsAuditFilter")}</label><select id="audit-group" value={group} onChange={event => { setGroup(event.target.value); setPage(1); }}>{([["all","opsAuditAll"],["clinical","opsAuditClinical"],["previews","opsAuditPreviews"],["examples","opsAuditExamples"]] as const).map(([value,key]) => <option key={value} value={value}>{t(key)}</option>)}</select></div>
+    {error ? <div className="data-error" role="alert"><CircleAlert size={23}/>{t(error)}</div> : loading ? <div className="registry-loading" role="status"><span className="loading-orbit"/>{t("auditLoading")}</div> : <div className="patient-table-wrap"><table className="patient-table audit-table"><thead><tr>{(["auditTime", "auditActor", "auditAction", "auditEntity", "auditDetail"] as MessageKey[]).map(key => <th key={key}>{t(key)}</th>)}</tr></thead><tbody>{data?.events.map(event => {
+      const actionKey = `audit_${event.action.replaceAll(".", "_")}`;
+      return <tr key={event.id}><td>{formatDate(event.at, true)}</td><td>{event.actor ?? t("auditSystem")}</td><td><span className={`audit-action ${event.action.includes("denied") || event.action.includes("failed") ? "audit-warning" : ""}`}>{actionKey in en ? t(actionKey as MessageKey) : event.action}</span></td><td>{t(event.entityType === "doctor_event" || event.entityType === "event" ? "doctorEvent" : event.entityType === "prescription" ? "prescriptions" : event.entityType === "operations_preview" ? "opsPreviews" : event.entityType === "appointment" ? "appointments" : event.entityType === "encounter" ? "encounterLabel" : event.entityType === "patient" ? "patientRecord" : event.entityType === "session" ? "authSession" : event.entityType === "permission" ? "permissionEntity" : "auditLog")}{event.entityId && <small>{event.entityId.slice(0, 8)}</small>}</td><td>{event.metadata.synthetic ? <span className="ops-example-label">{t(event.action === "security.break_glass_example" ? "opsAuditExample" : "seededData")}</span> : event.metadata.returnedRows !== undefined ? `${t("resultsReturned")}: ${event.metadata.returnedRows}` : event.metadata.candidateCount !== undefined ? `${t("possibleMatches")}: ${event.metadata.candidateCount}` : (event.metadata.to ? `${event.metadata.from} to ${event.metadata.to}${event.metadata.reason ? ` - ${event.metadata.reason}` : ""}` : event.metadata.version ? `v${event.metadata.version}` : undefined) ?? event.metadata.duplicateReason ?? event.metadata.permission ?? "—"}{event.metadata.contentHash && <small className="ops-audit-hash">{t("opsAuditHash")}: {event.metadata.contentHash}</small>}{event.metadata.warningReason && <small>{event.metadata.warningReason}</small>}{event.metadata.sampleReceipt && <small>{event.metadata.sampleReceipt}</small>}</td></tr>;
+    })}</tbody></table></div>}
+    {data?.total === 0 && !loading && <p className="intake-empty">{t("opsAuditEmpty")}</p>}
+    {data && <div className="registry-pagination"><span>{data.total} {t("auditEntryCount")}</span><div><button type="button" aria-label={t("previousPage")} disabled={page <= 1 || loading} onClick={() => setPage(value => value - 1)}><ArrowLeft size={15}/></button><span>{t("pageLabel")} {page} {t("ofLabel")} {Math.max(1, Math.ceil(data.total / data.pageSize))}</span><button type="button" aria-label={t("nextPage")} disabled={page * data.pageSize >= data.total || loading} onClick={() => setPage(value => value + 1)}><ArrowRight size={15}/></button></div></div>}
+  </section>;
+}

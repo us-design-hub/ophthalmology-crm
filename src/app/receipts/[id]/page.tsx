@@ -1,0 +1,8 @@
+import {redirect,notFound} from 'next/navigation';
+import {pageSession} from '@/server/auth';
+import {receipt} from '@/server/reports-service';
+import {ApiError} from '@/server/http';
+import {PrintButton} from '@/components/operations/print-button';
+export const dynamic='force-dynamic';
+const money=(v:number)=>new Intl.NumberFormat('en-PK',{style:'currency',currency:'PKR'}).format(v/100);
+export default async function ReceiptPage({params}:{params:Promise<{id:string}>}){const session=await pageSession();if(!session)redirect('/login');if(session.user.mustChangePassword)redirect('/');let d;try{d=await receipt(session.user,(await params).id,{});}catch(e){if(e instanceof ApiError&&[403,404].includes(e.status))notFound();throw e;}return <main className="ops-receipt"><PrintButton/><article className="panel ops-receipt-paper"><header><div><h1>{d.hospital}</h1><p>{d.settings.address} {d.settings.phone}</p><h2>Payment receipt</h2></div></header><p>{d.patient} · {d.mrn}</p><p>{d.facility} · {new Date(d.at).toLocaleString('en-PK',{timeZone:'Asia/Karachi'})} PKT</p><p style={{overflowWrap:'anywhere'}}>Receipt {d.receipt}</p><table className="patient-table"><thead><tr><th>Service</th><th>Quantity</th><th>Unit price</th></tr></thead><tbody>{d.lines.map((l:{description:string;quantity:number;price:number},i:number)=><tr key={i}><td>{l.description}</td><td>{l.quantity}</td><td>{money(l.price)}</td></tr>)}</tbody></table><p>Invoice total: {money(d.total)} · Discount: {money(d.discount)}</p><h2>Received: {money(d.amount)}</h2><p>Method: {d.method} · Reference: {d.reference||'—'}</p><p>Cashier: {d.cashier}</p><footer>Powered by Logic box</footer></article></main>;}

@@ -1,0 +1,31 @@
+import { z } from 'zod';
+import { ANATOMY_SITES } from './anatomy';
+import type { Encounter, Workup } from './intake';
+export const laterality = z.enum(['OD','OS','OU']);
+const text = (length: number) => z.string().trim().max(length);
+export const planSchema = z.object({ id:z.uuid(), eye:z.enum(['OD','OS']), anatomySite:z.enum(ANATOMY_SITES), intent:z.enum(['observation','medical','laser','surgical']), notes:text(500) }).strict();
+export const eventInputSchema = z.object({ encounterId:z.uuid(), version:z.number().int().nonnegative(), complaint:text(1500), findings:z.object({OD:text(2000),OS:text(2000)}).strict(), diagnoses:z.array(z.object({eye:laterality,label:text(200).min(1),codeSystem:z.enum(['ICD-10','SNOMED CT']).optional(),code:text(40).optional(),primary:z.boolean().optional()}).strict()).max(12), plans:z.array(planSchema).max(22), referral:text(1000), followUp:text(500) }).strict().refine(data => new Set(data.plans.map(plan => `${plan.eye}:${plan.anatomySite}`)).size === data.plans.length);
+export const rxItemSchema = z.object({ id:z.uuid(), drugId:z.uuid().nullable(), quantity:z.number().int().min(1).max(10000).nullable().optional(), name:text(150).min(1), strength:text(80).min(1), eye:laterality, dose:text(100).min(1), route:text(80).min(1), frequency:text(100).min(1), duration:text(100).min(1), instructions:text(500), instructionsUr:text(500) }).strict();
+export const rxInputSchema = z.object({ encounterId:z.uuid(), version:z.number().int().nonnegative(), items:z.array(rxItemSchema).max(12) }).strict();
+export const reviewSchema = z.object({ kind:z.enum(['event','prescription']), id:z.uuid(), version:z.number().int().positive() }).strict();
+export const signSchema = reviewSchema.extend({ reviewHash:z.string().regex(/^[a-f0-9]{64}$/), password:z.string().min(1).max(256), warningReason:text(500).default('') }).strict();
+export const addendumSchema = z.object({ kind:z.enum(['event','prescription']), id:z.uuid(), text:text(3000).min(8), password:z.string().min(1).max(256) }).strict();
+export type EventInput = z.infer<typeof eventInputSchema>;
+export type RxItem = z.infer<typeof rxItemSchema>;
+export type RxInput = z.infer<typeof rxInputSchema>;
+export type Drug = {id:string;name:string;strength:string;therapyGroup:string};
+export type SignedFields = {id:string;version:number;status:'draft'|'signed';authorId:string;author:string;signedAt:string|null;contentHash:string|null;snapshot:Record<string,unknown>|null;synthetic:boolean};
+export type DoctorEvent = EventInput & SignedFields;
+export type Prescription = RxInput & SignedFields;
+export type Addendum = {id:string;kind:'event'|'prescription';text:string;author:string;at:string;contentHash:string};
+export type ClinicalDetail = {encounter:Encounter & {closedAt:string|null};patient:{id:string;name:string;mrn:string;dob:string;gender:string;flags:{type:string;value:string}[]};workup:Workup|null;event:DoctorEvent|null;prescription:Prescription|null;addenda:Addendum[]};
+export type ClinicalList = { encounters:(Encounter & {eventStatus:'draft'|'signed'|null;closedAt:string|null})[] };
+export type Timeline = {entries:{id:string;date:string;clinic:string;author:string;eventId:string|null;status:string|null;synthetic:boolean;workupVersion:number;addendumCount:number}[]};
+export type Review = {snapshot:Record<string,unknown>;hash:string;warnings:string[]};
+export function prescriptionWarnings(items:(RxItem & {therapyGroup?:string})[], flags:{type:string;value:string}[]) {
+ const warnings:string[]=[];
+ if(flags.some(flag=>flag.type==='allergy')) warnings.push('allergyReview');
+ if(items.some(item=>!item.drugId)) warnings.push('nonFormularyReview');
+ if(items.some((item,index)=>items.slice(0,index).some(other=>(item.eye===other.eye||item.eye==='OU'||other.eye==='OU') && ((item.therapyGroup && item.therapyGroup===other.therapyGroup)||item.name.toLowerCase()===other.name.toLowerCase())))) warnings.push('duplicateTherapyReview');
+ return warnings;
+}

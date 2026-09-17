@@ -1,0 +1,8 @@
+'use client';
+import { Printer } from 'lucide-react';
+import type { SampleInvoice } from '@/lib/operations';
+import { invoiceTotal } from '@/lib/operations';
+import { useLocale } from '../locale-provider';
+import { InvoiceLines } from './billing';
+import { money } from './shared';
+export function SampleReceipt({ invoice, hospital, asOf }: { invoice: SampleInvoice; hospital: string; asOf: string }) { const { t } = useLocale(); const payment = invoice.payment!; return <main className="ops-receipt"><div className="ops-print-toolbar"><button type="button" className="primary-button" onClick={() => window.print()}><Printer size={17}/>{t('opsPrint')}</button><p>{t('opsPrintNote')}</p></div><article className="panel ops-receipt-paper"><header><div><p className="eyebrow">{hospital}</p><h1>{t('opsReceiptTitle')}</h1><p>{payment.id}</p></div><strong>{t('opsReceiptBoundary')}</strong></header><div className="ops-record-summary"><strong>{invoice.patient}</strong><p>{invoice.mrn} · {invoice.clinic}</p><p>{t('opsInvoice')}: {invoice.id} · {invoice.date}</p></div><InvoiceLines invoice={invoice}/><section className="ops-receipt-payment"><h2>{t('opsPayment')}</h2><p>{t('opsReceiptApplied')}</p><dl><div><dt>{t('opsDate')}</dt><dd>{payment.date}</dd></div><div><dt>{t('opsPayment')}</dt><dd>{t(payment.method === 'cash' ? 'opsCash' : 'opsCard')}</dd></div><div><dt>{t('opsCollected')}</dt><dd>{money(payment.amount)}</dd></div><div><dt>{t('opsOutstanding')}</dt><dd>{money(invoiceTotal(invoice) - payment.amount)}</dd></div></dl></section><footer><strong>{t('opsReceiptBoundary')}</strong><p>{t('opsBoundary')}</p><small>{t('opsSnapshot')}: {asOf}</small></footer></article></main>; }
