@@ -10,10 +10,19 @@ export function useLiveData<T>(path: string) {
  const [data, setData] = useState<T | null>(null), [error, setError] = useState<MessageKey | null>(null), [updated, setUpdated] = useState<Date | null>(null), [generation, setGeneration] = useState(0);
  const refresh = useCallback(() => setGeneration(value => value + 1), []);
  useEffect(() => {
-  const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
-  setData(null); setError(null);
-  const run = async () => { try { const value = await api<T>(path, undefined, { signal: controller.signal }); if (!controller.signal.aborted) { setData(value); setUpdated(new Date()); setError(null); } } catch (error) { if (!controller.signal.aborted) setError(intakeError(error)); } finally { if (!controller.signal.aborted) timer = setTimeout(run, 5000); } };
-  void run(); return () => { controller.abort(); clearTimeout(timer); };
+  const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>, running = false;
+  setError(null);
+  const run = async () => {
+   if (controller.signal.aborted || running) return;
+   if (document.visibilityState !== "visible") { timer = setTimeout(run, 5000); return; }
+   running = true;
+   try { const value = await api<T>(path, undefined, { signal: controller.signal }); if (!controller.signal.aborted) { setData(value); setUpdated(new Date()); setError(null); } }
+   catch (error) { if (!controller.signal.aborted) setError(intakeError(error)); }
+   finally { running = false; if (!controller.signal.aborted) timer = setTimeout(run, 5000); }
+  };
+  const visible = () => { if (document.visibilityState === "visible" && !running) { clearTimeout(timer); void run(); } };
+  document.addEventListener("visibilitychange", visible);
+  void run(); return () => { controller.abort(); clearTimeout(timer); document.removeEventListener("visibilitychange", visible); };
  }, [path, generation]);
  return { data, error, updated, refresh };
 }

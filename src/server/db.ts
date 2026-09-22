@@ -24,14 +24,32 @@ export async function transaction<T>(work: (db: PoolClient) => Promise<T>): Prom
   await verifyAppRole();
   const db = await pool().connect();
   try {
-    await db.query("BEGIN");
-    await db.query("SET LOCAL statement_timeout = '8s'");
+    // Both statements use the simple protocol, saving one network round trip
+    // for every transaction without changing its timeout or isolation.
+    await db.query("BEGIN; SET LOCAL statement_timeout = '8s'");
     const result = await work(db);
     await db.query("COMMIT");
     return result;
   } catch (error) { await db.query("ROLLBACK"); throw error; }
   finally { db.release(); }
 }
+
+
+export type ReadQuery = { text: string; values?: readonly unknown[] };
+export async function readBatch(db: PoolClient, queries: readonly ReadQuery[]): Promise<Record<string, unknown>[][]> {
+  if (!queries.length) return [];
+  const values: unknown[] = [];
+  const columns = queries.map((query, index) => {
+    if (!/^\s*(SELECT|WITH)\b/i.test(query.text) || query.text.includes(";")) throw new Error("readBatch only accepts one read query");
+    const offset = values.length;
+    const sql = query.text.replace(/\$(\d+)\b/g, (_match, number: string) => `$${Number(number) + offset}`);
+    values.push(...(query.values ?? []));
+    return `(SELECT coalesce(jsonb_agg(to_jsonb(batch_row)), '[]'::jsonb) FROM (${sql}) AS batch_row) AS "q${index}"`;
+  });
+  const row = (await db.query(`SELECT ${columns.join(",")}`, values)).rows[0] as Record<string, Record<string, unknown>[]>;
+  return queries.map((_query, index) => row[`q${index}`] ?? []);
+}
+
 export async function setTenant(db: PoolClient, tenantId: string, actorId?: string) {
   await db.query("SELECT set_config('app.tenant_id',$1,true), set_config('app.actor_id',$2,true)", [tenantId, actorId ?? ""]);
 }

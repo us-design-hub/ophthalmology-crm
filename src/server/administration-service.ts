@@ -4,7 +4,7 @@ import { z } from 'zod';
 import type { PoolClient } from 'pg';
 import type { AuthUser, Permission, Session } from '@/lib/access';
 import { accessSchema, facilitySchema, passwordSchema, settingsSchema, staffSchema, type AdministrationData } from '@/lib/administration';
-import { withTenant } from './db';
+import { readBatch, withTenant } from './db';
 import { audit, type AuditContext } from './audit';
 import { ApiError } from './http';
 import { consumeLimit } from './auth';
@@ -21,9 +21,13 @@ async function lockAdministration(db:PoolClient,user:AuthUser){await db.query('S
 async function log(db:PoolClient,user:AuthUser,context:AuditContext,action:string,id?:string,metadata?:Record<string,unknown>){await audit(db,{tenantId:user.tenantId,actorId:user.id,action,entityType:'administration',entityId:id,metadata,context});}
 async function validateFacilities(db:PoolClient,ids:string[]){if((await db.query('SELECT id FROM app.facility WHERE active AND id=ANY($1::uuid[])',[ids])).rowCount!==ids.length)throw new ApiError(400,'facilityRequired');}
 export async function administrationData(user:AuthUser,context:AuditContext):Promise<AdministrationData>{requireAction(user,'admin:read');return withTenant(user.tenantId,user.id,async db=>{
- const staff=(await db.query(`SELECT u.id,u.version,u.full_name AS name,u.email,u.designation,u.licence_number AS licence,u.licence_expiry AS "licenceExpiry",u.status,u.must_change_password AS "mustChangePassword",ARRAY(SELECT role_code FROM app.user_role r WHERE r.user_id=u.id ORDER BY role_code) AS roles,ARRAY(SELECT facility_id FROM app.user_facility f WHERE f.user_id=u.id ORDER BY facility_id) AS "facilityIds" FROM app.user_account u ORDER BY u.full_name`)).rows;
- const facilities=(await db.query(`SELECT f.id,f.version,f.name,f.type,f.active,coalesce(s.start_minute,540) AS "startMinute",coalesce(s.end_minute,1020) AS "endMinute",coalesce(s.slot_minutes,15) AS "slotMinutes",coalesce(s.weekdays,ARRAY[0,1,2,3,4,5,6]) AS weekdays,coalesce(s.closed_dates,'{}'::date[])::text[] AS "closedDates",ARRAY(SELECT doctor_id FROM app.clinic_doctor cd WHERE cd.facility_id=f.id AND cd.active ORDER BY doctor_id) AS "doctorIds" FROM app.facility f LEFT JOIN app.clinic_schedule s ON s.facility_id=f.id AND s.tenant_id=f.tenant_id ORDER BY f.name`)).rows;
- const tenant=(await db.query('SELECT name,mrn_prefix,settings,version FROM app.tenant WHERE id=$1',[user.tenantId])).rows[0];
+ const [staffRows,facilityRows,tenantRows]=await readBatch(db,[
+  {text:`SELECT u.id,u.version,u.full_name AS name,u.email,u.designation,u.licence_number AS licence,u.licence_expiry AS "licenceExpiry",u.status,u.must_change_password AS "mustChangePassword",ARRAY(SELECT role_code FROM app.user_role r WHERE r.user_id=u.id ORDER BY role_code) AS roles,ARRAY(SELECT facility_id FROM app.user_facility f WHERE f.user_id=u.id ORDER BY facility_id) AS "facilityIds" FROM app.user_account u ORDER BY u.full_name`},
+  {text:`SELECT f.id,f.version,f.name,f.type,f.active,coalesce(s.start_minute,540) AS "startMinute",coalesce(s.end_minute,1020) AS "endMinute",coalesce(s.slot_minutes,15) AS "slotMinutes",coalesce(s.weekdays,ARRAY[0,1,2,3,4,5,6]) AS weekdays,coalesce(s.closed_dates,'{}'::date[])::text[] AS "closedDates",ARRAY(SELECT doctor_id FROM app.clinic_doctor cd WHERE cd.facility_id=f.id AND cd.active ORDER BY doctor_id) AS "doctorIds" FROM app.facility f LEFT JOIN app.clinic_schedule s ON s.facility_id=f.id AND s.tenant_id=f.tenant_id ORDER BY f.name`},
+  {text:'SELECT name,mrn_prefix,settings,version FROM app.tenant WHERE id=$1',values:[user.tenantId]},
+ ]);
+ const staff=staffRows as AdministrationData['staff'],facilities=facilityRows as AdministrationData['facilities'];
+ const tenant=tenantRows[0] as {name:string;mrn_prefix:string;settings:Partial<AdministrationData['hospital']>;version:number};
  await log(db,user,context,'administration.read');return {staff,facilities,hospital:{name:tenant.name,mrnPrefix:tenant.mrn_prefix,version:tenant.version,address:'',phone:'',email:'',clinicalIdleMinutes:15,adminIdleMinutes:30,dilationMinutes:20,...tenant.settings}};
  });}
 export async function saveStaff(user:AuthUser,input:unknown,context:AuditContext){const data=parseInput(staffSchema,input);requireAction(user,data.id?'staff:write':'account:create');const proof=await verifyAccountPassword(user,data.currentPassword,context);
