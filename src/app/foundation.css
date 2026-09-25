@@ -7,12 +7,11 @@
    Semantic tokens only.
    ========================================================================== */
 .login-page {
-  min-height: 100vh; display: flex; flex-direction: column;
-  padding: var(--space-6) var(--space-8) var(--space-5);
+  min-height: 100vh; display: flex; flex-direction: column; justify-content: center;
+  padding: var(--card-gap) var(--space-6);
   color: var(--text-primary);
   background:
-    radial-gradient(90% 70% at 12% -10%, color-mix(in srgb, var(--sage-300) 55%, transparent) 0%, transparent 60%),
-    radial-gradient(70% 60% at 100% 100%, color-mix(in srgb, var(--amber-100) 45%, transparent) 0%, transparent 55%),
+    radial-gradient(75% 60% at 12% -10%, color-mix(in srgb, var(--brand-400) 10%, transparent) 0%, transparent 62%),
     var(--surface-page);
 }
 .login-topline { width: 100%; max-width: 1140px; margin: 0 auto var(--space-6); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
@@ -23,47 +22,36 @@
   width: 100%; max-width: 680px; margin: auto; flex-shrink: 0;
   display: grid; grid-template-columns: 1fr;
   background: var(--surface-panel);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg); overflow: hidden;
+  border: var(--card-border); border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow-raised); overflow: hidden;
 }
 .login-card-with-demo { max-width: 1140px; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); }
 .login-card > .login-story { grid-column: 1 / -1; }
-.login-card > .demo-accounts { align-self: start; margin: var(--space-8); margin-inline-start: 0; min-width: 0; }
+.login-card > .demo-accounts { align-self: start; margin: var(--card-padding); margin-inline-start: 0; min-width: 0; }
 
 /* --- identity panel ------------------------------------------------------ */
 .login-story {
   position: relative; overflow: hidden;
-  display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-6);
-  padding: var(--space-5) var(--space-8);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4) var(--space-6); flex-wrap: wrap;
+  padding: var(--space-4) var(--card-padding);
   background:
     radial-gradient(115% 95% at 100% 0%, color-mix(in srgb, var(--brand-600) 58%, transparent) 0%, transparent 58%),
     var(--surface-inverse);
   color: var(--text-on-inverse);
 }
-.login-story::after {
-  content: ""; position: absolute; inset-block-end: -220px; inset-inline-start: -150px;
-  width: 460px; height: 460px; border-radius: var(--radius-full);
-  border: 1px solid color-mix(in srgb, var(--amber-300) 16%, transparent); pointer-events: none;
-}
-.login-hospital { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--space-3); padding-bottom: var(--space-5); border-bottom: 1px solid color-mix(in srgb, var(--white) 12%, transparent); }
+.login-hospital { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .login-hospital-mark { display: grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; border-radius: var(--radius-md); border: 1px solid color-mix(in srgb, var(--amber-300) 38%, transparent); color: var(--amber-300); background: color-mix(in srgb, var(--white) 6%, transparent); }
 .login-hospital strong { display: block; font-size: var(--text-xl); font-weight: var(--weight-semi); color: var(--white); }
 .login-hospital small { display: block; margin-top: 5px; font-size: var(--text-xs); letter-spacing: var(--tracking-label); color: var(--text-on-inverse-muted); }
 
-.login-story-copy { position: relative; z-index: 1; }
-.login-story-eyebrow { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--amber-300); margin-bottom: var(--space-4); }
-.login-story h1 { font-family: var(--font-serif); font-size: clamp(30px, 3.1vw, 42px); font-weight: var(--weight-normal); line-height: 1.14; letter-spacing: var(--tracking-display); color: var(--white); max-width: 15ch; text-wrap: balance; }
-.login-story-detail { margin-top: var(--space-4); max-width: 40ch; font-size: var(--text-md); line-height: var(--leading-relaxed); color: var(--text-on-inverse-muted); }
 
-.login-assurances { position: relative; z-index: 1; list-style: none; margin: 0; padding: 0; display: grid; }
-.login-assurances > li { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid color-mix(in srgb, var(--white) 9%, transparent); font-size: var(--text-md); line-height: var(--leading-snug); color: var(--text-on-inverse); }
-.login-assurances > li > svg { flex-shrink: 0; margin-top: 2px; color: var(--amber-300); }
 
-.login-demo-note { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--space-2); padding-top: var(--space-4); border-top: 1px solid color-mix(in srgb, var(--white) 12%, transparent); font-size: var(--text-xs); letter-spacing: .5px; color: var(--text-on-inverse-muted); }
-.login-demo-note small { font-size: var(--text-xs); color: var(--text-on-inverse-muted); margin-inline-start: auto; }
+.login-demo-note { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-xs); letter-spacing: .5px; color: var(--text-on-inverse-muted); }
+.login-demo-note small { font-size: var(--text-xs); color: var(--text-on-inverse-muted); }
 
 /* --- credential panel ---------------------------------------------------- */
-.login-form-panel { padding: var(--space-8); }
+.login-form-panel { padding: var(--card-padding); align-self: center; }
 .login-form-heading > .eyebrow { font-size: var(--text-xs); letter-spacing: var(--tracking-label); color: var(--text-subtle); }
 .login-form-heading h1 { font-family: var(--font-serif); font-size: var(--display-md); font-weight: var(--weight-normal); letter-spacing: var(--tracking-display); margin-top: var(--space-3); }
 .login-form-heading p { margin-top: var(--space-2); font-size: var(--text-md); line-height: var(--leading-normal); color: var(--text-muted); }
@@ -72,43 +60,43 @@
 .login-form > label { display: block; margin-bottom: var(--space-4); }
 .login-form > label > span { display: block; margin-bottom: var(--space-2); font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text-primary); }
 .login-form input {
-  width: 100%; height: 46px; padding: 0 var(--space-3);
+  width: 100%; height: var(--control-height); padding: 0 var(--space-5);
   font-size: var(--text-md); color: var(--text-primary);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
-  transition: border-color var(--duration-fast) var(--ease), background var(--duration-fast) var(--ease);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-subtle); border-radius: var(--control-radius);
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 .login-form input:hover { border-color: var(--border-strong); }
-.login-form input:focus { background: var(--surface-panel); }
+.login-form input:focus { border-color: var(--border-accent); }
 .login-form input::placeholder { color: var(--text-subtle); }
 .password-input { position: relative; }
-.password-input input { padding-inline-end: 46px; }
+.password-input input { padding-inline-end: 52px; }
 .password-input > button { position: absolute; inset-inline-end: 6px; inset-block-start: 6px; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--text-subtle); }
 .password-input > button:hover { color: var(--text-secondary); background: var(--surface-subtle); }
-.sign-in-button { width: 100%; height: 48px; margin-top: var(--space-2); font-size: var(--text-md); font-weight: var(--weight-semi); }
+.sign-in-button { width: 100%; height: 50px; margin-top: var(--space-3); border-radius: var(--control-radius); font-size: var(--text-md); font-weight: var(--weight-semi); box-shadow: var(--card-shadow); }
 .sign-in-button > svg:last-child { margin-inline-start: auto; }
 .sign-in-button > svg:first-child { margin-inline-end: auto; }
 .login-form .form-error { margin-bottom: var(--space-3); }
 
 /* --- demo account picker -------------------------------------------------- */
-.demo-accounts { margin-top: var(--space-6); padding: var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-sunken); }
+.demo-accounts { margin-top: var(--space-6); padding: var(--space-5); border: var(--card-border); border-radius: var(--card-radius); background: var(--surface-sunken); }
 .demo-accounts-head { display: flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); }
 .demo-accounts-head strong { font-size: var(--text-md); font-weight: var(--weight-semi); }
 .demo-env { margin-inline-start: auto; font-size: var(--text-xs); letter-spacing: .4px; padding: 3px var(--space-2); border-radius: var(--radius-xs); background: var(--amber-100); color: var(--amber-800); white-space: nowrap; }
 .demo-accounts > p { margin-top: var(--space-2); font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--text-muted); }
 .demo-account-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-top: var(--space-3); }
 .demo-account-grid > button {
-  position: relative; text-align: start; padding: var(--space-2) var(--space-3);
-  background: var(--surface-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+  position: relative; text-align: start; padding: var(--space-3);
+  background: var(--surface-panel); border: var(--card-border); border-radius: var(--control-radius);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
 }
 .demo-account-grid > button > span { display: block; font-size: var(--text-xs); letter-spacing: .3px; color: var(--text-subtle); }
 .demo-account-grid > button > strong { display: block; margin-top: 2px; font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text-primary); }
 .demo-account-grid > button > svg { position: absolute; inset-inline-end: var(--space-2); inset-block-start: var(--space-2); color: var(--text-accent); }
-.demo-account-grid > button:hover { border-color: var(--border-strong); }
-.demo-account-grid > button.selected { border-color: var(--border-accent); background: var(--accent-soft-bg); }
+.demo-account-grid > button:hover { box-shadow: var(--card-shadow-raised); transform: translateY(-1px); }
+.demo-account-grid > button.selected { background: var(--accent-soft-bg); box-shadow: 0 0 0 1.5px var(--border-accent); }
 
-.login-security-note { margin-top: var(--space-5); display: flex; align-items: flex-start; gap: var(--space-2); font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--text-subtle); }
-.login-security-note > svg { flex-shrink: 0; margin-top: 1px; }
 .login-footer { text-align: center; margin-top: var(--space-5); font-size: var(--text-sm); color: var(--text-subtle); }
 .registry-heading { padding: 21px 22px 17px; display: flex; align-items: center; justify-content: space-between; gap: 15px; }
 .registry-heading>div { display: flex; gap: 9px; align-items: center; }
@@ -232,14 +220,13 @@
 }
 @media(max-width:760px) {
   .login-page { padding: 18px 15px; }
-  .login-card { grid-template-columns: 1fr; }
+  .login-card, .login-card-with-demo { grid-template-columns: minmax(0, 1fr); }
   .login-card > .demo-accounts { margin: 0 24px 24px; }
-  .login-story { padding: 24px; }
-  .login-story-copy { margin-top: 24px; }
-  .login-story h1 { font-size: var(--display-lg); max-width: 360px; }
-  .login-story-detail, .login-visual, .login-assurances, .login-demo-note, .login-story-copy>p:first-child { display: none; }
+  /* The identity band stacks rather than hiding the demonstration notice,
+     which is the one thing that must stay visible at every width. */
+  .login-story { padding: 20px 24px; align-items: flex-start; flex-direction: column; gap: var(--space-3); }
   .login-form-panel { padding: 27px 24px; }
-  .login-form-heading h2 { font-size: var(--display-md); }
+  .login-form-heading h1 { font-size: var(--display-sm); }
   .login-topline { margin-bottom: 18px; }
   .login-hospital small { font-size: var(--text-xs); }
   .registry-heading { flex-wrap: wrap; }

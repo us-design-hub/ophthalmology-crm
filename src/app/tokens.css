@@ -24,6 +24,7 @@
    * stylesheets used 167 colours in this family; the dark end is genuinely
    * olive (#4c6340, #657f4b), and stays distinct from the navy brand ramp.
    * Keeping the two apart is what stops panels and chrome muddying together. */
+  --slate-25: #f9fafc;   /* sunken surfaces, cool to match the page ground */
   --slate-50: #f3f5f8;   /* page ground; deliberately outside the sage ramp */
   --sage-25:  #fafbf7;
   --sage-50:  #f5f7f1;
@@ -124,7 +125,7 @@
   /* ---- Surfaces --------------------------------------------------------- */
   --surface-page:     var(--slate-50);
   --surface-panel:    var(--white);
-  --surface-sunken:   var(--sage-25);
+  --surface-sunken:   var(--slate-25);
   --surface-subtle:   var(--sage-100);
   --surface-raised:   var(--white);
   --surface-inverse:  var(--brand-800);
@@ -242,6 +243,23 @@
 
   /* Legacy alias: component CSS referenced --radius before tokens existed. */
   --radius: var(--radius-lg);
+
+  /* ======================================================================
+     SURFACE TREATMENT
+     The card language: borderless, soft tinted shadow, generous padding and
+     a calm vertical rhythm. Defined once here so every panel in the system
+     picks up the same treatment rather than each screen restating it.
+     ====================================================================== */
+  --card-radius:  10px;
+  --card-padding: 30px;
+  --card-gap:     30px;
+  --card-border:  transparent;
+  --card-shadow:  0 5px 5px color-mix(in srgb, var(--brand-900) 6%, transparent);
+  --card-shadow-raised: 0 8px 18px color-mix(in srgb, var(--brand-900) 9%, transparent);
+
+  /* Controls share the card radius so inputs and panels read as one system. */
+  --control-radius: 10px;
+  --control-height: 46px;
 
   /* ======================================================================
      ELEVATION
