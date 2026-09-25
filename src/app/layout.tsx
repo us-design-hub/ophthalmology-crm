@@ -8,6 +8,7 @@ import "./intake.css";
 import "./clinical.css";
 import "./operations.css";
 import "./overview.css";
+import "./contrast.css";
 
 // Self-hosted at build time by next/font: no runtime request to Google, no
 // layout shift, and the same rendering on every machine. The previous stack

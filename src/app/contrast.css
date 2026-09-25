@@ -1,0 +1,107 @@
+/* Readability layer
+   Loaded after the component styles so legacy pale sage text inherits the
+   stronger system palette without flattening status and clinical colours. */
+:root {
+  --text-primary: #111827;
+  --text-secondary: #29382f;
+  --text-muted: #435048;
+  --text-subtle: #536159;
+  --text-faint: #647168;
+  --text-link: #26376e;
+}
+
+/* The global text tokens are dark for light surfaces. Keep inverse chrome on
+   its dedicated high-contrast palette. */
+.sidebar .brand small,
+.sidebar .hospital-label small,
+.sidebar .nav-group > p,
+.sidebar .sidebar-bottom small,
+.sidebar .sidebar-bottom > svg {
+  color: var(--text-on-inverse-muted);
+}
+
+/* Patient and shared data tables previously used the decorative sage ramp for
+   copy. Data now uses the normal text hierarchy while flags retain meaning. */
+.patient-table th {
+  color: var(--text-secondary);
+  font-weight: var(--weight-semi);
+}
+
+.patient-table td {
+  color: var(--text-primary);
+}
+
+.patient-table td > small,
+.patient-name-button small {
+  color: var(--text-muted);
+}
+
+.patient-name-button strong {
+  color: var(--text-primary);
+  font-weight: var(--weight-semi);
+}
+
+.view-record-button {
+  color: var(--text-link);
+  font-weight: var(--weight-medium);
+}
+
+.registry-info,
+.read-only-label,
+.registration-summary .eyebrow,
+.record-clinical-note {
+  color: var(--text-muted);
+}
+
+.registration-summary dt,
+.record-section dt {
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+
+.registration-summary dd,
+.record-section dd {
+  color: var(--text-primary);
+}
+
+.flag-tag {
+  color: var(--amber-800);
+  font-weight: var(--weight-medium);
+}
+
+.flag-allergy {
+  color: var(--burgundy-700);
+}
+
+/* Remaining legacy copy that still points directly at the pale sage ramp. */
+.laterality-note p,
+.clinical-history small,
+.clinical-anatomy > p,
+.signature-hash,
+.clinical-complete p,
+.registry-pagination,
+.registry-loading,
+.registry-empty,
+.data-error,
+.dob-toggle > label,
+.identifier-help,
+.patient-record-header p:last-child,
+.ops-metrics small,
+.ops-case > small,
+.ops-chart-axis,
+.ops-roadmap-summary p,
+.ops-interoperability > p,
+.ops-print-toolbar p {
+  color: var(--text-muted);
+}
+
+.registry-empty h3,
+.form-field > span,
+.registration-success,
+.duplicate-clear,
+.registry-pagination button,
+.record-status,
+.audit-action,
+.app-error {
+  color: var(--text-secondary);
+}
