@@ -131,6 +131,8 @@ export const en = {
   authSession: "Session", permissionEntity: "Permission", seededData: "Synthetic seed", accessControlled: "Access controlled",
   registrationReady: "Registration is ready", registrationReadyDetail: "Search seeded patients, check for duplicates, and register a new patient with an assigned MRN.",
   openPatientRegistry: "Open patient registry", databaseConnected: "Persistent patient registry", registrationRequiredMessage: "Please fill out this field.",
+  navRestrictedLabel: "areas need other access", navRestrictedOne: "area needs other access",
+  navRestrictedNote: "Your role cannot open these. An administrator can change your access.",
   reasonLabel: "Reason", reasonHint: "At least 8 characters. This is recorded in the audit trail and cannot be edited later.",
   reasonTooShort: "Enter at least 8 characters.", reasonConfirm: "Save reason", reasonCancel: "Cancel",
   queueChangeReason: "Reason for this queue change", resolveFlagReason: "Reason for resolving this flag",

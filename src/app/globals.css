@@ -21,25 +21,24 @@ input[type=number], input[type=date], input[type=time] { font-variant-numeric: t
 .skip-link { position: fixed; inset-block-start: -60px; inset-inline-start: 16px; background: var(--surface-panel); padding: 12px 20px; z-index: 100; color: var(--text-link); }
 .skip-link:focus { inset-block-start: 12px; }
 .sidebar { width: var(--sidebar-width); position: fixed; inset-block: 0; inset-inline-start: 0; z-index: 30; background: var(--surface-inverse-deep); color: var(--sage-100); display: flex; flex-direction: column; border-inline-end: 1px solid var(--border-inverse); }
-.brand { display: flex; align-items: center; gap: 11px; background: transparent; border: 0; color: var(--text-on-accent); padding: 24px 21px 22px; text-align: start; }
+.brand { display: flex; align-items: center; gap: var(--space-3); background: transparent; border: 0; color: var(--text-on-accent); padding: var(--space-5) var(--space-5) var(--space-4); text-align: start; }
 .brand-mark { width: 40px; height: 40px; border: 1px solid var(--border-inverse); border-radius: var(--radius-lg); display: grid; place-items: center; color: var(--amber-200); position: relative; }
 .brand-mark>span { position: absolute; width: 6px; height: 6px; background: var(--gold); border-radius: 50%; }
-.brand strong { font-size: var(--display-sm); letter-spacing: -.8px; font-weight: 600; display: block; line-height: 1.1; }
+.brand strong { font-size: var(--text-4xl); letter-spacing: -.6px; font-weight: var(--weight-semi); display: block; line-height: 1.1; }
 .brand small { display: block; font-size: var(--text-xs); letter-spacing: var(--tracking-label); color: var(--text-subtle); margin-top: 7px; line-height: 1.35; text-wrap: balance; }
-.hospital-label { margin: 0 15px 16px; padding: 12px 10px; display: flex; align-items: center; gap: 9px; border-block: 1px solid var(--border-inverse); font-size: var(--text-md); }
+.hospital-label { margin: 0 var(--space-4) var(--space-3); padding: var(--space-3) var(--space-2); display: flex; align-items: center; gap: var(--space-2); border-block: 1px solid var(--border-inverse); font-size: var(--text-md); }
 .hospital-avatar { width: 28px; height: 28px; border-radius: var(--radius-md); background: var(--surface-inverse); color: var(--amber-200); display: grid; place-items: center; font-size: var(--text-base); letter-spacing: .5px; }
 .hospital-label small { font-size: var(--text-sm); color: var(--text-faint); display: block; margin-top: 3px; }
-.sidebar nav { overflow-y: auto; flex: 1; padding: 0 13px; scrollbar-width: thin; scrollbar-color: var(--stone-900) transparent; }
-.nav-group { margin-bottom: 19px; }
-.nav-group>p { font-size: var(--text-xs); letter-spacing: 1.5px; color: var(--text-faint); padding: 0 13px; margin-bottom: 9px; font-weight: 600; }
-.nav-item { width: 100%; display: flex; gap: 11px; align-items: center; border: 1px solid transparent; border-radius: var(--radius-md); min-height: 37px; background: transparent; color: var(--text-subtle); text-align: start; padding: 9px 12px; font-size: var(--text-md); margin-bottom: 2px; }
-.nav-item:not(:disabled):hover { background: var(--surface-inverse); color: var(--text-on-accent); }
+.sidebar nav { overflow-y: auto; overscroll-behavior: contain; flex: 1; min-height: 0; padding: 0 var(--space-3) var(--space-4); scrollbar-width: thin; scrollbar-color: var(--brand-600) transparent;
+  /* the mask makes a cut-off item read as "more below" rather than broken */
+  mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 20px), transparent 100%); }
+.nav-group { margin-bottom: var(--space-4); }
+.nav-group>p { font-size: var(--text-xs); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-faint); padding: 0 var(--space-3); margin-bottom: 6px; font-weight: var(--weight-semi); }
+.nav-item { position: relative; width: 100%; display: flex; gap: var(--space-3); align-items: center; border: 1px solid transparent; border-radius: var(--radius-md); min-height: 36px; background: transparent; color: var(--sage-300); text-align: start; padding: 8px var(--space-3); font-size: var(--text-md); margin-bottom: 1px; }
+.nav-item:hover { background: color-mix(in srgb, var(--white) 8%, transparent); color: var(--text-on-accent); }
 .nav-item.active { background: var(--amber-100); color: var(--brand-900); font-weight: 650; box-shadow: 0 3px 9px color-mix(in srgb, var(--black) 7%, transparent); }
-.nav-item.active:before { content: ""; width: 3px; height: 14px; background: var(--burgundy); border-radius: var(--radius-xs); position: absolute; inset-inline-start: 14px; }
-.nav-item:disabled { color: var(--text-faint); }
-.nav-lock { margin-inline-start: auto; opacity: .45; }
-.nav-tag { margin-inline-start: auto; }
-.sidebar-bottom { display: flex; align-items: center; gap: 9px; margin: 16px 21px 20px; border-top: 1px solid var(--border-inverse); padding-top: 17px; }
+.nav-item.active::before { content: ""; position: absolute; inset-inline-start: 0; inset-block: 7px; width: 3px; background: var(--burgundy); border-radius: var(--radius-xs); }
+.sidebar-bottom { flex-shrink: 0; display: flex; align-items: center; gap: var(--space-2); margin: 0 var(--space-5) var(--space-5); border-top: 1px solid var(--border-inverse); padding-top: var(--space-4); }
 .sidebar-bottom strong { display: block; font-size: var(--text-xs); letter-spacing: 1px; color: var(--amber-200); font-weight: 600; }
 .sidebar-bottom small { font-size: var(--text-sm); color: var(--text-faint); display: block; margin-top: 4px; }
 .sidebar-bottom>svg { margin-inline-start: auto; color: var(--text-faint); }
@@ -313,3 +312,14 @@ html[dir=rtl] .eye-selection>svg { margin-left: 0; margin-right: auto; }
 /* Keeps an element available to assistive tech and to focus management while
    removing it visually — used where a page supplies its own visible heading. */
 .is-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* --- sidebar: areas this role cannot open --------------------------------- */
+.nav-restricted { margin: var(--space-2) var(--space-1) 0; border-top: 1px solid var(--border-inverse); padding-top: var(--space-3); }
+.nav-restricted > summary { display: flex; align-items: center; gap: var(--space-2); cursor: pointer; list-style: none; padding: 7px var(--space-3); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--text-faint); }
+.nav-restricted > summary::-webkit-details-marker { display: none; }
+.nav-restricted > summary:hover { color: var(--sage-300); background: color-mix(in srgb, var(--white) 6%, transparent); }
+.nav-restricted > summary > svg { flex-shrink: 0; opacity: .8; }
+.nav-restricted > p { margin: var(--space-2) var(--space-3) var(--space-2); font-size: var(--text-xs); line-height: var(--leading-normal); color: var(--text-faint); }
+.nav-restricted ul { list-style: none; margin: 0; padding: 0 var(--space-3) var(--space-2); display: grid; gap: 5px; }
+.nav-restricted li { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--stone-600); }
+.nav-restricted li > svg { flex-shrink: 0; opacity: .55; }

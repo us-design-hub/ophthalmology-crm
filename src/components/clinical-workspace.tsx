@@ -84,9 +84,33 @@ export function ClinicalWorkspace() {
     try { await api("/api/auth/logout", {}); router.replace("/login"); router.refresh(); }
     catch { setSignOutError(true); setSigningOut(false); }
   }
-  const navItem = (label: MessageKey, Icon: typeof EyeIcon, destination?: Page, extra?: string) => <button key={label} type="button" className={`nav-item ${destination === page ? "active" : ""}`} onClick={destination ? () => navigate(destination) : undefined} disabled={!destination} title={!destination ? t("upcoming") : undefined} aria-current={destination === page ? "page" : undefined}>
-    <Icon size={18} strokeWidth={1.65}/><span>{t(label)}</span>{extra && <span className="nav-tag">{extra}</span>}{!destination && <LockKeyhole className="nav-lock" size={11}/>}
-  </button>;
+  // Declarative nav model: each entry carries the permission that unlocks it,
+  // so a role's sidebar is derived rather than maintained per role. Items the
+  // role cannot open are collected into a disclosure instead of sitting in the
+  // list as padlocks — for most roles that was the majority of the sidebar.
+  const navGroups: { label: MessageKey; items: { key: MessageKey; icon: typeof EyeIcon; page: Page; allowed: boolean }[] }[] = [
+    { label: "care", items: [
+      { key: "overview", icon: LayoutDashboard, page: "overview", allowed: true },
+      { key: "patients", icon: Users, page: "patients", allowed: canReadPatients },
+      { key: "appointments", icon: CalendarDays, page: "appointments", allowed: canReadIntake },
+      { key: "queue", icon: ListOrdered, page: "queue", allowed: canReadIntake },
+      { key: "workup", icon: Activity, page: "workup", allowed: user.permissions.includes("workup:read") },
+      { key: "doctorEvent", icon: Stethoscope, page: "clinical", allowed: canReadClinical },
+      { key: "anatomyPractice", icon: Box, page: "workspace", allowed: canUseAnatomy },
+      { key: "prescriptions", icon: FileText, page: "prescriptions", allowed: canReadRx },
+    ] },
+    { label: "operations", items: [
+      { key: "pharmacy", icon: Pill, page: "pharmacy", allowed: canPreview("inventory") },
+      { key: "billing", icon: Wallet, page: "billing", allowed: canPreview("billing") },
+      { key: "surgery", icon: ScanEye, page: "surgery", allowed: canPreview("surgery") },
+    ] },
+    { label: "platform", items: [
+      { key: "management", icon: LayoutDashboard, page: "management", allowed: canPreview("management") },
+      { key: "auditLog", icon: ShieldCheck, page: "audit", allowed: canReadAudit },
+      { key: "administration", icon: ShieldCheck, page: "administration", allowed: canPreview("admin") },
+    ] },
+  ];
+  const restricted = navGroups.flatMap(group => group.items.filter(item => !item.allowed));
 
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">{t("skipContent")}</a>
@@ -98,11 +122,25 @@ export function ClinicalWorkspace() {
       <button type="button" className="close-mobile" aria-label={t("closeMenu")} onClick={() => setMenuOpen(false)}><PanelLeftClose size={19}/></button>
       <div className="hospital-label"><span className="hospital-avatar">DE</span><span>{user.tenantName}<small>{t("prototype")}</small></span></div>
       <nav aria-label={t("workspace")}>
-        <div className="nav-group"><p>{t("care")}</p>
-          {navItem("overview", LayoutDashboard, "overview")}{navItem("patients", Users, canReadPatients ? "patients" : undefined)}{navItem("appointments", CalendarDays, canReadIntake ? "appointments" : undefined)}{navItem("queue", ListOrdered, canReadIntake ? "queue" : undefined)}{navItem("workup", Activity, user.permissions.includes("workup:read") ? "workup" : undefined)}{navItem("doctorEvent", Stethoscope, canReadClinical ? "clinical" : undefined)}{navItem("anatomyPractice", Box, canUseAnatomy ? "workspace" : undefined)}{navItem("prescriptions", FileText, canReadRx ? "prescriptions" : undefined)}
-        </div>
-        <div className="nav-group"><p>{t("operations")}</p>{navItem("pharmacy", Pill, canPreview("inventory") ? "pharmacy" : undefined)}{navItem("billing", Wallet, canPreview("billing") ? "billing" : undefined)}{navItem("surgery", ScanEye, canPreview("surgery") ? "surgery" : undefined)}</div>
-        <div className="nav-group"><p>{t("platform")}</p>{navItem("management", LayoutDashboard, canPreview("management") ? "management" : undefined)}{navItem("auditLog", ShieldCheck, canReadAudit ? "audit" : undefined)}{navItem("administration", ShieldCheck, canPreview("admin") ? "administration" : undefined)}</div>
+        {navGroups.map(group => {
+          const items = group.items.filter(item => item.allowed);
+          if (!items.length) return null;
+          return <div className="nav-group" key={group.label}>
+            <p>{t(group.label)}</p>
+            {items.map(item => <button
+              key={item.key} type="button"
+              className={`nav-item ${item.page === page ? "active" : ""}`}
+              onClick={() => navigate(item.page)}
+              aria-current={item.page === page ? "page" : undefined}>
+              <item.icon size={18} strokeWidth={1.65}/><span>{t(item.key)}</span>
+            </button>)}
+          </div>;
+        })}
+        {restricted.length > 0 && <details className="nav-restricted">
+          <summary><LockKeyhole size={12}/><span dir="auto">{restricted.length} {t(restricted.length === 1 ? "navRestrictedOne" : "navRestrictedLabel")}</span></summary>
+          <p>{t("navRestrictedNote")}</p>
+          <ul>{restricted.map(item => <li key={item.key}><item.icon size={14} strokeWidth={1.6}/>{t(item.key)}</li>)}</ul>
+        </details>}
       </nav>
       <div className="sidebar-bottom"><span className="demo-dot"/><span><strong>{t("demoOnly")}</strong><small>{t("notClinical")}</small></span><CircleHelp size={16}/></div>
     </aside>
