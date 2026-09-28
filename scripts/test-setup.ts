@@ -29,7 +29,7 @@ async function main() {
       console.log('Cleared only the dedicated test schema for a fresh fixture run.');
     } catch (error) { await fixtures.query('ROLLBACK'); throw error; } finally { await fixtures.end(); }
   }
-  for (const script of ["scripts/migrate.ts", "scripts/seed.ts", "scripts/seed-intake.ts", "scripts/seed-clinical.ts", "scripts/seed-operations.ts", "scripts/seed-live-operations.ts"]) {
+  for (const script of ["scripts/migrate.ts", "scripts/seed.ts", "scripts/seed-intake.ts", "scripts/seed-clinical.ts"]) {
     const result = spawnSync(process.execPath, ["node_modules/tsx/dist/cli.mjs", script], { stdio: "inherit", env: process.env, windowsHide: true });
     if (result.status !== 0) throw new Error(`Test preparation failed: ${script}`);
   }

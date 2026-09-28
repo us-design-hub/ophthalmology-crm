@@ -3,7 +3,7 @@ import test from "node:test";
 import { randomBytes } from "node:crypto";
 import { ageFromDob, estimatedDob, normalizeIdentifier, normalizePhone, patientInputSchema } from "../src/lib/patients";
 import { encryptIdentifier, identifierIndex, matchesReview, signReview } from "../src/server/crypto";
-import { ROLE_PERMISSIONS } from "../src/lib/access";
+import { ASSIGNABLE_ROLES, ROLE_PERMISSIONS } from "../src/lib/access";
 
 process.env.IDENTIFIER_ENCRYPTION_KEY = randomBytes(32).toString("base64");
 process.env.IDENTIFIER_INDEX_KEY = randomBytes(32).toString("base64");
@@ -45,9 +45,13 @@ test("duplicate-review signatures bind the reviewed payload", () => {
   assert.equal(matchesReview(token, signReview({ patient: "synthetic", tenant: "b" })), false);
   assert.equal(matchesReview("short", token), false);
 });
-test("registration and audit roles are separated", () => {
-  assert.equal(ROLE_PERMISSIONS.receptionist.includes("patient:create"), true);
-  assert.equal(ROLE_PERMISSIONS.doctor.includes("patient:create"), false);
+test("Odoo owns demographics while active roles retain clinical and governance access", () => {
+  for (const role of ASSIGNABLE_ROLES) {
+    assert.equal(ROLE_PERMISSIONS[role].includes("patient:create"), false);
+    assert.equal(ROLE_PERMISSIONS[role].includes("patient:edit"), false);
+  }
+  assert.equal(ASSIGNABLE_ROLES.includes("doctor"), true);
+  assert.equal(ROLE_PERMISSIONS.doctor.includes("patient:read"), true);
   assert.equal(ROLE_PERMISSIONS.auditor.includes("patient:read"), false);
   assert.equal(ROLE_PERMISSIONS.auditor.includes("audit:read"), true);
 });

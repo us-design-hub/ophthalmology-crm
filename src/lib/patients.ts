@@ -57,7 +57,7 @@ export const patientInputSchema = z.object({
 export type PatientInput = z.infer<typeof patientInputSchema>;
 export type PatientSummary = {
   id: string; mrn: string; givenName: string; familyName: string; gender: string; dob: string; dobEstimated: boolean;
-  phone: string; identifierType: IdentifierType; identifierMasked: string; city: string; createdAt: string;
+  phone: string; identifierType: IdentifierType; identifierMasked: string; city: string; createdAt: string; source: "odoo" | "local";
   flags: { type: "allergy" | "risk"; value: string }[];
 };
 export type PatientDetail = PatientSummary & { version:number; address: string; preferredLanguage: string; nextOfKinName: string; nextOfKinPhone: string };

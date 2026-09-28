@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/anatomy.test.ts tests/patients.test.ts tests/intake.test.ts tests/clinical.test.ts tests/operations.test.ts",
+    "test": "tsx --test tests/anatomy.test.ts tests/patients.test.ts tests/odoo.test.ts tests/intake.test.ts tests/clinical.test.ts tests/operations.test.ts",
     "test:setup": "tsx scripts/test-setup.ts",
     "test:db": "tsx --test tests/database.test.ts",
     "test:e2e": "tsx scripts/run-e2e.ts",

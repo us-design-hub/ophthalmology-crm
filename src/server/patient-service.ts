@@ -10,6 +10,7 @@ import type { AuthUser } from "../lib/access";
 
 const summaryColumns = `p.id,p.version,p.mrn,p.given_name AS "givenName",p.family_name AS "familyName",p.gender,p.dob,
   p.dob_estimated AS "dobEstimated",p.phone_e164 AS phone,p.identifier_type AS "identifierType",
+  CASE WHEN EXISTS(SELECT 1 FROM app.patient_external_identity x WHERE x.patient_id=p.id AND x.tenant_id=p.tenant_id AND x.source='odoo') THEN 'odoo' ELSE 'local' END AS source,
   concat('•••• ',p.identifier_last4) AS "identifierMasked",p.city,p.created_at AS "createdAt",
   coalesce((SELECT json_agg(json_build_object('type',f.type,'value',f.value) ORDER BY f.created_at,f.id) FROM app.patient_flag f WHERE f.patient_id=p.id AND f.tenant_id=p.tenant_id AND f.resolved_at IS NULL),'[]'::json) AS flags`;
 

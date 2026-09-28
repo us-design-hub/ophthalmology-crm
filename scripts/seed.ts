@@ -13,9 +13,6 @@ const staff: { name: string; email: string; role: Role; designation: string }[] 
   { name: "Dr. Hamza Ali", email: "hamza.ali@demo.openeyes.local", role: "doctor", designation: "Retina specialist" },
   { name: "Nadia Raza", email: "nadia.raza@demo.openeyes.local", role: "nurse", designation: "Ophthalmic nurse" },
   { name: "Usman Farooq", email: "usman.farooq@demo.openeyes.local", role: "optometrist", designation: "Optometrist" },
-  { name: "Sana Iqbal", email: "sana.iqbal@demo.openeyes.local", role: "pharmacist", designation: "Pharmacist" },
-  { name: "Imran Shah", email: "imran.shah@demo.openeyes.local", role: "cashier", designation: "Cashier" },
-  { name: "Hina Aslam", email: "hina.aslam@demo.openeyes.local", role: "inventory_officer", designation: "Inventory officer" },
   { name: "Omar Siddiqui", email: "omar.siddiqui@demo.openeyes.local", role: "hospital_admin", designation: "Hospital administrator" },
   { name: "Faisal Noor", email: "faisal.noor@demo.openeyes.local", role: "security_admin", designation: "Security administrator" },
   { name: "Maryam Saeed", email: "maryam.saeed@demo.openeyes.local", role: "auditor", designation: "Clinical systems auditor" },
@@ -43,7 +40,7 @@ async function main() {
     const tenantId = randomUUID();
     await db.query("INSERT INTO app.tenant(id,code,name,mrn_prefix,is_demo) VALUES($1,'DEMO','Demo Eye Hospital','DEH',true)", [tenantId]);
     const facilityIds: string[] = [];
-    for (const [name, type] of [["General Ophthalmology", "clinic"], ["Retina", "clinic"], ["Glaucoma", "clinic"], ["Theatre", "theatre"], ["Pharmacy", "pharmacy"]]) {
+    for (const [name, type] of [["General Ophthalmology", "clinic"], ["Retina", "clinic"], ["Glaucoma", "clinic"], ["Theatre", "theatre"]]) {
       const facilityId = randomUUID(); facilityIds.push(facilityId);
       await db.query("INSERT INTO app.facility(id,tenant_id,name,type) VALUES($1,$2,$3,$4)", [facilityId, tenantId, name, type]);
     }
@@ -58,7 +55,7 @@ async function main() {
       const passwordHash = await hash(password, { algorithm: 2, memoryCost: 65536, timeCost: 3, parallelism: 1 }); // Argon2id
       await db.query("INSERT INTO app.user_account(id,tenant_id,email,full_name,designation,password_hash) VALUES($1,$2,$3,$4,$5,$6)", [id, tenantId, member.email, member.name, member.designation, passwordHash]);
       await db.query("INSERT INTO app.user_role(tenant_id,user_id,role_code) VALUES($1,$2,$3)", [tenantId, id, member.role]);
-      await db.query("INSERT INTO app.user_facility(tenant_id,user_id,facility_id) VALUES($1,$2,$3)", [tenantId, id, facilityIds[member.role === "pharmacist" ? 4 : 0]]);
+      await db.query("INSERT INTO app.user_facility(tenant_id,user_id,facility_id) VALUES($1,$2,$3)", [tenantId, id, facilityIds[0]]);
     }
     const year = Number(todayKarachi().slice(0, 4));
     for (let index = 0; index < 60; index++) {
@@ -79,7 +76,7 @@ async function main() {
     }
     await db.query("INSERT INTO app.mrn_counter(tenant_id,year,sequence) VALUES($1,$2,60)", [tenantId, year]);
     await db.query("COMMIT");
-    console.log(`Seeded 1 demo hospital, 5 facilities, 12 named accounts, and 60 synthetic patients in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
+    console.log(`Seeded 1 demo hospital, 4 facilities, 9 named accounts, and 60 synthetic patients in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
     console.log("Demo account choices are available on the login screen when explicitly enabled. Passwords were not printed.");
   } catch (error) { await db.query("ROLLBACK"); throw error; }
   finally { await db.end(); }

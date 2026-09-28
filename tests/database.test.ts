@@ -114,7 +114,7 @@ test("operations snapshots require tenant context and reject all runtime writes"
   await app.query('BEGIN');
   try {
     await app.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
-    assert.equal((await app.query('SELECT * FROM app.operations_preview')).rowCount,1);
+    assert.equal((await app.query('SELECT * FROM app.operations_preview')).rowCount,0);
     for(const sql of ["UPDATE app.operations_preview SET data='{}'::jsonb", 'DELETE FROM app.operations_preview', "INSERT INTO app.operations_preview(tenant_id,data) VALUES(gen_random_uuid(),'{\"version\":1}'::jsonb)"]){
       await app.query('SAVEPOINT denied'); await assert.rejects(app.query(sql),(error:{code?:string})=>error.code==='42501'); await app.query('ROLLBACK TO SAVEPOINT denied');
     }
@@ -122,3 +122,18 @@ test("operations snapshots require tenant context and reject all runtime writes"
 });
 
 test('new operational tables enforce RLS and financial and stock ledgers are append-only',async()=>{const names=['stock_batch','stock_movement','dispense','invoice','invoice_line','payment','refund','cashier_session','surgery_case','consent_document','patient_history'];for(const name of names){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}for(const statement of ['UPDATE app.stock_movement SET quantity=1 WHERE false','DELETE FROM app.payment WHERE false','UPDATE app.invoice SET total_paisa=0 WHERE false','UPDATE app.dispense SET actor_id=gen_random_uuid() WHERE false','DELETE FROM app.consent_document WHERE false',"UPDATE app.patient_history SET text='tampered' WHERE false"])await assert.rejects(app.query(statement),(e:{code?:string})=>e.code==='42501');});
+
+test('Odoo identity mappings enforce tenant isolation and retired access is absent', async () => {
+  const security = (await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='app.patient_external_identity'::regclass")).rows[0];
+  assert.equal(security.relrowsecurity, true);
+  assert.equal(security.relforcerowsecurity, true);
+  assert.equal((await app.query('SELECT 1 FROM app.patient_external_identity')).rowCount, 0);
+  assert.equal((await admin.query("SELECT has_column_privilege('openeyes_app','app.patient_external_identity','payload_hash','UPDATE') AS allowed")).rows[0].allowed, true);
+  assert.equal((await admin.query("SELECT has_column_privilege('openeyes_app','app.patient_external_identity','external_id','UPDATE') AS allowed")).rows[0].allowed, false);
+  await app.query('BEGIN');
+  try {
+    await app.query("SELECT set_config('app.tenant_id',$1,true)", [tenantId]);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('pharmacist','cashier','inventory_officer') OR permission_code IN ('patient:create','patient:edit','pharmacy:dispense','billing:write')")).rows[0].total, 0);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.user_role WHERE role_code IN ('pharmacist','cashier','inventory_officer')")).rows[0].total, 0);
+  } finally { await app.query('ROLLBACK'); }
+});

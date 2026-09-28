@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Activity, Box, CalendarDays, Check, ChevronRight, CircleHelp, ClipboardList, Eye as EyeIcon, FileText, Globe2, Layers3, LayoutDashboard, ListOrdered, LockKeyhole, Menu, PanelLeftClose, Pill, Plus, ScanEye, ShieldCheck, Stethoscope, Trash2, Users, Wallet, X } from "lucide-react";
+import { Activity, Box, CalendarDays, Check, ChevronRight, CircleHelp, ClipboardList, Eye as EyeIcon, FileText, Globe2, Layers3, LayoutDashboard, ListOrdered, LockKeyhole, Menu, PanelLeftClose, Plus, ScanEye, ShieldCheck, Stethoscope, Trash2, Users, X } from "lucide-react";
 import { EyeViewer } from "@/components/anatomy/eye-viewer";
 import { useLocale } from "@/components/locale-provider";
 import { appendSelection, EYES, selectSite, SITE_COLORS, type AnatomySite, type Intent, type PlanRow, type Selection, type ViewMode } from "@/lib/anatomy";
@@ -18,15 +18,13 @@ import { ClinicalWorkspace as DoctorWorkspace, PatientTimelineDialog } from "./c
 import { PrescriptionInbox } from "./clinical/prescription-inbox";
 import type { PatientSummary } from "@/lib/patients";
 
-import { PharmacyWorkspace } from "./operations/inventory";
-import { BillingWorkspace } from "./operations/billing";
 import { SurgeryWorkspace } from "./operations/surgery";
 import { ManagementWorkspace } from "./operations/management";
 import { PasswordForm } from "./account-password";
 import { ReportLinks } from "./operations/report-links";
 import { AdministrationWorkspace } from "./operations/administration";
 
-type Page = "workspace" | "overview" | "patients" | "audit" | "appointments" | "queue" | "workup" | "clinical" | "prescriptions" | "pharmacy" | "billing" | "surgery" | "management" | "administration";
+type Page = "workspace" | "overview" | "patients" | "audit" | "appointments" | "queue" | "workup" | "clinical" | "prescriptions" | "surgery" | "management" | "administration";
 
 export function ClinicalWorkspace() {
   const { locale, setLocale, t } = useLocale();
@@ -39,9 +37,9 @@ export function ClinicalWorkspace() {
   const [historyPatient, setHistoryPatient] = useState<string | null>(null);
   const canReadClinical = user.permissions.includes("clinical:read");
   const canReadRx = user.permissions.includes("prescription:read");
-  const canPreview = (section: "inventory" | "billing" | "surgery" | "management" | "admin") => user.permissions.includes(`preview:${section}`);
+  const canPreview = (section: "surgery" | "management" | "admin") => user.permissions.includes(`preview:${section}`);
   const [bookingPatient, setBookingPatient] = useState<PatientSummary | null>(null);
-  const [page, setPage] = useState<Page>(user.permissions.includes("clinical:write") ? "clinical" : canUseAnatomy ? "workspace" : canReadPatients ? "patients" : canReadAudit ? "audit" : canPreview("inventory") ? "pharmacy" : "overview");
+  const [page, setPage] = useState<Page>(user.permissions.includes("clinical:write") ? "clinical" : canUseAnatomy ? "workspace" : canReadPatients ? "patients" : canReadAudit ? "audit" : "overview");
   const [passwordOpen,setPasswordOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
@@ -76,7 +74,7 @@ export function ClinicalWorkspace() {
     setAnnouncement("rowAdded");
   };
   const updateRow = (id: string, patch: Partial<Pick<PlanRow, "intent" | "notes">>) => setRows(current => current.map(row => row.id === id ? { ...row, ...patch } : row));
-  const titleKeys: [MessageKey, MessageKey, MessageKey] = page === "pharmacy" ? ["opsEyebrow", "opsPharmacyTitle", "opsPharmacySubtitle"] : page === "billing" ? ["opsEyebrow", "opsBillingTitle", "opsBillingSubtitle"] : page === "surgery" ? ["opsEyebrow", "opsSurgeryTitle", "opsSurgerySubtitle"] : page === "management" ? ["opsEyebrow", "opsManagementTitle", "opsManagementSubtitle"] : page === "administration" ? ["opsEyebrow", "opsAdminTitle", "opsAdminSubtitle"] : page === "clinical" ? ["clinicalEyebrow", "clinicalTitle", "clinicalSubtitle"] : page === "prescriptions" ? ["clinicalEyebrow", "rxInboxTitle", "rxInboxSubtitle"] : page === "appointments" ? ["intakeEyebrow", "appointmentsTitle", "appointmentsSubtitle"] : page === "queue" ? ["intakeEyebrow", "queueTitle", "queueSubtitle"] : page === "workup" ? ["intakeEyebrow", "workupTitle", "workupSubtitle"] : page === "patients" ? ["patientsEyebrow", "patientsTitle", "patientsSubtitle"] : page === "audit" ? ["auditEyebrow", "auditTitle", "auditSubtitle"] : page === "workspace" ? ["eyebrow", "title", "subtitle"] : page === "overview" ? ["overviewEyebrow", "overviewTitle", "overviewSubtitle"] : ["overviewEyebrow", "overviewTitle", "overviewSubtitle"];
+  const titleKeys: [MessageKey, MessageKey, MessageKey] = page === "surgery" ? ["opsEyebrow", "opsSurgeryTitle", "opsSurgerySubtitle"] : page === "management" ? ["opsEyebrow", "opsManagementTitle", "opsManagementSubtitle"] : page === "administration" ? ["opsEyebrow", "opsAdminTitle", "opsAdminSubtitle"] : page === "clinical" ? ["clinicalEyebrow", "clinicalTitle", "clinicalSubtitle"] : page === "prescriptions" ? ["clinicalEyebrow", "rxInboxTitle", "rxInboxSubtitle"] : page === "appointments" ? ["intakeEyebrow", "appointmentsTitle", "appointmentsSubtitle"] : page === "queue" ? ["intakeEyebrow", "queueTitle", "queueSubtitle"] : page === "workup" ? ["intakeEyebrow", "workupTitle", "workupSubtitle"] : page === "patients" ? ["patientsEyebrow", "patientsTitle", "patientsSubtitle"] : page === "audit" ? ["auditEyebrow", "auditTitle", "auditSubtitle"] : page === "workspace" ? ["eyebrow", "title", "subtitle"] : page === "overview" ? ["overviewEyebrow", "overviewTitle", "overviewSubtitle"] : ["overviewEyebrow", "overviewTitle", "overviewSubtitle"];
   const pageLabel: MessageKey = page === "clinical" ? "doctorEvent" : page === "workspace" ? "anatomyPractice" : page === "audit" ? "auditLog" : page;
   async function signOut() {
     if (rows.length && !window.confirm(t("signOutPracticeWarning"))) return;
@@ -100,8 +98,6 @@ export function ClinicalWorkspace() {
       { key: "prescriptions", icon: FileText, page: "prescriptions", allowed: canReadRx },
     ] },
     { label: "operations", items: [
-      { key: "pharmacy", icon: Pill, page: "pharmacy", allowed: canPreview("inventory") },
-      { key: "billing", icon: Wallet, page: "billing", allowed: canPreview("billing") },
       { key: "surgery", icon: ScanEye, page: "surgery", allowed: canPreview("surgery") },
     ] },
     { label: "platform", items: [
@@ -157,7 +153,7 @@ export function ClinicalWorkspace() {
         {signOutError && <p className="form-error" role="alert">{t("serviceUnavailable")}</p>}
         <div className={`page-heading ${page === "overview" ? "is-visually-hidden" : ""}`}><div><p className="eyebrow">{t(titleKeys[0])}</p><h1 tabIndex={-1} ref={pageHeading}>{t(titleKeys[1])}</h1><p className="page-subtitle">{t(titleKeys[2])}</p></div></div>
 
-        {page === "pharmacy" ? <PharmacyWorkspace/> : page === "billing" ? <BillingWorkspace/> : page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "queue" || page === "workup" ? <QueueWorkspace workupOnly={page === "workup"}/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={patient => { setBookingPatient(patient); navigate("appointments"); }}/> : page === "audit" ? <AuditWorkspace /> : page === "overview" ? <OverviewWorkspace navigate={navigate}/> : page === "workspace" ? <>
+        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "queue" || page === "workup" ? <QueueWorkspace workupOnly={page === "workup"}/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={patient => { setBookingPatient(patient); navigate("appointments"); }}/> : page === "audit" ? <AuditWorkspace /> : page === "overview" ? <OverviewWorkspace navigate={navigate}/> : page === "workspace" ? <>
           <section className="encounter-context" aria-label={t("patientContext")}><span className="context-icon"><Users size={22}/></span><div><div className="context-title">{t("patientContext")}<span>{t("practiceBadge")}</span></div><p>{t("noPatient")}</p></div><span className="context-note">{t("sessionOnly")}</span></section>
           <div className="workflow-steps" aria-label={t("sequenceTitle")}>
             {(["patientStep", "findingsStep", "anatomyStep", "reviewStep"] as MessageKey[]).map((step, i) => <div key={step} className={i === 2 ? "workflow-step current" : "workflow-step"}><span>{String(i + 1).padStart(2, "0")}</span>{t(step)}{i !== 2 && <LockKeyhole size={11}/>}</div>)}

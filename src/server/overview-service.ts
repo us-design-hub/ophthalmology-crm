@@ -8,7 +8,7 @@ import { todayKarachi } from "@/lib/patients";
  *
  * Every slice is gated on the permission that already guards its workspace, so
  * a role only ever receives the sections it can act on. That is what lets one
- * component serve all ten roles without a ten-way switch in the UI, and it
+ * component serve every active role without a role-name switch in the UI, and it
  * means the client never fires requests it is going to get a 403 from.
  */
 export type OverviewData = {
@@ -16,16 +16,13 @@ export type OverviewData = {
   date: string;
   intake?: { appointments: number; checkedIn: number; waiting: number; workup: number; dilation: number; consultation: number };
   clinical?: { open: number; mine: number; drafts: number; signedToday: number };
-  prescriptions?: { signed: number; awaitingDispense: number | null };
-  inventory?: { stockValue: number; lowStock: number; expiringSoon: number; quarantined: number };
-  billing?: { outstanding: number; collectedToday: number; invoicesToday: number; sessionOpen: boolean };
+  prescriptions?: { signed: number };
   governance?: { activeStaff: number; facilities: number; auditToday: number | null };
 };
 
 export async function overviewData(user: AuthUser): Promise<OverviewData> {
   const can = (permission: string) => user.permissions.includes(permission as never);
   const today = todayKarachi();
-  const horizon = new Date(Date.parse(today) + 90 * 86400000).toISOString().slice(0, 10);
   const numeric = (value: unknown) => Number(value ?? 0);
 
   return withTenant(user.tenantId, user.id, async db => {
@@ -78,71 +75,14 @@ export async function overviewData(user: AuthUser): Promise<OverviewData> {
     }
 
     if (can("prescription:read")) {
-      result.prescriptions = { signed: 0, awaitingDispense: can("pharmacy:dispense") ? 0 : null };
+      result.prescriptions = { signed: 0 };
       add(
         "SELECT count(*)::int AS signed FROM app.prescription WHERE status='signed'",
         [],
         rows => { result.prescriptions!.signed = numeric(rows[0]?.signed); },
       );
-      if (can("pharmacy:dispense")) {
-        add(`SELECT count(*)::int AS pending FROM app.prescription r
-          WHERE r.status='signed'
-            AND NOT EXISTS (SELECT 1 FROM app.prescription_closure c WHERE c.prescription_id = r.id)
-            AND EXISTS (
-              SELECT 1 FROM app.prescription_item i WHERE i.prescription_id = r.id
-              AND i.quantity IS NOT NULL AND i.drug_id IS NOT NULL
-              AND coalesce((SELECT sum(-m.quantity) FROM app.dispense x JOIN app.stock_movement m ON m.id=x.movement_id WHERE x.prescription_item_id=i.id),0) < i.quantity
-            )`,
-          [],
-          rows => { result.prescriptions!.awaitingDispense = numeric(rows[0]?.pending); },
-        );
-      }
     }
 
-    if (can("preview:inventory")) {
-      add(`WITH b AS (
-          SELECT b.id,b.expiry,b.quarantined,b.unit_cost_paisa,
-                 coalesce((SELECT sum(m.quantity) FROM app.stock_movement m WHERE m.batch_id=b.id),0)::int AS quantity,
-                 b.facility_id,b.drug_id
-          FROM app.stock_batch b WHERE b.facility_id=ANY($1::uuid[]))
-        SELECT coalesce(sum(b.quantity*b.unit_cost_paisa),0)::float8 AS stock_value,
-          count(*) FILTER(WHERE b.quantity>0 AND NOT b.quarantined AND b.expiry >= $2::date AND b.expiry <= $3::date)::int AS expiring_soon,
-          count(*) FILTER(WHERE b.quarantined)::int AS quarantined,
-          (SELECT count(*)::int FROM app.stock_threshold t WHERE t.facility_id=ANY($1::uuid[])
-            AND coalesce((SELECT sum(x.quantity) FROM b x WHERE x.facility_id=t.facility_id AND x.drug_id=t.drug_id AND NOT x.quarantined AND x.expiry >= $2::date),0) < t.minimum) AS low_stock
-        FROM b`,
-        [user.facilityIds, today, horizon],
-        rows => {
-          const row = rows[0] ?? {};
-          result.inventory = { stockValue: numeric(row.stock_value), lowStock: numeric(row.low_stock), expiringSoon: numeric(row.expiring_soon), quarantined: numeric(row.quarantined) };
-        },
-      );
-    }
-
-    if (can("preview:billing")) {
-      result.billing = { outstanding: 0, collectedToday: 0, invoicesToday: 0, sessionOpen: false };
-      add(`SELECT
-          coalesce(sum(i.total_paisa - coalesce((SELECT sum(p.amount_paisa) FROM app.payment p WHERE p.invoice_id=i.id),0)
-            + coalesce((SELECT sum(r.amount_paisa) FROM app.refund r JOIN app.payment p ON p.id=r.payment_id WHERE p.invoice_id=i.id AND r.approved_at IS NOT NULL),0)),0)::float8 AS outstanding,
-          count(*) FILTER(WHERE i.created_at >= $2::date)::int AS invoices_today
-        FROM app.invoice i WHERE i.facility_id=ANY($1::uuid[])`,
-        [user.facilityIds, today],
-        rows => {
-          result.billing!.outstanding = numeric(rows[0]?.outstanding);
-          result.billing!.invoicesToday = numeric(rows[0]?.invoices_today);
-        },
-      );
-      add(
-        "SELECT coalesce(sum(p.amount_paisa),0)::float8 AS total FROM app.payment p JOIN app.invoice i ON i.id=p.invoice_id WHERE i.facility_id=ANY($1::uuid[]) AND p.at >= $2::date",
-        [user.facilityIds, today],
-        rows => { result.billing!.collectedToday = numeric(rows[0]?.total); },
-      );
-      add(
-        "SELECT 1 AS present FROM app.cashier_session WHERE cashier_id=$1 AND closed_at IS NULL LIMIT 1",
-        [user.id],
-        rows => { result.billing!.sessionOpen = rows.length > 0; },
-      );
-    }
 
     if (can("admin:read")) {
       result.governance = { activeStaff: 0, facilities: 0, auditToday: can("audit:read") ? 0 : null };

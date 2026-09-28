@@ -1,18 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Activity, AlertTriangle, ArrowRight, CalendarDays, ClipboardList, Clock3, FileCheck2, LayoutDashboard, Pill, RefreshCw, ShieldCheck, Stethoscope, Users, Wallet } from "lucide-react";
+import { Activity, ArrowRight, CalendarDays, ClipboardList, Clock3, FileCheck2, LayoutDashboard, RefreshCw, ShieldCheck, Stethoscope, Users } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { OverviewData } from "@/server/overview-service";
 import type { MessageKey } from "@/lib/messages";
 import { useLocale } from "../locale-provider";
 import { useSession } from "../session-provider";
 
-type Page = "appointments" | "queue" | "workup" | "clinical" | "prescriptions" | "pharmacy" | "billing" | "administration" | "audit" | "patients";
-
-const money = (paisa: number) => new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(paisa / 100);
+type Page = "appointments" | "queue" | "workup" | "clinical" | "prescriptions" | "administration" | "audit" | "patients";
 
 /**
- * One landing page for all ten roles.
+ * One landing page for every active role.
  *
  * The server sends only the slices a role may see, so the layout is composed
  * from whatever arrives rather than switched on role name. A role gains a
@@ -52,11 +50,6 @@ export function OverviewWorkspace({ navigate }: { navigate: (page: Page) => void
     data.intake && { key: "ovKpiWaiting", value: data.intake.waiting, page: "queue", icon: Clock3, urgent: false },
     data.intake && { key: "ovKpiConsultation", value: data.intake.consultation, page: "queue", icon: Activity, urgent: false },
     data.intake && { key: "ovKpiAppointments", value: data.intake.appointments, page: "appointments", icon: CalendarDays, urgent: false },
-    data.prescriptions?.awaitingDispense !== null && data.prescriptions && { key: "ovKpiAwaitingDispense", value: data.prescriptions.awaitingDispense, page: "pharmacy", icon: Pill, urgent: (data.prescriptions.awaitingDispense ?? 0) > 0 },
-    data.inventory && { key: "ovKpiLowStock", value: data.inventory.lowStock, page: "pharmacy", icon: AlertTriangle, urgent: data.inventory.lowStock > 0 },
-    data.inventory && { key: "ovKpiExpiring", value: data.inventory.expiringSoon, page: "pharmacy", icon: Clock3, urgent: false },
-    data.billing && { key: "ovKpiOutstanding", value: money(data.billing.outstanding), page: "billing", icon: Wallet, urgent: false },
-    data.billing && { key: "ovKpiCollected", value: money(data.billing.collectedToday), page: "billing", icon: Wallet, urgent: false },
     data.prescriptions && { key: "ovKpiSignedRx", value: data.prescriptions.signed, page: "prescriptions", icon: FileCheck2, urgent: false },
     data.governance && { key: "ovKpiStaff", value: data.governance.activeStaff, page: "administration", icon: Users, urgent: false },
     data.governance?.auditToday !== null && data.governance && { key: "ovKpiAuditToday", value: data.governance.auditToday, page: "audit", icon: ShieldCheck, urgent: false },
@@ -68,14 +61,12 @@ export function OverviewWorkspace({ navigate }: { navigate: (page: Page) => void
     : user.permissions.includes("workup:read") ? { label: "ovActionQueue", page: "queue" }
     : user.permissions.includes("settings:write") || user.permissions.includes("account:manage") ? { label: "ovActionAdministration", page: "administration" }
     : user.permissions.includes("appointment:create") ? { label: "ovActionAppointments", page: "appointments" }
-    : user.permissions.includes("pharmacy:dispense") || user.permissions.includes("inventory:write") ? { label: "ovActionPharmacy", page: "pharmacy" }
-    : user.permissions.includes("billing:write") ? { label: "ovActionBilling", page: "billing" }
     : user.permissions.includes("audit:read") ? { label: "ovActionAudit", page: "audit" }
     : user.permissions.includes("patient:read") ? { label: "ovActionPatients", page: "patients" }
     : null;
 
   // Put the KPIs that lead to this role's primary workspace first, so an
-  // auditor opens on governance figures and a cashier on money, without
+  // auditor opens on governance figures without
   // hard-coding either role. Stable sort keeps the curated order within a tier.
   const kpis = candidates
     .map((kpi, index) => ({ kpi, rank: (kpi.page === primary?.page ? 0 : 1) * 100 + index }))
@@ -95,18 +86,6 @@ export function OverviewWorkspace({ navigate }: { navigate: (page: Page) => void
       { label: "ovKpiMine" as MessageKey, value: data.clinical.mine },
       { label: "ovKpiDrafts" as MessageKey, value: data.clinical.drafts },
       { label: "ovKpiSignedToday" as MessageKey, value: data.clinical.signedToday },
-    ] },
-    data.inventory && { key: "pharmacy" as const, title: "ovSecPharmacy" as MessageKey, note: "ovSecPharmacyNote" as MessageKey, icon: Pill, page: "pharmacy" as Page, rows: [
-      { label: "ovKpiStockValue" as MessageKey, value: money(data.inventory.stockValue) },
-      { label: "ovKpiLowStock" as MessageKey, value: data.inventory.lowStock },
-      { label: "ovKpiExpiring" as MessageKey, value: data.inventory.expiringSoon },
-      { label: "ovRowQuarantined" as MessageKey, value: data.inventory.quarantined },
-    ] },
-    data.billing && { key: "billing" as const, title: "ovSecBilling" as MessageKey, note: "ovSecBillingNote" as MessageKey, icon: Wallet, page: "billing" as Page, rows: [
-      { label: "ovKpiOutstanding" as MessageKey, value: money(data.billing.outstanding) },
-      { label: "ovKpiCollected" as MessageKey, value: money(data.billing.collectedToday) },
-      { label: "ovRowInvoicesToday" as MessageKey, value: data.billing.invoicesToday },
-      { label: "ovRowSessionOpen" as MessageKey, value: t(data.billing.sessionOpen ? "ovSessionOpen" : "ovSessionClosed") },
     ] },
     data.governance && { key: "governance" as const, title: "ovSecGovernance" as MessageKey, note: "ovSecGovernanceNote" as MessageKey, icon: ShieldCheck, page: (user.permissions.includes("settings:write") || user.permissions.includes("account:manage") ? "administration" : "audit") as Page, rows: [
       { label: "ovKpiStaff" as MessageKey, value: data.governance.activeStaff },

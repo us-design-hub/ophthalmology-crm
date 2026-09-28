@@ -22,7 +22,12 @@ test('fixtures are deterministic, have two near-expiry and two low-stock medicin
   assert.equal(fixture.stock.filter(stock => stockSummary(stock, date).lowStock).length, 2); assert.equal(fixture.stock.filter(stock => stockSummary(stock, date).nearExpiry.length).length, 2);
   assert.deepEqual(fixture.surgeries.map(item => item.stage), [...SURGERY_STAGES]); for (const item of fixture.surgeries) { assert.ok(['OD','OS'].includes(item.eye)); assert.equal(item.history.at(-1)?.stage, item.stage); const dates = item.history.map(entry => Date.parse(entry.at)); assert.deepEqual(dates, [...dates].sort((a,b) => a-b)); }
 });
-test('preview permissions do not grant clinical signing, payment, or stock writes to operational roles', () => {
-  assert.ok(ROLE_PERMISSIONS.cashier.includes('preview:billing')); assert.ok(!ROLE_PERMISSIONS.cashier.includes('clinical:sign')); assert.ok(!ROLE_PERMISSIONS.cashier.includes('preview:admin'));
-  assert.ok(ROLE_PERMISSIONS.inventory_officer.includes('preview:inventory')); assert.ok(!ROLE_PERMISSIONS.inventory_officer.includes('prescription:read')); assert.ok(!ROLE_PERMISSIONS.receptionist.includes('preview:billing'));
+test('retired finance, pharmacy, and inventory roles have no active permissions', () => {
+  assert.deepEqual(ROLE_PERMISSIONS.pharmacist, []);
+  assert.deepEqual(ROLE_PERMISSIONS.cashier, []);
+  assert.deepEqual(ROLE_PERMISSIONS.inventory_officer, []);
+  for (const role of ['doctor', 'hospital_admin', 'auditor'] as const) {
+    assert.equal(ROLE_PERMISSIONS[role].includes('preview:billing'), false);
+    assert.equal(ROLE_PERMISSIONS[role].includes('preview:inventory'), false);
+  }
 });
