@@ -57,7 +57,7 @@ The idempotent seed creates one fictional hospital, four facilities, nine named 
 - Odoo-owned demographics with authenticated, idempotent synchronization, deterministic matching, encrypted identifiers, masked summaries, and attributed history/flag amendments.
 - Appointments, rescheduling, cancellations, no-shows, walk-ins, check-in, queue priority, departure, and clinical visit completion.
 - Bilateral VA/IOP, refraction, optional logMAR values, immutable workup revisions, and configurable dilation timing.
-- Patient 360, Doctor Events, coded diagnoses, anatomy plans, separate event/prescription signatures, addenda, and prescription PDFs with limited QR verification.
+- Patient 360, Doctor Events, coded diagnoses, anatomy plans, persistent bilateral drawing sheets, separate event/prescription signatures, handwritten-prescription evidence, addenda, and prescription PDFs with limited QR verification.
 - Eye-specific surgery cases with stored consent documents and gated preoperative, scheduled, operated, discharged and follow-up stages.
 - Live attendance, queue timing, documentation and surgery dashboards; CSV and printable operational reports.
 - Attributed audit records and forced row-level security on tenant-owned data.
@@ -65,7 +65,7 @@ The idempotent seed creates one fictional hospital, four facilities, nine named 
 
 ## Boundaries
 
-The local workspace uses synthetic patients. Real operational writes persist. Signed clinical content remains immutable. Persistent freehand anatomy sheets and handwritten-prescription evidence uploads are the next clinical increments.
+The local workspace uses synthetic patients. Real operational writes persist. Signed clinical content, drawing sheets, and prescription evidence remain immutable after signing. Evidence files currently use protected PostgreSQL storage; production AWS deployment can move the same hashed objects to S3 without changing the signed evidence metadata.
 
 Odoo connector acceptance, identity-provider/SSO integration, MFA, email recovery, external messaging, device interfaces and FHIR/HL7/DICOM integrations remain separate work. Terminology codes can be recorded but there is no external terminology service. Urdu coverage is partial. Surgery tracking does not implement a full theatre-resource scheduling engine. Reports support CSV and browser printing; prescription PDFs use server-side Chromium.
 

@@ -20,7 +20,7 @@ export async function GET(request:Request,context:Context){try{
 export async function POST(request:Request,context:Context){try{
  checkOrigin(request);const {resource}=await context.params;if(!['event','prescription','review','sign','addendum','complete','discard-prescription'].includes(resource))throw new ApiError(404,'invalidRequest');
  const {user}=await requestSession(request,['sign','addendum'].includes(resource)?'clinical:sign':'clinical:write');await consumeLimit(`clinical-write:${user.tenantId}:${user.id}`,60,60);
- const body=await readJson(request),audit=requestContext(request);
+ const body=await readJson(request,resource==='event'?262_144:16_384),audit=requestContext(request);
  if(resource==='discard-prescription')return json(await clinical.discardPrescription(user,body,audit));
  if(resource==='event')return json(await clinical.saveEvent(user,body,audit));if(resource==='prescription')return json(await clinical.savePrescription(user,body,audit));if(resource==='review')return json(await clinical.review(user,body,audit));if(resource==='sign')return json(await clinical.sign(user,body,audit));if(resource==='addendum')return json(await clinical.addendum(user,body,audit),201);return json(await clinical.complete(user,body,audit));
 }catch(error){return errorResponse(error);}}

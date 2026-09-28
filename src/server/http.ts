@@ -17,7 +17,7 @@ export function checkOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin || origin !== appOrigin()) throw new ApiError(403, "invalidOrigin");
 }
-export async function readJson(request: Request): Promise<unknown> {
+export async function readJson(request: Request, maximumBytes = 16_384): Promise<unknown> {
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) throw new ApiError(415, "invalidRequest");
   const reader = request.body?.getReader();
   if (!reader) throw new ApiError(400, "invalidRequest");
@@ -26,7 +26,7 @@ export async function readJson(request: Request): Promise<unknown> {
     const { done, value } = await reader.read();
     if (done) break;
     bytes += value.byteLength;
-    if (bytes > 16_384) { await reader.cancel(); throw new ApiError(413, "invalidRequest"); }
+    if (bytes > maximumBytes) { await reader.cancel(); throw new ApiError(413, "invalidRequest"); }
     chunks.push(value);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); }

@@ -121,7 +121,7 @@ test("operations snapshots require tenant context and reject all runtime writes"
   } finally {await app.query('ROLLBACK');}
 });
 
-test('new operational tables enforce RLS and financial and stock ledgers are append-only',async()=>{const names=['stock_batch','stock_movement','dispense','invoice','invoice_line','payment','refund','cashier_session','surgery_case','consent_document','patient_history'];for(const name of names){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}for(const statement of ['UPDATE app.stock_movement SET quantity=1 WHERE false','DELETE FROM app.payment WHERE false','UPDATE app.invoice SET total_paisa=0 WHERE false','UPDATE app.dispense SET actor_id=gen_random_uuid() WHERE false','DELETE FROM app.consent_document WHERE false',"UPDATE app.patient_history SET text='tampered' WHERE false"])await assert.rejects(app.query(statement),(e:{code?:string})=>e.code==='42501');});
+test('new operational tables enforce RLS and financial and stock ledgers are append-only',async()=>{const names=['stock_batch','stock_movement','dispense','invoice','invoice_line','payment','refund','cashier_session','surgery_case','consent_document','patient_history','prescription_evidence'];for(const name of names){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}for(const statement of ['UPDATE app.stock_movement SET quantity=1 WHERE false','DELETE FROM app.payment WHERE false','UPDATE app.invoice SET total_paisa=0 WHERE false','UPDATE app.dispense SET actor_id=gen_random_uuid() WHERE false','DELETE FROM app.consent_document WHERE false',"UPDATE app.patient_history SET text='tampered' WHERE false"])await assert.rejects(app.query(statement),(e:{code?:string})=>e.code==='42501');});
 
 test('Odoo identity mappings enforce tenant isolation and retired access is absent', async () => {
   const security = (await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='app.patient_external_identity'::regclass")).rows[0];
@@ -135,5 +135,17 @@ test('Odoo identity mappings enforce tenant isolation and retired access is abse
     await app.query("SELECT set_config('app.tenant_id',$1,true)", [tenantId]);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('pharmacist','cashier','inventory_officer') OR permission_code IN ('patient:create','patient:edit','pharmacy:dispense','billing:write')")).rows[0].total, 0);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.user_role WHERE role_code IN ('pharmacist','cashier','inventory_officer')")).rows[0].total, 0);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.doctor_event WHERE jsonb_typeof(drawings)<>'object' OR drawings IS NULL")).rows[0].total, 0);
   } finally { await app.query('ROLLBACK'); }
+});
+
+test('signed prescriptions reject new evidence', async () => {
+  await admin.query('BEGIN');
+  try {
+    const parent=(await admin.query(`SELECT d.tenant_id,d.id AS event_id,d.author_id FROM app.doctor_event d WHERE NOT EXISTS(SELECT 1 FROM app.prescription r WHERE r.event_id=d.id) LIMIT 1`)).rows[0];
+    assert.ok(parent);
+    const prescription=(await admin.query(`INSERT INTO app.prescription(tenant_id,event_id,author_id) VALUES($1,$2,$3) RETURNING id`,[parent.tenant_id,parent.event_id,parent.author_id])).rows[0];
+    await admin.query(`UPDATE app.prescription SET status='signed',signed_at=now(),signed_by=$2,snapshot_text='{}',content_hash=encode(sha256(convert_to('{}','UTF8')),'hex') WHERE id=$1`,[prescription.id,parent.author_id]);
+    await assert.rejects(admin.query(`INSERT INTO app.prescription_evidence(tenant_id,prescription_id,content,mime,filename,hash,actor_id) VALUES($1,$2,$3,'image/jpeg','late.jpg',$4,$5)`,[parent.tenant_id,prescription.id,Buffer.from([255,216,255,1]),'0'.repeat(64),parent.author_id]),(error:{code?:string})=>error.code==='42501');
+  } finally { await admin.query('ROLLBACK'); }
 });
