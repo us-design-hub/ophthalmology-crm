@@ -2,7 +2,6 @@ import { requestSession,consumeLimit } from '@/server/auth';
 import { requestContext } from '@/server/audit';
 import { ApiError,checkOrigin,errorResponse,json,readJson } from '@/server/http';
 import * as clinical from '@/server/clinical-service';
-import { prescriptionPdf } from '@/server/prescription-pdf';
 type Context={params:Promise<{resource:string}>};
 export async function GET(request:Request,context:Context){try{
  const {resource}=await context.params;if(!['list','detail','timeline','formulary','prescriptions','prescription','pdf'].includes(resource))throw new ApiError(404,'invalidRequest');
@@ -14,7 +13,7 @@ export async function GET(request:Request,context:Context){try{
  if(resource==='formulary')return json(await clinical.formulary(user));
  if(resource==='prescriptions')return json(await clinical.prescriptionList(user,audit));
  const record=await clinical.signedPrescription(user,query.get('id'),audit);if(resource==='prescription')return json(record);
- await consumeLimit(`pdf:${user.tenantId}:${user.id}`,10,60);const pdf=await prescriptionPdf(record);await clinical.recordPdfExport(user,record.id,audit);
+ await consumeLimit(`pdf:${user.tenantId}:${user.id}`,10,60);const {prescriptionPdf}=await import('@/server/prescription-pdf');const pdf=await prescriptionPdf(record);await clinical.recordPdfExport(user,record.id,audit);
  return new Response(new Uint8Array(pdf),{headers:{'Content-Type':'application/pdf','Content-Disposition':`inline; filename="OpenEyes-prescription-${record.id}.pdf"`,'Cache-Control':'no-store, private','Vary':'Cookie','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}});
 }catch(error){return errorResponse(error);}}
 export async function POST(request:Request,context:Context){try{
