@@ -12,7 +12,7 @@ export const overviewMessages = {
   ovNothing: "No workspace sections are assigned to your role yet.",
   ovNothingDetail: "Your account can sign in, but no dashboard data is available for its permissions. Ask an administrator to review your role.",
   ovOpen: "Open",
-  ovBoundary: "Figures are drawn from working demo records for your assigned clinics only.",
+  ovBoundary: "Figures are drawn from records for your assigned clinics only.",
 
   // --- primary action -------------------------------------------------------
   ovActionClinical: "Open Doctor Event",

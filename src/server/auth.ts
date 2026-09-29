@@ -65,14 +65,14 @@ export async function login(email: string, password: string, context: AuditConte
   }
   const token = randomBytes(32).toString("base64url");
   const user = await withTenant(tenant.id, account.id, async db => {
-    const result = await db.query(`SELECT u.id,u.tenant_id AS "tenantId",t.name AS "tenantName",t.is_demo AS "demoTenant",u.full_name AS name,u.email,u.must_change_password AS "mustChangePassword",
+    const result = await db.query(`SELECT u.id,u.tenant_id AS "tenantId",t.name AS "tenantName",t.is_demo AS "isDemo",u.full_name AS name,u.email,u.must_change_password AS "mustChangePassword",
       u.password_hash AS "passwordHash",t.settings,
       ARRAY(SELECT ur.role_code FROM app.user_role ur WHERE ur.user_id=u.id ORDER BY ur.role_code) AS roles,
       ARRAY(SELECT DISTINCT rp.permission_code FROM app.user_role ur JOIN app.role_permission rp ON rp.tenant_id=ur.tenant_id AND rp.role_code=ur.role_code WHERE ur.user_id=u.id) AS permissions,
       ARRAY(SELECT uf.facility_id FROM app.user_facility uf JOIN app.facility f ON f.id=uf.facility_id AND f.active WHERE uf.user_id=u.id ORDER BY uf.facility_id) AS "facilityIds"
       FROM app.user_account u JOIN app.tenant t ON t.id=u.tenant_id WHERE u.id=$1 AND u.status='active'`, [account.id]);
-    const current = result.rows[0] as (AuthUser & { demoTenant: boolean; passwordHash: string; settings: { adminIdleMinutes?: number; clinicalIdleMinutes?: number } }) | undefined;
-    if (!current || (!isDemo() && current.demoTenant) || current.passwordHash !== account.password_hash) throw new ApiError(401, "invalidCredentials");
+    const current = result.rows[0] as (AuthUser & { passwordHash: string; settings: { adminIdleMinutes?: number; clinicalIdleMinutes?: number } }) | undefined;
+    if (!current || (!isDemo() && current.isDemo) || current.passwordHash !== account.password_hash) throw new ApiError(401, "invalidCredentials");
     const idleMinutes = current.roles.some(role => ["hospital_admin", "security_admin", "auditor"].includes(role)) ? (current.settings.adminIdleMinutes ?? 30) : (current.settings.clinicalIdleMinutes ?? 15);
     await db.query(`WITH inserted AS (
         INSERT INTO app.session(token_hash,tenant_id,user_id,expires_at,idle_minutes)
@@ -87,7 +87,7 @@ export async function login(email: string, password: string, context: AuditConte
              (SELECT count(*) FROM cleared) AS cleared,
              (SELECT count(*) FROM logged) AS logged`,
       [privateHash(token), tenant.id, account.id, idleMinutes, privateHash(limitKey), context.ip ?? null, context.userAgent ?? null]);
-    const { demoTenant: _demoTenant, passwordHash: _passwordHash, settings: _settings, ...safeUser } = current;
+    const { passwordHash: _passwordHash, settings: _settings, ...safeUser } = current;
     return safeUser;
   });
   return { user, token };
@@ -116,7 +116,7 @@ export async function sessionFromToken(token: string | undefined, touch = true):
             WHERE u.id=$3 AND u.status='active' AND ($4::boolean OR NOT t.is_demo))
         RETURNING 1
       )
-      SELECT u.id,u.tenant_id AS "tenantId",t.name AS "tenantName",u.full_name AS name,u.email,u.must_change_password AS "mustChangePassword",
+      SELECT u.id,u.tenant_id AS "tenantId",t.name AS "tenantName",t.is_demo AS "isDemo",u.full_name AS name,u.email,u.must_change_password AS "mustChangePassword",
         ARRAY(SELECT ur.role_code FROM app.user_role ur WHERE ur.user_id=u.id ORDER BY ur.role_code) AS roles,
         ARRAY(SELECT DISTINCT rp.permission_code FROM app.user_role ur JOIN app.role_permission rp ON rp.tenant_id=ur.tenant_id AND rp.role_code=ur.role_code WHERE ur.user_id=u.id) AS permissions,
         ARRAY(SELECT uf.facility_id FROM app.user_facility uf JOIN app.facility f ON f.id=uf.facility_id AND f.active WHERE uf.user_id=u.id ORDER BY uf.facility_id) AS "facilityIds",

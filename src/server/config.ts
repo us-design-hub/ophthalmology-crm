@@ -4,7 +4,14 @@ export function requiredEnv(name: string): string {
   return value;
 }
 export function appOrigin(): string { return new URL(requiredEnv("APP_ORIGIN")).origin; }
-export function isDemo(): boolean { return process.env.APP_MODE === "demo"; }
+export type AppMode = "demo" | "production";
+export function appMode(): AppMode {
+  const mode = requiredEnv("APP_MODE");
+  if (mode !== "demo" && mode !== "production") throw new Error("APP_MODE must be demo or production");
+  return mode;
+}
+export function isDemo(): boolean { return appMode() === "demo"; }
+export function isProduction(): boolean { return appMode() === "production"; }
 export function showDemoCredentials(): boolean { return isDemo() && process.env.SHOW_DEMO_CREDENTIALS === "true"; }
 export function secureCookies(): boolean {
   const secure = new URL(appOrigin()).protocol === "https:";

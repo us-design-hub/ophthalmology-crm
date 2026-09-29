@@ -7,7 +7,7 @@ import { api, ClientApiError } from "@/lib/api-client";
 import type { DemoAccount } from "@/server/auth";
 import type { MessageKey } from "@/lib/messages";
 
-export function LoginForm({ demo, hospitalName }: { hospitalName: string; demo: { accounts: DemoAccount[]; password: string } | null }) {
+export function LoginForm({ demo, hospitalName, isDemo }: { hospitalName: string; isDemo: boolean; demo: { accounts: DemoAccount[]; password: string } | null }) {
   const { locale, setLocale, t } = useLocale();
   const router = useRouter();
   const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
@@ -33,11 +33,11 @@ export function LoginForm({ demo, hospitalName }: { hospitalName: string; demo: 
           <div><strong>{hospitalName}</strong><small>{t("brandCaption")}</small></div>
         </div>
 
-        <div className="login-demo-note">
+        {isDemo && <div className="login-demo-note">
           <span className="demo-dot"/>
           <span>{t("demoOnly")}</span>
           <small>{t("notClinical")}</small>
-        </div>
+        </div>}
       </section>
 
       <section className="login-form-panel">

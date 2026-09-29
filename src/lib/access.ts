@@ -15,7 +15,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   security_admin: ["reports:read", "admin:read", "staff:write", "account:create", "account:manage", "audit:read", "preview:admin"],
   auditor: ["reports:read", "admin:read", "audit:read", "preview:surgery", "preview:management", "preview:admin"],
 };
-export type AuthUser = { id: string; tenantId: string; tenantName: string; name: string; email: string; roles: Role[]; permissions: Permission[]; facilityIds: string[]; mustChangePassword?: boolean };
+export type AuthUser = { id: string; tenantId: string; tenantName: string; isDemo: boolean; name: string; email: string; roles: Role[]; permissions: Permission[]; facilityIds: string[]; mustChangePassword?: boolean };
 export type Session = { user: AuthUser; tokenHash: string };
 
 export function hasPermission(user: AuthUser, permission: Permission) { return user.permissions.includes(permission); }

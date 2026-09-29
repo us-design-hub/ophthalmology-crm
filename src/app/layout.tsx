@@ -43,7 +43,7 @@ const plexArabic = IBM_Plex_Sans_Arabic({
 
 export const metadata: Metadata = {
   title: "OpenEyes · Clinical workspace",
-  description: "OpenEyes ophthalmology demo — patient intake and bilateral ophthalmic workup. Powered by Logic box.",
+  description: "OpenEyes ophthalmology clinical workspace for connected patient care. Powered by Logic box.",
   robots: { index: false, follow: false },
 };
 

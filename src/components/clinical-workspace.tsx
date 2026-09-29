@@ -29,6 +29,7 @@ type Page = "workspace" | "overview" | "patients" | "audit" | "appointments" | "
 export function ClinicalWorkspace() {
   const { locale, setLocale, t } = useLocale();
   const user = useSession();
+  const hospitalInitials = user.tenantName.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join("").toUpperCase();
   const router = useRouter();
   const canReadPatients = user.permissions.includes("patient:read");
   const canUseAnatomy = user.permissions.includes("anatomy:use");
@@ -116,7 +117,7 @@ export function ClinicalWorkspace() {
         <span className="brand-mark"><EyeIcon size={29} strokeWidth={1.6}/><span/></span><span><strong>{t("appName")}</strong><small>{t("brandCaption")}</small></span>
       </button>
       <button type="button" className="close-mobile" aria-label={t("closeMenu")} onClick={() => setMenuOpen(false)}><PanelLeftClose size={19}/></button>
-      <div className="hospital-label"><span className="hospital-avatar">DE</span><span>{user.tenantName}<small>{t("prototype")}</small></span></div>
+      <div className="hospital-label"><span className="hospital-avatar">{hospitalInitials}</span><span>{user.tenantName}{user.isDemo&&<small>{t("prototype")}</small>}</span></div>
       <nav aria-label={t("workspace")}>
         {navGroups.map(group => {
           const items = group.items.filter(item => item.allowed);
@@ -138,14 +139,14 @@ export function ClinicalWorkspace() {
           <ul>{restricted.map(item => <li key={item.key}><item.icon size={14} strokeWidth={1.6}/>{t(item.key)}</li>)}</ul>
         </details>}
       </nav>
-      <div className="sidebar-bottom"><span className="demo-dot"/><span><strong>{t("demoOnly")}</strong><small>{t("notClinical")}</small></span><CircleHelp size={16}/></div>
+      <div className="sidebar-bottom">{user.isDemo&&<span className="demo-dot"/>}<span><strong>{user.isDemo?t("demoOnly"):t("notClinical")}</strong>{user.isDemo&&<small>{t("notClinical")}</small>}</span><CircleHelp size={16}/></div>
     </aside>
 
     <div className="main-shell">
       <header className="topbar">
         <button type="button" className="icon-button mobile-menu" aria-label={t("menu")} aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={21}/></button>
         <div className="breadcrumbs"><span>{t("careLabel")}</span><ChevronRight size={13}/><strong>{t(pageLabel)}</strong></div>
-        <div className="topbar-actions"><span className="build-status"><span/>{t("prototype")}</span><button className="language-button" type="button" onClick={() => setLocale(locale === "en" ? "ur" : "en")} aria-label={t("language")}><Globe2 size={16}/><span>{locale === "en" ? t("urdu") : t("english")}</span></button><span className="header-divider"/><span className="profile-avatar"><Stethoscope size={18}/></span><div className="profile-caption"><strong>{user.name}</strong><small>{user.roles.map(role => t(`role_${role}`)).join(" · ")}</small></div><button type="button" className="sign-out-button" onClick={() => setPasswordOpen(!passwordOpen)}>Password</button><button type="button" className="sign-out-button" disabled={signingOut} onClick={signOut}>{t(signingOut ? "signingOut" : "signOut")}</button></div>
+        <div className="topbar-actions">{user.isDemo&&<span className="build-status"><span/>{t("prototype")}</span>}<button className="language-button" type="button" onClick={() => setLocale(locale === "en" ? "ur" : "en")} aria-label={t("language")}><Globe2 size={16}/><span>{locale === "en" ? t("urdu") : t("english")}</span></button><span className="header-divider"/><span className="profile-avatar"><Stethoscope size={18}/></span><div className="profile-caption"><strong>{user.name}</strong><small>{user.roles.map(role => t(`role_${role}`)).join(" · ")}</small></div><button type="button" className="sign-out-button" onClick={() => setPasswordOpen(!passwordOpen)}>Password</button><button type="button" className="sign-out-button" disabled={signingOut} onClick={signOut}>{t(signingOut ? "signingOut" : "signOut")}</button></div>
       </header>
       <main id="main-content" className="main-content">
         {locale === "ur" && <div className="locale-banner" role="status">{t("urduPreview")}</div>}

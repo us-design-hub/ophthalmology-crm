@@ -6,5 +6,5 @@ export default async function LoginPage() {
   if (await pageSession()) redirect("/");
   const tenant = await configuredTenant();
   const demo = await demoAccounts(tenant);
-  return <LoginForm demo={demo} hospitalName={tenant.name}/>;
+  return <LoginForm demo={demo} hospitalName={tenant.name} isDemo={tenant.is_demo}/>;
 }

@@ -1,8 +1,8 @@
-# OpenEyes demo
+# OpenEyes clinical workspace
 
 OpenEyes connects Odoo-synchronized patient demographics with ophthalmology appointments, clinical queues, bilateral workup, signed clinical documentation, digital prescriptions, surgery tracking, administration, audit, and operational reporting on PostgreSQL. The frontend supports the existing partial Urdu/RTL interface and iPad-sized layouts.
 
-See [Odoo integration](docs/ODOO_INTEGRATION.md), [current implementation](docs/USABLE_SYSTEM_IMPLEMENTATION.md), and [current verification](docs/USABLE_SYSTEM_VERIFICATION.md). Earlier milestone documents describe historical demo boundaries and are superseded by these records. Planning documents remain in the project folder, outside the client interface.
+See [Odoo integration](docs/ODOO_INTEGRATION.md), [production readiness](docs/PRODUCTION_READINESS.md), [current implementation](docs/USABLE_SYSTEM_IMPLEMENTATION.md), and [current verification](docs/USABLE_SYSTEM_VERIFICATION.md). Earlier milestone documents describe historical demo boundaries and are superseded by these records. Planning documents remain in the project folder, outside the client interface.
 
 ## Start on this machine
 
@@ -73,6 +73,21 @@ Odoo connector acceptance, identity-provider/SSO integration, MFA, email recover
 PDF generation requires a Playwright-compatible Chromium installation and a font supporting Urdu. This Windows workspace uses its existing `.playwright` browser and Nirmala UI. For deployment, install the browser and system dependencies or set `PDF_CHROMIUM_EXECUTABLE`; verify Urdu rendering on that host. PDF rendering blocks external network requests and keeps generated documents in memory.
 
 Demo credential filling requires `APP_MODE=demo`, `SHOW_DEMO_CREDENTIALS=true`, and a tenant marked as demo. It never bypasses password verification. Outside demo mode, credentials are not shown, demo tenants are rejected, and cookie issuance requires HTTPS. `NODE_ENV` controls build optimization, not demo authorization.
+
+## Production release gate
+
+Use a clean, non-demo database for staging and production. Configure the protected values shown in `.env.production.example`, then run these from a controlled deployment job:
+
+```sh
+npm run db:provision:production
+npm run db:migrate:production
+npm run db:bootstrap:production
+npm run preflight:production
+```
+
+Bootstrap creates one clinic, separate hospital and security administrators with forced password changes, and a non-interactive Odoo identity. It refuses to modify an existing hospital.
+
+The administrative database URL belongs only in the migration/preflight environment. Do not expose it to the web application. The detailed AWS, Odoo, evidence-storage, PDF, identity, and operational gates are in [production readiness](docs/PRODUCTION_READINESS.md).
 
 ## Verification
 
