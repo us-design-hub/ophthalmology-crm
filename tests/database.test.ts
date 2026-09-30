@@ -4,6 +4,7 @@ import test, { after, before } from "node:test";
 import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { encryptIdentifier, identifierIndex } from "../src/server/crypto";
+import { examinationTemplateDefinitionSchema } from "../src/lib/clinical";
 
 const admin = new pg.Client({ connectionString: process.env.DATABASE_ADMIN_URL });
 const app = new pg.Client({ connectionString: process.env.DATABASE_URL });
@@ -17,13 +18,13 @@ test("signed event parents and plan children reject direct runtime mutation", as
   await app.query('BEGIN');
   try {
     await app.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
-    const attempts:[string,unknown[]][]=[['UPDATE app.doctor_event SET complaint=$2 WHERE id=$1',[record.id,'Tampered']],['DELETE FROM app.event_plan WHERE id=$1',[record.plan_id]],['INSERT INTO app.event_plan(id,tenant_id,event_id,eye,anatomy_site,intent,notes) VALUES($1,$2,$3,\'OS\',\'retina\',\'observation\',\'Tampered\')',[randomUUID(),tenantId,record.id]],['UPDATE app.clinical_addendum SET text=\'Tampered\' WHERE false',[]]];
+    const attempts:[string,unknown[]][]=[['UPDATE app.doctor_event SET complaint=$2 WHERE id=$1',[record.id,'Tampered']],['UPDATE app.doctor_event SET examination_answers=$2 WHERE id=$1',[record.id,JSON.stringify({fundus:{OD:'Tampered',OS:'Tampered'}})]],['DELETE FROM app.event_plan WHERE id=$1',[record.plan_id]],['INSERT INTO app.event_plan(id,tenant_id,event_id,eye,anatomy_site,intent,notes) VALUES($1,$2,$3,\'OS\',\'retina\',\'observation\',\'Tampered\')',[randomUUID(),tenantId,record.id]],['UPDATE app.clinical_addendum SET text=\'Tampered\' WHERE false',[]]];
     for(const [query,args] of attempts){await app.query('SAVEPOINT denied');await assert.rejects(app.query(query,args),(error:{code?:string})=>error.code==='42501');await app.query('ROLLBACK TO SAVEPOINT denied');}
   } finally {await app.query('ROLLBACK');}
 });
 
 test("all clinical tables require tenant context and enforce forced RLS",async()=>{
-  const names=['formulary','doctor_event','event_plan','prescription','prescription_item','clinical_addendum'];
+  const names=['examination_template','examination_template_assignment','formulary','doctor_event','event_plan','prescription','prescription_item','clinical_addendum'];
   const tables=(await admin.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND c.relname=ANY($1)",[names])).rows;assert.equal(tables.length,names.length);
   for(const row of tables){assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query(`SELECT * FROM app.${row.relname}`)).rowCount,0);}
 });
@@ -72,6 +73,7 @@ test("a second hospital's rows are invisible and cross-tenant writes fail", asyn
   await admin.query("BEGIN");
   try {
     await admin.query("INSERT INTO app.tenant(id,code,name,mrn_prefix,is_demo) VALUES($1,$2,'Isolation test','ISO',true)", [otherTenant, `TEST-${otherTenant}`]);
+    const template=(await admin.query("SELECT id FROM app.examination_template WHERE tenant_id=$1 AND is_default AND status='published'",[otherTenant])).rows[0].id;
     await admin.query("INSERT INTO app.facility(id,tenant_id,name,type) VALUES($1,$2,'Test clinic','clinic')", [facility, otherTenant]);
     await admin.query("INSERT INTO app.user_account(id,tenant_id,email,full_name,designation,password_hash) VALUES($1,$2,'fixture@test.invalid','Fixture','Fixture','not-a-login-hash')", [author, otherTenant]);
     await admin.query(`INSERT INTO app.patient(id,tenant_id,mrn,given_name,dob,gender,phone_e164,identifier_type,identifier_encrypted,identifier_blind_index,identifier_last4,created_by,created_facility_id)
@@ -84,7 +86,7 @@ test("a second hospital's rows are invisible and cross-tenant writes fail", asyn
     const revision = (await admin.query("INSERT INTO app.workup_revision(tenant_id,encounter_id,version,author_id) VALUES($1,$2,1,$3) RETURNING id", [otherTenant,encounter,author])).rows[0].id;
     await admin.query("INSERT INTO app.workup_eye(tenant_id,revision_id,eye,uncorrected,pinhole,corrected,iop,method,measured_at) VALUES($1,$2,'OD','CF','HM','6/12',24,'NCT',now())", [otherTenant,revision]);
     const drug=(await admin.query("INSERT INTO app.formulary(tenant_id,name,strength,therapy_group) VALUES($1,'Isolation drug','Demo','Demo') RETURNING id",[otherTenant])).rows[0].id;
-    const event=(await admin.query('INSERT INTO app.doctor_event(tenant_id,encounter_id,author_id) VALUES($1,$2,$3) RETURNING id',[otherTenant,encounter,author])).rows[0].id;
+    const event=(await admin.query('INSERT INTO app.doctor_event(tenant_id,encounter_id,author_id,examination_template_id) VALUES($1,$2,$3,$4) RETURNING id',[otherTenant,encounter,author,template])).rows[0].id;
     await admin.query("INSERT INTO app.event_plan(id,tenant_id,event_id,eye,anatomy_site,intent) VALUES($1,$2,$3,'OD','lens','observation')",[randomUUID(),otherTenant,event]);
     const prescription=(await admin.query('INSERT INTO app.prescription(tenant_id,event_id,author_id) VALUES($1,$2,$3) RETURNING id',[otherTenant,event,author])).rows[0].id;
     await admin.query("INSERT INTO app.prescription_item(id,tenant_id,prescription_id,position,drug_id,name,strength,eye,dose,route,frequency,duration) VALUES($1,$2,$3,0,$4,'Isolation drug','Demo','OD','Demo','Demo','Demo','Demo')",[randomUUID(),otherTenant,prescription,drug]);
@@ -96,7 +98,7 @@ test("a second hospital's rows are invisible and cross-tenant writes fail", asyn
     assert.equal((await admin.query("SELECT id FROM app.patient WHERE id=$1", [patient])).rowCount, 0);
     assert.equal((await admin.query("SELECT * FROM app.operations_preview WHERE tenant_id=$1", [otherTenant])).rowCount, 0);
     for (const table of ['clinic_schedule','clinic_doctor','appointment','encounter','queue_transition','workup_revision','workup_eye']) assert.equal((await admin.query(`SELECT * FROM app.${table} WHERE tenant_id=$1`,[otherTenant])).rowCount,0);
-    for (const table of ['formulary','doctor_event','event_plan','prescription','prescription_item','clinical_addendum']) assert.equal((await admin.query(`SELECT * FROM app.${table} WHERE tenant_id=$1`,[otherTenant])).rowCount,0);
+    for (const table of ['examination_template','examination_template_assignment','formulary','doctor_event','event_plan','prescription','prescription_item','clinical_addendum']) assert.equal((await admin.query(`SELECT * FROM app.${table} WHERE tenant_id=$1`,[otherTenant])).rowCount,0);
     await admin.query("SAVEPOINT denied_write");
     await assert.rejects(admin.query("INSERT INTO app.patient_flag(tenant_id,patient_id,type,value,created_by) VALUES($1,$2,'risk','Test',$3)", [otherTenant, patient, author]), (error: { code?: string }) => error.code === "42501");
     await admin.query("ROLLBACK TO SAVEPOINT denied_write");
@@ -148,4 +150,37 @@ test('signed prescriptions reject new evidence', async () => {
     await admin.query(`UPDATE app.prescription SET status='signed',signed_at=now(),signed_by=$2,snapshot_text='{}',content_hash=encode(sha256(convert_to('{}','UTF8')),'hex') WHERE id=$1`,[prescription.id,parent.author_id]);
     await assert.rejects(admin.query(`INSERT INTO app.prescription_evidence(tenant_id,prescription_id,content,mime,filename,hash,actor_id) VALUES($1,$2,$3,'image/jpeg','late.jpg',$4,$5)`,[parent.tenant_id,prescription.id,Buffer.from([255,216,255,1]),'0'.repeat(64),parent.author_id]),(error:{code?:string})=>error.code==='42501');
   } finally { await admin.query('ROLLBACK'); }
+});
+
+test('published examination templates are immutable and assignments enforce tenant context', async () => {
+  const published=(await admin.query("SELECT id,name FROM app.examination_template WHERE tenant_id=$1 AND status='published' LIMIT 1",[tenantId])).rows[0];
+  assert.ok(published);
+  assert.equal((await app.query('SELECT 1 FROM app.examination_template_assignment')).rowCount,0);
+  await app.query('BEGIN');
+  try {
+    await app.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
+    assert.ok((await app.query('SELECT 1 FROM app.examination_template_assignment')).rowCount! > 0);
+    await app.query('SAVEPOINT immutable');
+    await assert.rejects(app.query('UPDATE app.examination_template SET name=$2 WHERE id=$1',[published.id,'Changed']), (error:{code?:string})=>error.code==='P0001');
+    await app.query('ROLLBACK TO SAVEPOINT immutable');
+    const draft=(await app.query(`INSERT INTO app.examination_template(tenant_id,code,version,name,specialty,status,definition)
+      SELECT tenant_id,code,version+1000,name,specialty,'draft',definition FROM app.examination_template WHERE id=$1 RETURNING id`,[published.id])).rows[0];
+    assert.ok(draft);
+    assert.equal((await app.query("UPDATE app.examination_template SET name='Editable draft' WHERE id=$1",[draft.id])).rowCount,1);
+  } finally { await app.query('ROLLBACK'); }
+});
+
+
+test('General Ophthalmology v2 is published, valid and assigned as the active baseline', async () => {
+  const row=(await admin.query(`SELECT t.version,t.status,t.definition,a.active
+    FROM app.examination_template_assignment a
+    JOIN app.examination_template t ON t.id=a.template_id AND t.tenant_id=a.tenant_id
+    WHERE a.tenant_id=$1 AND a.facility_id IS NULL AND a.specialty='Ophthalmology' AND a.visit_type='general' AND a.active`,[tenantId])).rows[0];
+  assert.ok(row);
+  assert.equal(row.version,2);
+  assert.equal(row.status,'published');
+  const definition=examinationTemplateDefinitionSchema.parse(row.definition);
+  assert.equal(definition.sections.length,7);
+  assert.ok(definition.sections.some(section=>section.fields.some(field=>field.roles?.includes('nurse'))));
+  assert.ok(definition.sections.some(section=>section.fields.some(field=>field.visibleWhen)));
 });

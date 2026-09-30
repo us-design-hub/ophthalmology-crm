@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg';
 import { verify } from '@node-rs/argon2';
 import { timingSafeEqual } from 'node:crypto';
 import type { AuthUser } from '@/lib/access';
-import { eventInputSchema,rxInputSchema,reviewSchema,signSchema,addendumSchema,prescriptionWarnings,type ClinicalDetail,type DoctorEvent,type Prescription,type Review } from '@/lib/clinical';
+import { eventInputSchema,rxInputSchema,reviewSchema,signSchema,addendumSchema,prescriptionWarnings,examinationTemplateDefinitionSchema,validateExaminationAnswers,type ClinicalDetail,type DoctorEvent,type ExaminationTemplate,type Prescription,type Review } from '@/lib/clinical';
 import { canonicalJson,contentHash } from './clinical-hash';
 import { privateHash } from './crypto';
 import { withTenant } from './db';
@@ -15,9 +15,23 @@ import { audit,type AuditContext } from './audit';
 import { appOrigin } from './config';
 function parse<T>(schema:z.ZodType<T>,input:unknown):T {const result=schema.safeParse(input);if(!result.success)throw new ApiError(400,'clinicalInvalid');return result.data;}
 const flags=`(SELECT coalesce(jsonb_agg(jsonb_build_object('type',f.type,'value',f.value)),'[]') FROM app.patient_flag f WHERE f.tenant_id=p.tenant_id AND f.patient_id=p.id AND f.resolved_at IS NULL)`;
-const encounterSelect=`SELECT e.id,e.patient_id AS "patientId",p.given_name||' '||p.family_name AS name,p.mrn,p.dob,p.gender,${flags} AS flags,e.facility_id AS "facilityId",f.name AS clinic,e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.closed_at AS "closedAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.encounter_id=e.id AND w.tenant_id=e.tenant_id),0) AS "workupVersion",d.status AS "eventStatus" FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id LEFT JOIN app.doctor_event d ON d.encounter_id=e.id AND d.tenant_id=e.tenant_id`;
+const encounterSelect=`SELECT e.id,e.patient_id AS "patientId",p.given_name||' '||p.family_name AS name,p.mrn,p.dob,p.gender,${flags} AS flags,e.facility_id AS "facilityId",f.name AS clinic,f.specialty,e.visit_type AS "visitType",e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.closed_at AS "closedAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.encounter_id=e.id AND w.tenant_id=e.tenant_id),0) AS "workupVersion",d.status AS "eventStatus" FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id LEFT JOIN app.doctor_event d ON d.encounter_id=e.id AND d.tenant_id=e.tenant_id`;
 const signedColumns=`d.id,d.version,d.status,d.author_id AS "authorId",u.full_name AS author,d.signed_at AS "signedAt",d.content_hash AS "contentHash",CASE WHEN d.snapshot_text IS NOT NULL THEN d.snapshot_text::jsonb ELSE NULL END AS snapshot,d.synthetic`;
 async function log(db:PoolClient,user:AuthUser,context:AuditContext,action:string,kind:string,id?:string,metadata?:Record<string,unknown>) {await audit(db,{tenantId:user.tenantId,actorId:user.id,action,entityType:kind,entityId:id,metadata,context});}
+async function examinationTemplate(db:PoolClient,id?:string,context?:{facilityId:string;specialty:string;visitType:string}):Promise<ExaminationTemplate>{
+ const row=(await db.query(`SELECT id,code,version,name,specialty,definition FROM app.examination_template
+  WHERE id=coalesce(
+   $1::uuid,
+   (SELECT a.template_id FROM app.examination_template_assignment a
+    JOIN app.examination_template assigned ON assigned.id=a.template_id AND assigned.tenant_id=a.tenant_id
+    WHERE a.active AND assigned.status='published' AND a.specialty=$3 AND a.visit_type IN ($4,'general')
+      AND (a.facility_id=$2::uuid OR a.facility_id IS NULL)
+    ORDER BY (a.facility_id=$2::uuid) DESC,(a.visit_type=$4) DESC,a.updated_at DESC LIMIT 1),
+   (SELECT id FROM app.examination_template WHERE is_default AND status='published' LIMIT 1)
+  ) AND status='published'`,[id??null,context?.facilityId??null,context?.specialty??'Ophthalmology',context?.visitType??'general'])).rows[0];
+ const definition=examinationTemplateDefinitionSchema.safeParse(row?.definition);if(!row||!definition.success)throw new ApiError(503,'clinicalTemplateUnavailable');
+ return {...row,definition:definition.data};
+}
 async function lockedEncounter(db:PoolClient,user:AuthUser,id:string,write=false) {
  const row=(await db.query('SELECT * FROM app.encounter WHERE id=$1 AND facility_id=ANY($2::uuid[]) FOR UPDATE',[id,user.facilityIds])).rows[0];
  if(!row)throw new ApiError(404,'encounterNotFound');
@@ -27,14 +41,15 @@ async function lockedEncounter(db:PoolClient,user:AuthUser,id:string,write=false
 async function loadDetail(db:PoolClient,user:AuthUser,id:string):Promise<ClinicalDetail> {
  await lockedEncounter(db,user,id);
  const encounter=(await db.query(`${encounterSelect} WHERE e.id=$1`,[id])).rows[0];
- const event=(await db.query(`SELECT ${signedColumns},d.encounter_id AS "encounterId",d.complaint,d.findings,d.diagnoses,d.referral,d.follow_up AS "followUp",d.drawings FROM app.doctor_event d JOIN app.user_account u ON u.id=d.author_id AND u.tenant_id=d.tenant_id WHERE d.encounter_id=$1`,[id])).rows[0] as DoctorEvent|undefined;
+ const event=(await db.query(`SELECT ${signedColumns},d.encounter_id AS "encounterId",d.examination_template_id AS "templateId",d.examination_answers AS answers,d.complaint,d.findings,d.diagnoses,d.referral,d.follow_up AS "followUp",d.drawings FROM app.doctor_event d JOIN app.user_account u ON u.id=d.author_id AND u.tenant_id=d.tenant_id WHERE d.encounter_id=$1`,[id])).rows[0] as DoctorEvent|undefined;
+ const template=await examinationTemplate(db,event?.templateId,{facilityId:encounter.facilityId,specialty:encounter.specialty,visitType:encounter.visitType});
  let prescription:Prescription|null=null;
  if(event){event.plans=(await db.query('SELECT id,eye,anatomy_site AS "anatomySite",intent,notes FROM app.event_plan WHERE event_id=$1 ORDER BY eye,anatomy_site',[event.id])).rows;
   prescription=(await db.query(`SELECT ${signedColumns},$2::uuid AS "encounterId" FROM app.prescription d JOIN app.user_account u ON u.id=d.author_id AND u.tenant_id=d.tenant_id WHERE d.event_id=$1`,[event.id,id])).rows[0]??null;
   if(prescription){prescription.items=await items(db,prescription.id);prescription.evidence=(await db.query(`SELECT e.id,e.filename,e.mime,e.hash,e.captured_at AS "capturedAt",u.full_name AS actor FROM app.prescription_evidence e JOIN app.user_account u ON u.id=e.actor_id AND u.tenant_id=e.tenant_id WHERE e.prescription_id=$1 ORDER BY e.captured_at,e.id`,[prescription.id])).rows;}
  }
  const addenda=event?(await db.query(`SELECT a.id,CASE WHEN a.event_id IS NOT NULL THEN 'event' ELSE 'prescription' END AS kind,a.text,u.full_name AS author,a.at,a.content_hash AS "contentHash" FROM app.clinical_addendum a JOIN app.user_account u ON u.id=a.author_id AND u.tenant_id=a.tenant_id WHERE a.event_id=$1 OR a.prescription_id=$2 ORDER BY a.at,a.id`,[event.id,prescription?.id??null])).rows:[];
- return {encounter,patient:{id:encounter.patientId,name:encounter.name,mrn:encounter.mrn,dob:encounter.dob,gender:encounter.gender,flags:encounter.flags},workup:await latestWorkup(db,id),event:event??null,prescription,addenda};
+ return {encounter,patient:{id:encounter.patientId,name:encounter.name,mrn:encounter.mrn,dob:encounter.dob,gender:encounter.gender,flags:encounter.flags},workup:await latestWorkup(db,id),template,event:event??null,prescription,addenda};
 }
 async function items(db:PoolClient,id:string){return(await db.query('SELECT id,quantity,drug_id AS "drugId",name,strength,therapy_group AS "therapyGroup",eye,dose,route,frequency,duration,instructions,instructions_ur AS "instructionsUr" FROM app.prescription_item WHERE prescription_id=$1 ORDER BY position',[id])).rows;}
 export async function clinicalList(user:AuthUser,context:AuditContext){return withTenant(user.tenantId,user.id,async db=>{const encounters=(await db.query(`${encounterSelect} WHERE e.closed_at IS NULL AND e.stage='consultation' AND e.facility_id=ANY($1::uuid[]) ORDER BY (e.doctor_id=$2) DESC,e.checked_in_at`,[user.facilityIds,user.id])).rows;await log(db,user,context,'clinical.list','encounter',undefined,{count:encounters.length});return {encounters};});}
@@ -45,14 +60,15 @@ export async function timeline(user:AuthUser,id:unknown,context:AuditContext){co
  await log(db,user,context,'clinical.timeline','patient',patientId,{count:entries.length});return {entries};});}
 export async function formulary(user:AuthUser){return withTenant(user.tenantId,user.id,async db=>({drugs:(await db.query('SELECT id,name,strength,therapy_group AS "therapyGroup" FROM app.formulary WHERE active ORDER BY name,strength')).rows}));}
 export async function saveEvent(user:AuthUser,input:unknown,context:AuditContext){const data=parse(eventInputSchema,input);return withTenant(user.tenantId,user.id,async db=>{
- await lockedEncounter(db,user,data.encounterId,true);const prior=(await db.query('SELECT * FROM app.doctor_event WHERE encounter_id=$1 FOR UPDATE',[data.encounterId])).rows[0];
+ const encounter=await lockedEncounter(db,user,data.encounterId,true);const prior=(await db.query('SELECT * FROM app.doctor_event WHERE encounter_id=$1 FOR UPDATE',[data.encounterId])).rows[0];
  if(prior?.status==='signed')throw new ApiError(409,'signedLocked');if(prior && prior.author_id!==user.id)throw new ApiError(403,'clinicalOwner');if((prior?.version??0)!==data.version)throw new ApiError(409,'clinicalConflict');
+ const template=await examinationTemplate(db,prior?.examination_template_id??data.templateId,{facilityId:encounter.facility_id,specialty:encounter.specialty,visitType:encounter.visit_type});if(data.templateId&&template.id!==data.templateId)throw new ApiError(409,'clinicalTemplateChanged');if(validateExaminationAnswers(template.definition,data.answers,user.roles).length)throw new ApiError(400,'clinicalInvalid');
  let id=prior?.id as string|undefined;
- if(!id)id=(await db.query('INSERT INTO app.doctor_event(tenant_id,encounter_id,author_id,complaint,findings,diagnoses,referral,follow_up,drawings) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',[user.tenantId,data.encounterId,user.id,data.complaint,JSON.stringify(data.findings),JSON.stringify(data.diagnoses),data.referral,data.followUp,JSON.stringify(data.drawings)])).rows[0].id;
- else await db.query('UPDATE app.doctor_event SET complaint=$2,findings=$3,diagnoses=$4,referral=$5,follow_up=$6,drawings=$7,version=version+1,updated_at=now() WHERE id=$1',[id,data.complaint,JSON.stringify(data.findings),JSON.stringify(data.diagnoses),data.referral,data.followUp,JSON.stringify(data.drawings)]);
+ if(!id)id=(await db.query('INSERT INTO app.doctor_event(tenant_id,encounter_id,author_id,examination_template_id,examination_answers,complaint,findings,diagnoses,referral,follow_up,drawings) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',[user.tenantId,data.encounterId,user.id,template.id,JSON.stringify(data.answers),data.complaint,JSON.stringify(data.findings),JSON.stringify(data.diagnoses),data.referral,data.followUp,JSON.stringify(data.drawings)])).rows[0].id;
+ else await db.query('UPDATE app.doctor_event SET examination_answers=$2,complaint=$3,findings=$4,diagnoses=$5,referral=$6,follow_up=$7,drawings=$8,version=version+1,updated_at=now() WHERE id=$1',[id,JSON.stringify(data.answers),data.complaint,JSON.stringify(data.findings),JSON.stringify(data.diagnoses),data.referral,data.followUp,JSON.stringify(data.drawings)]);
  await db.query('DELETE FROM app.event_plan WHERE event_id=$1',[id]);
  for(const plan of data.plans)await db.query('INSERT INTO app.event_plan(id,tenant_id,event_id,eye,anatomy_site,intent,notes) VALUES($1,$2,$3,$4,$5,$6,$7)',[plan.id,user.tenantId,id,plan.eye,plan.anatomySite,plan.intent,plan.notes]);
- await log(db,user,context,'clinical.draft_saved','doctor_event',id,{version:data.version+1});return loadDetail(db,user,data.encounterId);
+ await log(db,user,context,'clinical.draft_saved','doctor_event',id,{version:data.version+1,templateId:template.id,templateVersion:template.version});return loadDetail(db,user,data.encounterId);
  });}
 export async function savePrescription(user:AuthUser,input:unknown,context:AuditContext){const data=parse(rxInputSchema,input);return withTenant(user.tenantId,user.id,async db=>{
  if(!data.items.length)throw new ApiError(400,'prescriptionEmpty');
@@ -76,7 +92,7 @@ async function reviewInTransaction(db:PoolClient,user:AuthUser,kind:'event'|'pre
  if(!licence)throw new ApiError(409,'licenceRequired');
  const common={schemaVersion:1,kind,id,version,tenantId:user.tenantId,hospital:user.tenantName,encounterId,patient:detail.patient,prescriber:{id:user.id,name:user.name,licence},synthetic:record.synthetic};
  let snapshot:Record<string,unknown>;let warnings:string[]=[];
- if(kind==='event'){const event=detail.event!;if(!event.complaint||!event.findings.OD||!event.findings.OS||!event.diagnoses.length)throw new ApiError(400,'eventIncomplete');snapshot={...common,complaint:event.complaint,findings:event.findings,diagnoses:event.diagnoses,plans:event.plans,drawings:event.drawings,referral:event.referral,followUp:event.followUp,workup:detail.workup};}
+ if(kind==='event'){const event=detail.event!;if(!event.complaint||!event.findings.OD||!event.findings.OS||!event.diagnoses.length||validateExaminationAnswers(detail.template.definition,event.answers,user.roles).length)throw new ApiError(400,'eventIncomplete');snapshot={...common,examination:{template:{id:detail.template.id,code:detail.template.code,version:detail.template.version,name:detail.template.name,specialty:detail.template.specialty},answers:event.answers},complaint:event.complaint,findings:event.findings,diagnoses:event.diagnoses,plans:event.plans,drawings:event.drawings,referral:event.referral,followUp:event.followUp,workup:detail.workup};}
  else {if(detail.event?.status!=='signed')throw new ApiError(409,'signEventFirst');if(!detail.prescription!.items.length)throw new ApiError(400,'prescriptionEmpty');if(!detail.prescription!.evidence.length)throw new ApiError(409,'prescriptionEvidenceRequired');snapshot={...common,eventId:detail.event.id,eventHash:detail.event.contentHash,items:detail.prescription!.items,evidence:detail.prescription!.evidence.map(({id,filename,mime,hash,capturedAt})=>({id,filename,mime,hash,capturedAt}))};warnings=prescriptionWarnings(detail.prescription!.items,detail.patient.flags);}
  return {snapshot,hash:contentHash(snapshot),warnings,encounterId};
 }

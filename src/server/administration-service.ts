@@ -3,7 +3,7 @@ import { hash, verify } from '@node-rs/argon2';
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
 import type { AuthUser, Permission, Session } from '@/lib/access';
-import { accessSchema, facilitySchema, passwordSchema, settingsSchema, staffSchema, type AdministrationData } from '@/lib/administration';
+import { accessSchema, facilitySchema, passwordSchema, settingsSchema, staffSchema, templateActionSchema, type AdministrationData } from '@/lib/administration';
 import { readBatch, withTenant } from './db';
 import { audit, type AuditContext } from './audit';
 import { ApiError } from './http';
@@ -23,12 +23,14 @@ async function validateFacilities(db:PoolClient,ids:string[]){if((await db.query
 export async function administrationData(user:AuthUser,context:AuditContext):Promise<AdministrationData>{requireAction(user,'admin:read');return withTenant(user.tenantId,user.id,async db=>{
  const [staffRows,facilityRows,tenantRows]=await readBatch(db,[
   {text:`SELECT u.id,u.version,u.full_name AS name,u.email,u.designation,u.licence_number AS licence,u.licence_expiry AS "licenceExpiry",u.status,u.must_change_password AS "mustChangePassword",ARRAY(SELECT role_code FROM app.user_role r WHERE r.user_id=u.id ORDER BY role_code) AS roles,ARRAY(SELECT facility_id FROM app.user_facility f WHERE f.user_id=u.id ORDER BY facility_id) AS "facilityIds" FROM app.user_account u WHERE NOT (EXISTS(SELECT 1 FROM app.user_role retired WHERE retired.user_id=u.id AND retired.role_code IN ('pharmacist','cashier','inventory_officer')) AND NOT EXISTS(SELECT 1 FROM app.user_role active_role WHERE active_role.user_id=u.id AND active_role.role_code NOT IN ('pharmacist','cashier','inventory_officer'))) ORDER BY u.full_name`},
-  {text:`SELECT f.id,f.version,f.name,f.type,f.active,coalesce(s.start_minute,540) AS "startMinute",coalesce(s.end_minute,1020) AS "endMinute",coalesce(s.slot_minutes,15) AS "slotMinutes",coalesce(s.weekdays,ARRAY[0,1,2,3,4,5,6]) AS weekdays,coalesce(s.closed_dates,'{}'::date[])::text[] AS "closedDates",ARRAY(SELECT doctor_id FROM app.clinic_doctor cd WHERE cd.facility_id=f.id AND cd.active ORDER BY doctor_id) AS "doctorIds" FROM app.facility f LEFT JOIN app.clinic_schedule s ON s.facility_id=f.id AND s.tenant_id=f.tenant_id WHERE f.type<>'pharmacy' ORDER BY f.name`},
+  {text:`SELECT f.id,f.version,f.name,f.type,f.specialty,f.active,coalesce(s.start_minute,540) AS "startMinute",coalesce(s.end_minute,1020) AS "endMinute",coalesce(s.slot_minutes,15) AS "slotMinutes",coalesce(s.weekdays,ARRAY[0,1,2,3,4,5,6]) AS weekdays,coalesce(s.closed_dates,'{}'::date[])::text[] AS "closedDates",ARRAY(SELECT doctor_id FROM app.clinic_doctor cd WHERE cd.facility_id=f.id AND cd.active ORDER BY doctor_id) AS "doctorIds" FROM app.facility f LEFT JOIN app.clinic_schedule s ON s.facility_id=f.id AND s.tenant_id=f.tenant_id WHERE f.type<>'pharmacy' ORDER BY f.name`},
   {text:'SELECT name,mrn_prefix,settings,version FROM app.tenant WHERE id=$1',values:[user.tenantId]},
  ]);
  const staff=staffRows as AdministrationData['staff'],facilities=facilityRows as AdministrationData['facilities'];
+ const templates=(await db.query(`SELECT id,code,version,revision,name,specialty,status,is_default AS "isDefault",definition,updated_at AS "updatedAt" FROM app.examination_template ORDER BY code,version DESC`)).rows as AdministrationData['templates'];
+ const templateAssignments=(await db.query(`SELECT id,template_id AS "templateId",facility_id AS "facilityId",specialty,visit_type AS "visitType",active FROM app.examination_template_assignment WHERE active ORDER BY specialty,visit_type`)).rows as AdministrationData['templateAssignments'];
  const tenant=tenantRows[0] as {name:string;mrn_prefix:string;settings:Partial<AdministrationData['hospital']>;version:number};
- await log(db,user,context,'administration.read');return {staff,facilities,hospital:{name:tenant.name,mrnPrefix:tenant.mrn_prefix,version:tenant.version,address:'',phone:'',email:'',clinicalIdleMinutes:15,adminIdleMinutes:30,dilationMinutes:20,...tenant.settings}};
+ await log(db,user,context,'administration.read');return {staff,facilities,templates,templateAssignments,hospital:{name:tenant.name,mrnPrefix:tenant.mrn_prefix,version:tenant.version,address:'',phone:'',email:'',clinicalIdleMinutes:15,adminIdleMinutes:30,dilationMinutes:20,...tenant.settings}};
  });}
 export async function saveStaff(user:AuthUser,input:unknown,context:AuditContext){const data=parseInput(staffSchema,input);requireAction(user,data.id?'staff:write':'account:create');const proof=await verifyAccountPassword(user,data.currentPassword,context);
  const secret=!data.id&&data.temporaryPassword?await hash(data.temporaryPassword,hashOptions):null;if(!data.id&&!secret)throw new ApiError(400,'validationFailed');
@@ -54,8 +56,44 @@ export async function changeAccess(user:AuthUser,input:unknown,context:AuditCont
 export async function changeOwnPassword(session:Session,input:unknown,context:AuditContext){const data=parseInput(z.object({currentPassword:z.string().min(1).max(256),password:passwordSchema}).strict(),input);if(data.currentPassword===data.password)throw new ApiError(400,'passwordMustDiffer');const proof=await verifyAccountPassword(session.user,data.currentPassword,context),secret=await hash(data.password,hashOptions);
  return withTenant(session.user.tenantId,session.user.id,async db=>{await db.query('SELECT id FROM app.user_account WHERE id=$1 FOR UPDATE',[session.user.id]);await checkProof(db,session.user,proof);await db.query('UPDATE app.user_account SET password_hash=$2,must_change_password=false,version=version+1 WHERE id=$1',[session.user.id,secret]);await db.query('DELETE FROM app.session WHERE user_id=$1',[session.user.id]);await log(db,session.user,context,'account.password_changed',session.user.id);return {ok:true};});}
 export async function saveHospital(user:AuthUser,input:unknown,context:AuditContext){requireAction(user,'settings:write');const data=parseInput(settingsSchema,input);return withTenant(user.tenantId,user.id,async db=>{const {name,mrnPrefix,version,...settings}=data;const result=await db.query('UPDATE app.tenant SET name=$2,mrn_prefix=$3,settings=$4,version=version+1 WHERE id=$1 AND version=$5 RETURNING version',[user.tenantId,name,mrnPrefix,JSON.stringify(settings),version]);if(!result.rowCount)throw new ApiError(409,'recordChanged');await log(db,user,context,'hospital.updated',user.tenantId,{fields:Object.keys(data)});return result.rows[0];});}
-export async function saveFacility(user:AuthUser,input:unknown,context:AuditContext){requireAction(user,'settings:write');const data=parseInput(facilitySchema,input);if(!data.id&&data.type==='pharmacy')throw new ApiError(400,'validationFailed');try{return await withTenant(user.tenantId,user.id,async db=>{await lockAdministration(db,user);let id=data.id;if(id){const prior=(await db.query('SELECT * FROM app.facility WHERE id=$1 FOR UPDATE',[id])).rows[0];if(!prior)throw new ApiError(404,'facilityNotFound');if(prior.version!==data.version)throw new ApiError(409,'recordChanged');if(prior.type!==data.type)throw new ApiError(400,'facilityTypeLocked');if(!data.active&&(await db.query("SELECT 1 FROM app.encounter WHERE facility_id=$1 AND closed_at IS NULL UNION ALL SELECT 1 FROM app.appointment WHERE facility_id=$1 AND status='booked' LIMIT 1",[id])).rowCount)throw new ApiError(409,'facilityHasVisits');await db.query('UPDATE app.facility SET name=$2,active=$3,version=version+1 WHERE id=$1',[id,data.name,data.active]);}else{id=(await db.query('INSERT INTO app.facility(tenant_id,name,type,active) VALUES($1,$2,$3,$4) RETURNING id',[user.tenantId,data.name,data.type,data.active])).rows[0].id;}
+export async function saveFacility(user:AuthUser,input:unknown,context:AuditContext){requireAction(user,'settings:write');const data=parseInput(facilitySchema,input);if(!data.id&&data.type==='pharmacy')throw new ApiError(400,'validationFailed');try{return await withTenant(user.tenantId,user.id,async db=>{await lockAdministration(db,user);let id=data.id;if(id){const prior=(await db.query('SELECT * FROM app.facility WHERE id=$1 FOR UPDATE',[id])).rows[0];if(!prior)throw new ApiError(404,'facilityNotFound');if(prior.version!==data.version)throw new ApiError(409,'recordChanged');if(prior.type!==data.type)throw new ApiError(400,'facilityTypeLocked');if(!data.active&&(await db.query("SELECT 1 FROM app.encounter WHERE facility_id=$1 AND closed_at IS NULL UNION ALL SELECT 1 FROM app.appointment WHERE facility_id=$1 AND status='booked' LIMIT 1",[id])).rowCount)throw new ApiError(409,'facilityHasVisits');await db.query('UPDATE app.facility SET name=$2,active=$3,specialty=$4,version=version+1 WHERE id=$1',[id,data.name,data.active,data.specialty]);}else{id=(await db.query('INSERT INTO app.facility(tenant_id,name,type,active,specialty) VALUES($1,$2,$3,$4,$5) RETURNING id',[user.tenantId,data.name,data.type,data.active,data.specialty])).rows[0].id;}
  if(data.type==='clinic'){
  const valid=(await db.query("SELECT u.id FROM app.user_account u WHERE u.id=ANY($1::uuid[]) AND u.status='active' AND EXISTS(SELECT 1 FROM app.user_role r WHERE r.user_id=u.id AND r.role_code='doctor') AND EXISTS(SELECT 1 FROM app.user_facility f WHERE f.user_id=u.id AND f.facility_id=$2)",[data.doctorIds,id])).rowCount;if(valid!==data.doctorIds.length)throw new ApiError(400,'rosterAssignmentRequired');
  await db.query('INSERT INTO app.clinic_schedule(tenant_id,facility_id,start_minute,end_minute,slot_minutes,weekdays,closed_dates) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(tenant_id,facility_id) DO UPDATE SET start_minute=EXCLUDED.start_minute,end_minute=EXCLUDED.end_minute,slot_minutes=EXCLUDED.slot_minutes,weekdays=EXCLUDED.weekdays,closed_dates=EXCLUDED.closed_dates',[user.tenantId,id,data.startMinute,data.endMinute,data.slotMinutes,[...new Set(data.weekdays)],data.closedDates]);await db.query('UPDATE app.clinic_doctor SET active=false WHERE facility_id=$1',[id]);for(const doctorId of data.doctorIds)await db.query('INSERT INTO app.clinic_doctor(tenant_id,facility_id,doctor_id) VALUES($1,$2,$3) ON CONFLICT(tenant_id,facility_id,doctor_id) DO UPDATE SET active=true',[user.tenantId,id,doctorId]);
  }await log(db,user,context,'facility.updated',id,{active:data.active,type:data.type,rosterCount:data.doctorIds.length});return {id};});}catch(error){if((error as {code?:string}).code==='23505')throw new ApiError(409,'facilityNameExists');throw error;}}
+
+
+export async function manageExaminationTemplates(user:AuthUser,input:unknown,context:AuditContext){
+ requireAction(user,'settings:write');
+ const data=parseInput(templateActionSchema,input);
+ return withTenant(user.tenantId,user.id,async db=>{
+  await lockAdministration(db,user);
+  if(data.action==='createVersion'){
+   const source=(await db.query('SELECT * FROM app.examination_template WHERE id=$1 FOR UPDATE',[data.sourceId])).rows[0];
+   if(!source)throw new ApiError(404,'templateNotFound');
+   const version=(await db.query('SELECT coalesce(max(version),0)+1 AS version FROM app.examination_template WHERE code=$1',[source.code])).rows[0].version;
+   const row=(await db.query(`INSERT INTO app.examination_template(tenant_id,code,version,name,specialty,status,is_default,definition) VALUES($1,$2,$3,$4,$5,'draft',false,$6) RETURNING id`,[user.tenantId,source.code,version,source.name,source.specialty,source.definition])).rows[0];
+   await log(db,user,context,'examination_template.version_created',row.id,{sourceId:data.sourceId,version});
+   return row;
+  }
+  if(data.action==='saveDraft'){
+   const result=await db.query(`UPDATE app.examination_template SET name=$2,specialty=$3,definition=$4,revision=revision+1,updated_at=now() WHERE id=$1 AND status='draft' AND revision=$5 RETURNING id`,[data.id,data.name,data.specialty,JSON.stringify(data.definition),data.revision]);
+   if(!result.rowCount)throw new ApiError(409,'recordChanged');
+   await log(db,user,context,'examination_template.draft_saved',data.id,{revision:data.revision+1});
+   return result.rows[0];
+  }
+  if(data.action==='publish'){
+   const result=await db.query(`UPDATE app.examination_template SET status='published',published_at=now(),revision=revision+1,updated_at=now() WHERE id=$1 AND status='draft' AND revision=$2 RETURNING id,code,version`,[data.id,data.revision]);
+   if(!result.rowCount)throw new ApiError(409,'recordChanged');
+   await log(db,user,context,'examination_template.published',data.id,{code:result.rows[0].code,version:result.rows[0].version});
+   return result.rows[0];
+  }
+  const template=(await db.query("SELECT id FROM app.examination_template WHERE id=$1 AND status='published'",[data.templateId])).rows[0];
+  if(!template)throw new ApiError(400,'templatePublishedRequired');
+  if(data.facilityId && !(await db.query("SELECT id FROM app.facility WHERE id=$1 AND active AND type='clinic'",[data.facilityId])).rowCount)throw new ApiError(400,'facilityRequired');
+  await db.query(`UPDATE app.examination_template_assignment SET active=false,updated_at=now() WHERE specialty=$1 AND visit_type=$2 AND facility_id IS NOT DISTINCT FROM $3::uuid AND active`,[data.specialty,data.visitType,data.facilityId]);
+  const row=(await db.query(`INSERT INTO app.examination_template_assignment(tenant_id,template_id,facility_id,specialty,visit_type) VALUES($1,$2,$3,$4,$5) RETURNING id`,[user.tenantId,data.templateId,data.facilityId,data.specialty,data.visitType])).rows[0];
+  await log(db,user,context,'examination_template.assigned',row.id,{templateId:data.templateId,facilityId:data.facilityId,specialty:data.specialty,visitType:data.visitType});
+  return row;
+ });
+}

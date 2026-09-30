@@ -178,6 +178,13 @@ test("an existing patient from another hospital returns 404 without exposing dat
     await db.query("DELETE FROM app.patient WHERE id=$1 AND tenant_id=$2", [patientId, tenantId]);
     await db.query("DELETE FROM app.user_account WHERE id=$1 AND tenant_id=$2", [userId, tenantId]);
     await db.query("DELETE FROM app.facility WHERE id=$1 AND tenant_id=$2", [facilityId, tenantId]);
+    await db.query("DELETE FROM app.examination_template_assignment WHERE tenant_id=$1", [tenantId]);
+    await db.query("ALTER TABLE app.examination_template DISABLE TRIGGER examination_template_immutable");
+    try {
+      await db.query("DELETE FROM app.examination_template WHERE tenant_id=$1", [tenantId]);
+    } finally {
+      await db.query("ALTER TABLE app.examination_template ENABLE TRIGGER examination_template_immutable");
+    }
     await db.query("DELETE FROM app.tenant WHERE id=$1 AND code=$2", [tenantId, `TEST-${tenantId}`]);
     await db.end();
   }

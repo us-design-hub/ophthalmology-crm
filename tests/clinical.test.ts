@@ -2,13 +2,59 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { canonicalJson,contentHash } from '../src/server/clinical-hash';
-import { EMPTY_DRAWINGS,eventInputSchema,rxInputSchema,prescriptionWarnings,type RxItem } from '../src/lib/clinical';
+import { EMPTY_DRAWINGS,eventInputSchema,rxInputSchema,prescriptionWarnings,examinationTemplateDefinitionSchema,validateExaminationAnswers,type RxItem } from '../src/lib/clinical';
 import { ROLE_PERMISSIONS } from '../src/lib/access';
 test('content hashes are independent of object insertion order but preserve laterality and row order',()=>{assert.equal(contentHash({a:1,b:{x:'OD',y:2}}),contentHash({b:{y:2,x:'OD'},a:1}));assert.notEqual(contentHash({eye:'OD'}),contentHash({eye:'OS'}));assert.notEqual(contentHash(['OD','OS']),contentHash(['OS','OD']));assert.equal(canonicalJson({when:new Date('2026-09-14T00:00:00Z')}),'{"when":"2026-09-14T00:00:00.000Z"}');});
 test('event validation rejects missing laterality, duplicate anatomy pairs and injected signing fields',()=>{const plan={id:randomUUID(),eye:'OD',anatomySite:'optic_nerve',intent:'observation',notes:''};const input={encounterId:randomUUID(),version:0,complaint:'Demo',findings:{OD:'Right',OS:'Left'},diagnoses:[{eye:'OU',label:'Demo diagnosis'}],plans:[plan],referral:'',followUp:'',drawings:structuredClone(EMPTY_DRAWINGS)};assert.equal(eventInputSchema.safeParse(input).success,true);assert.equal(eventInputSchema.safeParse({...input,status:'signed'}).success,false);assert.equal(eventInputSchema.safeParse({...input,plans:[plan,{...plan,id:randomUUID()}]}).success,false);assert.equal(eventInputSchema.safeParse({...input,diagnoses:[{label:'Missing eye'}]}).success,false);});
-const item:RxItem={id:randomUUID(),drugId:randomUUID(),name:'Example',strength:'Demo',eye:'OD',dose:'Demo dose',route:'Demo route',frequency:'Demo frequency',duration:'Demo duration',instructions:'',instructionsUr:'صرف نمونہ'};
+const item:RxItem={id:randomUUID(),drugId:randomUUID(),name:'Example',strength:'Demo',eye:'OD',dose:'Demo dose',route:'Demo route',frequency:'Demo frequency',duration:'Demo duration',instructions:'',instructionsUr:'ØµØ±Ù Ù†Ù…ÙˆÙ†Û'};
 test('prescription entry requires explicit medication directions and preserves Urdu text',()=>{const data={encounterId:randomUUID(),version:0,items:[item]};assert.equal(rxInputSchema.parse(data).items[0].instructionsUr,item.instructionsUr);assert.equal(rxInputSchema.safeParse({...data,items:[{...item,dose:''}]}).success,false);assert.equal(rxInputSchema.safeParse({...data,signedBy:randomUUID()}).success,false);});
 test('warning review differentiates separate eyes from overlapping duplicate therapy',()=>{assert.deepEqual(prescriptionWarnings([item,{...item,id:randomUUID(),eye:'OS'}],[]),[]);assert.deepEqual(prescriptionWarnings([item,{...item,id:randomUUID(),eye:'OU'}],[]),['duplicateTherapyReview']);assert.deepEqual(prescriptionWarnings([{...item,drugId:null}],[{type:'allergy',value:'Needs reconciliation'}]),['allergyReview','nonFormularyReview']);});
 test('prescribing and signing are restricted to doctors and retired pharmacy access is empty',()=>{for(const role of ['receptionist','nurse','hospital_admin','pharmacist'] as const)assert.equal(ROLE_PERMISSIONS[role].includes('clinical:sign'),false);assert.ok(ROLE_PERMISSIONS.doctor.includes('clinical:sign'));assert.deepEqual(ROLE_PERMISSIONS.pharmacist,[]);});
 
 test('clinical drawings validate bounded stylus paths and reject injected SVG content',()=>{const valid=structuredClone(EMPTY_DRAWINGS);valid.OD.strokes.push({id:randomUUID(),color:'#7f1d1d',width:6,points:[[10,20],[30,40]]});const base={encounterId:randomUUID(),version:0,complaint:'Demo',findings:{OD:'Right',OS:'Left'},diagnoses:[{eye:'OU',label:'Demo'}],plans:[],referral:'',followUp:'',drawings:valid};assert.equal(eventInputSchema.safeParse(base).success,true);assert.equal(eventInputSchema.safeParse({...base,drawings:{...valid,OD:{...valid.OD,strokes:[{...valid.OD.strokes[0],color:'url(javascript:bad)'}]}}}).success,false);assert.equal(eventInputSchema.safeParse({...base,drawings:{...valid,OS:{...valid.OS,template:'uploaded-html'}}}).success,false);});
+
+
+test('examination templates enforce unique fields, laterality, required values and select options',()=>{
+ const definition={sections:[{id:'ocular_exam',title:'Ocular examination',fields:[
+  {id:'fundus',label:'Fundus',type:'textarea',laterality:'bilateral',required:true,maxLength:100},
+  {id:'outcome',label:'Outcome',type:'select',laterality:'none',required:false,options:['Follow-up','Discharge']},
+ ]}]};
+ const template=examinationTemplateDefinitionSchema.parse(definition);
+ assert.deepEqual(validateExaminationAnswers(template,{fundus:{OD:'Normal',OS:'Normal'},outcome:'Follow-up'}),[]);
+ assert.ok(validateExaminationAnswers(template,{fundus:{OD:'',OS:'Normal'},outcome:'Unknown'}).includes('fundus:required'));
+ assert.ok(validateExaminationAnswers(template,{fundus:'Normal'}).includes('fundus:laterality'));
+ assert.ok(validateExaminationAnswers(template,{fundus:{OD:'Normal',OS:'Normal'},unexpected:'value'}).includes('unexpected:unknown'));
+ assert.equal(examinationTemplateDefinitionSchema.safeParse({sections:[...definition.sections,{id:'duplicate',title:'Duplicate',fields:[definition.sections[0].fields[0]]}]}).success,false);
+});
+
+
+test('examination templates apply role visibility and conditional field rules',()=>{
+ const template=examinationTemplateDefinitionSchema.parse({sections:[{id:'outcome',title:'Outcome',fields:[
+  {id:'visit_outcome',label:'Visit outcome',type:'select',laterality:'none',required:true,options:['Follow-up','Discharge']},
+  {id:'recall_interval',label:'Recall interval',type:'text',laterality:'none',required:true,roles:['doctor'],visibleWhen:{fieldId:'visit_outcome',operator:'equals',value:'Follow-up'}},
+  {id:'handoff_note',label:'Handoff note',type:'textarea',laterality:'none',required:true,roles:['nurse']},
+ ]}]});
+ assert.deepEqual(validateExaminationAnswers(template,{visit_outcome:'Discharge'},['doctor']),[]);
+ assert.ok(validateExaminationAnswers(template,{visit_outcome:'Follow-up'},['doctor']).includes('recall_interval:required'));
+ assert.ok(validateExaminationAnswers(template,{visit_outcome:'Discharge',recall_interval:'3 months'},['doctor']).includes('recall_interval:hidden'));
+ assert.ok(validateExaminationAnswers(template,{visit_outcome:'Follow-up',recall_interval:'3 months',handoff_note:'Not permitted'},['doctor']).includes('handoff_note:hidden'));
+ assert.equal(examinationTemplateDefinitionSchema.safeParse({sections:[{id:'bad',title:'Bad',fields:[
+  {id:'dependent',label:'Dependent',type:'text',laterality:'none',required:false,visibleWhen:{fieldId:'later',operator:'answered'}},
+  {id:'later',label:'Later',type:'text',laterality:'none',required:false},
+ ]}]}).success,false);
+});
+
+
+test('conditional template rules reject incompatible controller options, types and roles',()=>{
+ const base={sections:[{id:'rules',title:'Rules',fields:[
+  {id:'outcome',label:'Outcome',type:'select',laterality:'none',required:false,options:['Follow-up'],roles:['doctor']},
+  {id:'detail',label:'Detail',type:'text',laterality:'none',required:false,roles:['doctor'],visibleWhen:{fieldId:'outcome',operator:'equals',value:'Follow-up'}},
+ ]}]};
+ assert.equal(examinationTemplateDefinitionSchema.safeParse(base).success,true);
+ const unknownOption:any=structuredClone(base);unknownOption.sections[0].fields[1].visibleWhen.value='Discharge';
+ assert.equal(examinationTemplateDefinitionSchema.safeParse(unknownOption).success,false);
+ const wrongType:any=structuredClone(base);wrongType.sections[0].fields[1].visibleWhen.value=true;
+ assert.equal(examinationTemplateDefinitionSchema.safeParse(wrongType).success,false);
+ const hiddenController:any=structuredClone(base);hiddenController.sections[0].fields[1].roles=['doctor','nurse'];
+ assert.equal(examinationTemplateDefinitionSchema.safeParse(hiddenController).success,false);
+});

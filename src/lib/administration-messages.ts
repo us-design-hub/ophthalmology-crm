@@ -2,12 +2,12 @@
 // intake-messages / clinical-messages / operations-messages.
 export const administrationMessages = {
   // --- shell ---------------------------------------------------------------
-  adminLoading: "Loading administration…",
+  adminLoading: "Loading administrationÃ¢â‚¬Â¦",
   adminLoadFailed: "Unable to load administration.",
   adminSaved: "Changes saved.",
   adminSaveFailed: "Unable to save. Check your permissions and entries.",
   adminConnectFailed: "Unable to connect.",
-  adminSaving: "Saving…",
+  adminSaving: "SavingÃ¢â‚¬Â¦",
   adminSaveChanges: "Save changes",
   adminCancel: "Cancel",
 
@@ -26,6 +26,7 @@ export const administrationMessages = {
   adminTabStaff: "Staff and access",
   adminTabHospital: "Hospital settings",
   adminTabFacilities: "Clinics and facilities",
+  adminTabTemplates: "Examination templates",
 
   // --- staff table ---------------------------------------------------------
   adminStaffTitle: "Staff and user accounts",
@@ -79,6 +80,7 @@ export const administrationMessages = {
   adminEditFacility: "Edit facility",
   adminNewFacility: "New facility",
   adminFacilityName: "Facility name",
+  adminSpecialty: "Clinical specialty",
   adminType: "Type",
   adminOpeningTime: "Opening time",
   adminClosingTime: "Closing time",

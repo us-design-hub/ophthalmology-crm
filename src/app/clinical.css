@@ -5,3 +5,17 @@
 @media(max-width:500px){.rx-item-grid{grid-template-columns:1fr}.doctor-layout>aside .clinical-history{grid-template-columns:1fr 1fr}.clinical-bilateral,.clinical-workup-eyes{gap:8px}.clinical-workup-eyes>div{padding:8px}.clinical-workup-eyes dl{grid-template-columns:1fr}.clinical-complete{align-items:start;flex-direction:column}.clinical-signature>button{width:100%}}
 
 .clinical-encounter-grid{max-height:max(480px,calc(100dvh - 290px));overflow-y:auto;padding:2px 4px 12px;scrollbar-width:thin}.signature-snapshot>p,.signature-snapshot section p{white-space:pre-wrap}
+
+.examination-template{display:grid;gap:14px;margin:16px 0 22px}
+.examination-template-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--surface-subtle)}
+.examination-template-header>div{display:grid;gap:3px}
+.examination-template-header strong{font-size:var(--text-xl);color:var(--brand-700)}
+.examination-template-header span,.examination-template-header small{font-size:var(--text-base);color:var(--text-muted)}
+.examination-section{border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:0 14px 14px;background:var(--surface-page)}
+.examination-section>summary{cursor:pointer;font-size:var(--text-xl);font-weight:650;padding:14px 0}
+.examination-section>.intake-help{margin:0 0 14px}
+.examination-bilateral-field{display:grid;gap:8px}
+.examination-bilateral-field>h4{margin:6px 0 0}
+.examination-boolean{display:flex!important;grid-template-columns:auto 1fr;align-items:center}
+.examination-boolean input{width:auto!important}
+@media(max-width:700px){.examination-template-header{align-items:flex-start}.examination-template-header small{white-space:nowrap}}
