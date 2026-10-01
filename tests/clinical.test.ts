@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { canonicalJson,contentHash } from '../src/server/clinical-hash';
 import { EMPTY_DRAWINGS,eventInputSchema,rxInputSchema,prescriptionWarnings,examinationTemplateDefinitionSchema,validateExaminationAnswers,type RxItem } from '../src/lib/clinical';
 import { ROLE_PERMISSIONS } from '../src/lib/access';
+import { clinicalMarkersForTemplate,suggestedDrawingSection } from '../src/lib/clinical-drawing';
 test('content hashes are independent of object insertion order but preserve laterality and row order',()=>{assert.equal(contentHash({a:1,b:{x:'OD',y:2}}),contentHash({b:{y:2,x:'OD'},a:1}));assert.notEqual(contentHash({eye:'OD'}),contentHash({eye:'OS'}));assert.notEqual(contentHash(['OD','OS']),contentHash(['OS','OD']));assert.equal(canonicalJson({when:new Date('2026-09-14T00:00:00Z')}),'{"when":"2026-09-14T00:00:00.000Z"}');});
 test('event validation rejects missing laterality, duplicate anatomy pairs and injected signing fields',()=>{const plan={id:randomUUID(),eye:'OD',anatomySite:'optic_nerve',intent:'observation',notes:''};const input={encounterId:randomUUID(),version:0,complaint:'Demo',findings:{OD:'Right',OS:'Left'},diagnoses:[{eye:'OU',label:'Demo diagnosis'}],plans:[plan],referral:'',followUp:'',drawings:structuredClone(EMPTY_DRAWINGS)};assert.equal(eventInputSchema.safeParse(input).success,true);assert.equal(eventInputSchema.safeParse({...input,status:'signed'}).success,false);assert.equal(eventInputSchema.safeParse({...input,plans:[plan,{...plan,id:randomUUID()}]}).success,false);assert.equal(eventInputSchema.safeParse({...input,diagnoses:[{label:'Missing eye'}]}).success,false);});
 const item:RxItem={id:randomUUID(),drugId:randomUUID(),name:'Example',strength:'Demo',eye:'OD',dose:'Demo dose',route:'Demo route',frequency:'Demo frequency',duration:'Demo duration',instructions:'',instructionsUr:'ØµØ±Ù Ù†Ù…ÙˆÙ†Û'};
@@ -57,4 +58,24 @@ test('conditional template rules reject incompatible controller options, types a
  assert.equal(examinationTemplateDefinitionSchema.safeParse(wrongType).success,false);
  const hiddenController:any=structuredClone(base);hiddenController.sections[0].fields[1].roles=['doctor','nurse'];
  assert.equal(examinationTemplateDefinitionSchema.safeParse(hiddenController).success,false);
+});
+
+
+test('structured clinical markers enforce catalogue, template and placement bounds',()=>{
+ const valid=structuredClone(EMPTY_DRAWINGS);
+ valid.OD.markers.push({id:randomUUID(),type:'retinal_tear',x:720,y:130,size:42,rotation:25,label:'Superior temporal tear'});
+ const base={encounterId:randomUUID(),version:0,complaint:'Demo',findings:{OD:'Right',OS:'Left'},diagnoses:[{eye:'OD',label:'Retinal tear'}],plans:[],referral:'',followUp:'',drawings:valid};
+ assert.equal(eventInputSchema.safeParse(base).success,true);
+ assert.ok(clinicalMarkersForTemplate('fundus').some(marker=>marker.type==='retinal_tear'));
+ assert.equal(eventInputSchema.safeParse({...base,drawings:{...valid,OD:{...valid.OD,markers:[{...valid.OD.markers[0],type:'script'}]}}}).success,false);
+ assert.equal(eventInputSchema.safeParse({...base,drawings:{...valid,OD:{...valid.OD,markers:[{...valid.OD.markers[0],x:1001}]}}}).success,false);
+ assert.equal(eventInputSchema.safeParse({...base,drawings:{...valid,OD:{...valid.OD,template:'anterior'}}}).success,false);
+});
+
+
+test('drawing sheets bind fundus and anterior views to the matching examination section',()=>{
+ const sections=[{id:'visit_history',title:'Presenting complaint'},{id:'anterior_segment',title:'Anterior segment examination'},{id:'posterior_segment',title:'Posterior segment and motility'}];
+ assert.equal(suggestedDrawingSection(sections,'fundus').id,'posterior_segment');
+ assert.equal(suggestedDrawingSection(sections,'anterior').id,'anterior_segment');
+ assert.equal(suggestedDrawingSection([], 'blank').id,'clinical_drawing');
 });

@@ -7,4 +7,7 @@ for (const key of ["DATABASE_URL", "DATABASE_ADMIN_URL"]) {
   process.env[key] = url.toString();
 }
 process.env.APP_ORIGIN = "http://127.0.0.1:3100";
+// Keep local E2E PDF rendering on the repository-managed Chromium even when
+// a private production migration environment file exists on the workstation.
+process.env.PDF_CHROMIUM_EXECUTABLE = "";
 

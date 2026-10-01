@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ANATOMY_SITES } from './anatomy';
+import { CLINICAL_MARKER_TYPES, DRAWING_TEMPLATES, markerAllowedOnTemplate } from './clinical-drawing';
 import type { Encounter, Workup } from './intake';
 
 export const laterality = z.enum(['OD', 'OS', 'OU']);
@@ -23,15 +24,33 @@ const drawingStrokeSchema = z.object({
   width: z.number().int().min(2).max(16),
   points: z.array(drawingPointSchema).min(2).max(240),
 }).strict();
-export const eyeDrawingSchema = z.object({
-  template: z.enum(['fundus', 'anterior', 'blank']),
-  strokes: z.array(drawingStrokeSchema).max(40),
+const drawingMarkerSchema = z.object({
+  id: z.uuid(),
+  type: z.enum(CLINICAL_MARKER_TYPES),
+  x: z.number().int().min(0).max(1000),
+  y: z.number().int().min(0).max(500),
+  size: z.number().int().min(12).max(120),
+  rotation: z.number().int().min(-180).max(180),
+  label: text(120),
 }).strict();
+export const eyeDrawingSchema = z.object({
+  template: z.enum(DRAWING_TEMPLATES),
+  sectionId: z.string().regex(/^[a-z][a-z0-9_]{1,63}$/),
+  sectionLabel: text(120).min(1),
+  strokes: z.array(drawingStrokeSchema).max(40),
+  markers: z.array(drawingMarkerSchema).max(60),
+}).strict().superRefine((drawing, context) => {
+  drawing.markers.forEach((marker, index) => {
+    if (!markerAllowedOnTemplate(marker.type, drawing.template)) {
+      context.addIssue({ code: 'custom', path: ['markers', index, 'type'], message: 'Marker is not valid for this drawing template' });
+    }
+  });
+});
 export const drawingsSchema = z.object({ OD: eyeDrawingSchema, OS: eyeDrawingSchema }).strict();
 export type ClinicalDrawings = z.infer<typeof drawingsSchema>;
 export const EMPTY_DRAWINGS: ClinicalDrawings = {
-  OD: { template: 'fundus', strokes: [] },
-  OS: { template: 'fundus', strokes: [] },
+  OD: { template: 'fundus', sectionId: 'clinical_drawing', sectionLabel: 'Clinical drawing', strokes: [], markers: [] },
+  OS: { template: 'fundus', sectionId: 'clinical_drawing', sectionLabel: 'Clinical drawing', strokes: [], markers: [] },
 };
 
 const fieldId = z.string().regex(/^[a-z][a-z0-9_]{1,63}$/);
@@ -305,6 +324,16 @@ export type ClinicalDetail = {
 };
 export type ClinicalList = {
   encounters: (Encounter & { eventStatus: 'draft' | 'signed' | null; closedAt: string | null })[];
+};
+export type DrawingHistory = {
+  entries: {
+    eventId: string;
+    encounterId: string;
+    signedAt: string;
+    clinic: string;
+    author: string;
+    drawings: ClinicalDrawings;
+  }[];
 };
 export type Timeline = {
   entries: {

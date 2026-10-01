@@ -184,3 +184,15 @@ test('General Ophthalmology v2 is published, valid and assigned as the active ba
   assert.ok(definition.sections.some(section=>section.fields.some(field=>field.roles?.includes('nurse'))));
   assert.ok(definition.sections.some(section=>section.fields.some(field=>field.visibleWhen)));
 });
+
+
+test('clinical drawing documents contain structured marker arrays', async () => {
+  const invalid = await admin.query(`SELECT count(*)::int AS total FROM app.doctor_event
+    WHERE jsonb_typeof(drawings->'OD'->'markers') <> 'array'
+       OR jsonb_typeof(drawings->'OS'->'markers') <> 'array'
+       OR jsonb_typeof(drawings->'OD'->'sectionId') <> 'string'
+       OR jsonb_typeof(drawings->'OD'->'sectionLabel') <> 'string'
+       OR jsonb_typeof(drawings->'OS'->'sectionId') <> 'string'
+       OR jsonb_typeof(drawings->'OS'->'sectionLabel') <> 'string'`);
+  assert.equal(invalid.rows[0].total, 0);
+});

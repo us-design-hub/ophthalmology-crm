@@ -58,10 +58,10 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Persistent bilateral drawing sheets inside Doctor Events
 - [x] Apple Pencil-compatible pointer drawing through the browser
 - [~] Drawing templates and freehand evidence stored with the signed event
-- [ ] Structured ophthalmic markers such as tears, haemorrhages, exudates, laser areas, grafts, lenses, and tubes
-- [ ] Marker parameters, anatomical position, laterality, size, rotation, and clinical labels
-- [ ] Combined structured annotation and freehand overlay
-- [ ] Drawing comparison across visits
+- [~] Initial structured markers cover tears, haemorrhages, exudates, laser areas, grafts, lenses, and tubes; clinical review and catalogue expansion remain
+- [x] Marker parameters, anatomical position, laterality, size, rotation, and clinical labels
+- [x] Combined structured annotation and freehand overlay
+- [x] Drawing comparison across visits
 - [ ] Clinician-approved template and marker catalogue
 
 ### Prescriptions
@@ -146,11 +146,13 @@ Initial sections:
 
 ### Phase 2 - Structured ophthalmic drawing
 
-- [ ] Define the marker data model separately from rendered pixels
-- [ ] Add a clinically reviewed initial marker catalogue
-- [ ] Support touch, Apple Pencil, undo/redo, zoom, and freehand overlay
-- [ ] Bind drawings to examination sections and signed event snapshots
-- [ ] Display prior-visit drawings for comparison without modifying them
+Technical implementation is complete. Hospital approval of the marker catalogue is the deployment checkpoint for this phase.
+
+- [x] Define the marker data model separately from rendered pixels
+- [x] Add an initial marker catalogue; hospital clinical review remains required
+- [x] Support touch, Apple Pencil, undo/redo, zoom, pan, and freehand overlay
+- [x] Bind drawings to examination sections and signed event snapshots
+- [x] Display prior-visit signed drawings for read-only comparison
 
 ### Phase 3 - Odoo operational integration
 

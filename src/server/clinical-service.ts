@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg';
 import { verify } from '@node-rs/argon2';
 import { timingSafeEqual } from 'node:crypto';
 import type { AuthUser } from '@/lib/access';
-import { eventInputSchema,rxInputSchema,reviewSchema,signSchema,addendumSchema,prescriptionWarnings,examinationTemplateDefinitionSchema,validateExaminationAnswers,type ClinicalDetail,type DoctorEvent,type ExaminationTemplate,type Prescription,type Review } from '@/lib/clinical';
+import { eventInputSchema,rxInputSchema,reviewSchema,signSchema,addendumSchema,prescriptionWarnings,examinationTemplateDefinitionSchema,validateExaminationAnswers,type ClinicalDetail,type ClinicalDrawings,type DoctorEvent,type ExaminationTemplate,type Prescription,type Review } from '@/lib/clinical';
 import { canonicalJson,contentHash } from './clinical-hash';
 import { privateHash } from './crypto';
 import { withTenant } from './db';
@@ -32,6 +32,10 @@ async function examinationTemplate(db:PoolClient,id?:string,context?:{facilityId
  const definition=examinationTemplateDefinitionSchema.safeParse(row?.definition);if(!row||!definition.success)throw new ApiError(503,'clinicalTemplateUnavailable');
  return {...row,definition:definition.data};
 }
+function drawingSectionsValid(drawings:ClinicalDrawings,template:ExaminationTemplate['definition']){
+ const sections=new Map(template.sections.map(section=>[section.id,section.title]));
+ return (['OD','OS'] as const).every(eye=>{const drawing=drawings[eye],populated=drawing.strokes.length>0||drawing.markers.length>0;return !populated||(sections.get(drawing.sectionId)===drawing.sectionLabel);});
+}
 async function lockedEncounter(db:PoolClient,user:AuthUser,id:string,write=false) {
  const row=(await db.query('SELECT * FROM app.encounter WHERE id=$1 AND facility_id=ANY($2::uuid[]) FOR UPDATE',[id,user.facilityIds])).rows[0];
  if(!row)throw new ApiError(404,'encounterNotFound');
@@ -58,11 +62,24 @@ export async function timeline(user:AuthUser,id:unknown,context:AuditContext){co
  if(!(await db.query('SELECT id FROM app.patient WHERE id=$1',[patientId])).rowCount)throw new ApiError(404,'patientNotFound');
  const entries=(await db.query(`SELECT e.id,e.checked_in_at AS date,f.name AS clinic,u.full_name AS author,d.id AS "eventId",d.status,coalesce(d.synthetic,false) AS synthetic,coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.encounter_id=e.id),0) AS "workupVersion",(SELECT count(*)::int FROM app.clinical_addendum a WHERE a.event_id=d.id OR a.prescription_id IN (SELECT r.id FROM app.prescription r WHERE r.event_id=d.id)) AS "addendumCount" FROM app.encounter e JOIN app.facility f ON f.id=e.facility_id JOIN app.user_account u ON u.id=e.doctor_id LEFT JOIN app.doctor_event d ON d.encounter_id=e.id WHERE e.patient_id=$1 AND e.facility_id=ANY($2::uuid[]) ORDER BY e.checked_in_at DESC LIMIT 100`,[patientId,user.facilityIds])).rows;
  await log(db,user,context,'clinical.timeline','patient',patientId,{count:entries.length});return {entries};});}
+export async function drawingHistory(user:AuthUser,id:unknown,current:unknown,context:AuditContext){const patientId=parse(z.uuid(),id),currentEncounterId=current?parse(z.uuid(),current):null;return withTenant(user.tenantId,user.id,async db=>{
+ if(!(await db.query('SELECT id FROM app.patient WHERE id=$1',[patientId])).rowCount)throw new ApiError(404,'patientNotFound');
+ const entries=(await db.query(`SELECT d.id AS "eventId",e.id AS "encounterId",d.signed_at AS "signedAt",f.name AS clinic,u.full_name AS author,d.drawings
+  FROM app.doctor_event d
+  JOIN app.encounter e ON e.id=d.encounter_id AND e.tenant_id=d.tenant_id
+  JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id
+  JOIN app.user_account u ON u.id=d.author_id AND u.tenant_id=d.tenant_id
+  WHERE e.patient_id=$1 AND e.facility_id=ANY($2::uuid[]) AND d.status='signed'
+    AND ($3::uuid IS NULL OR e.id<>$3)
+    AND (jsonb_array_length(d.drawings->'OD'->'strokes')+jsonb_array_length(d.drawings->'OS'->'strokes')+jsonb_array_length(d.drawings->'OD'->'markers')+jsonb_array_length(d.drawings->'OS'->'markers'))>0
+  ORDER BY d.signed_at DESC LIMIT 12`,[patientId,user.facilityIds,currentEncounterId])).rows;
+ await log(db,user,context,'clinical.drawing_history','patient',patientId,{count:entries.length});return {entries};
+ });}
 export async function formulary(user:AuthUser){return withTenant(user.tenantId,user.id,async db=>({drugs:(await db.query('SELECT id,name,strength,therapy_group AS "therapyGroup" FROM app.formulary WHERE active ORDER BY name,strength')).rows}));}
 export async function saveEvent(user:AuthUser,input:unknown,context:AuditContext){const data=parse(eventInputSchema,input);return withTenant(user.tenantId,user.id,async db=>{
  const encounter=await lockedEncounter(db,user,data.encounterId,true);const prior=(await db.query('SELECT * FROM app.doctor_event WHERE encounter_id=$1 FOR UPDATE',[data.encounterId])).rows[0];
  if(prior?.status==='signed')throw new ApiError(409,'signedLocked');if(prior && prior.author_id!==user.id)throw new ApiError(403,'clinicalOwner');if((prior?.version??0)!==data.version)throw new ApiError(409,'clinicalConflict');
- const template=await examinationTemplate(db,prior?.examination_template_id??data.templateId,{facilityId:encounter.facility_id,specialty:encounter.specialty,visitType:encounter.visit_type});if(data.templateId&&template.id!==data.templateId)throw new ApiError(409,'clinicalTemplateChanged');if(validateExaminationAnswers(template.definition,data.answers,user.roles).length)throw new ApiError(400,'clinicalInvalid');
+ const template=await examinationTemplate(db,prior?.examination_template_id??data.templateId,{facilityId:encounter.facility_id,specialty:encounter.specialty,visitType:encounter.visit_type});if(data.templateId&&template.id!==data.templateId)throw new ApiError(409,'clinicalTemplateChanged');if(validateExaminationAnswers(template.definition,data.answers,user.roles).length||!drawingSectionsValid(data.drawings,template.definition))throw new ApiError(400,'clinicalInvalid');
  let id=prior?.id as string|undefined;
  if(!id)id=(await db.query('INSERT INTO app.doctor_event(tenant_id,encounter_id,author_id,examination_template_id,examination_answers,complaint,findings,diagnoses,referral,follow_up,drawings) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',[user.tenantId,data.encounterId,user.id,template.id,JSON.stringify(data.answers),data.complaint,JSON.stringify(data.findings),JSON.stringify(data.diagnoses),data.referral,data.followUp,JSON.stringify(data.drawings)])).rows[0].id;
  else await db.query('UPDATE app.doctor_event SET examination_answers=$2,complaint=$3,findings=$4,diagnoses=$5,referral=$6,follow_up=$7,drawings=$8,version=version+1,updated_at=now() WHERE id=$1',[id,JSON.stringify(data.answers),data.complaint,JSON.stringify(data.findings),JSON.stringify(data.diagnoses),data.referral,data.followUp,JSON.stringify(data.drawings)]);
