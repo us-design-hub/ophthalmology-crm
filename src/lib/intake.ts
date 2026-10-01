@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { todayKarachi } from "./patients";
 
-export const STAGES = ["waiting", "workup", "dilation", "consultation", "pharmacy_billing"] as const;
+export const STAGES = ["waiting", "workup", "dilation", "consultation"] as const;
 export type Stage = typeof STAGES[number];
 export const VA_VALUES = ["6/4", "6/5", "6/6", "6/9", "6/12", "6/18", "6/24", "6/36", "6/60", "3/60", "1/60", "CF", "HM", "PL", "NPL", "not_tested"] as const;
 export const IOP_METHODS = ["Goldmann", "NCT", "Tonopen"] as const;

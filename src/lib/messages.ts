@@ -17,7 +17,7 @@ export const en = {
   care: "CLINICAL CARE", operations: "HOSPITAL OPERATIONS", platform: "PLATFORM",
   overview: "Overview", patients: "Patients", appointments: "Appointments", queue: "Live queue",
   workup: "Ophthalmic workup", doctorEvent: "Doctor Event", prescriptions: "Prescriptions",
-  pharmacy: "Pharmacy", billing: "Billing & cashier", surgery: "Surgery lifecycle",
+  surgery: "Surgery lifecycle",
   roadmap: "Build roadmap", administration: "Administration", upcoming: "Planned for a later build milestone",
   prototype: "Working demo", demoOnly: "DEMONSTRATION ONLY", notClinical: "Powered by Logic box",
   sessionOnly: "Practice workspace · changes last until you reload", language: "Switch language",
@@ -143,7 +143,7 @@ export type Locale = "en" | "ur";
 export const ur: Partial<Record<MessageKey, string>> = {
   hospital: "نمونہ آئی ہسپتال", overview: "جائزہ", patients: "مریض", appointments: "ملاقاتیں", queue: "مریضوں کی قطار",
   care: "طبی نگہداشت", operations: "ہسپتال کے امور", platform: "پلیٹ فارم", workspace: "طبی ورک اسپیس",
-  doctorEvent: "ڈاکٹر کا معائنہ", prescriptions: "نسخے", pharmacy: "فارمیسی", billing: "بلنگ اور کیشئر",
+  doctorEvent: "ڈاکٹر کا معائنہ", prescriptions: "نسخے",
   roadmap: "ترقیاتی منصوبہ", rightEye: "دائیں آنکھ", leftEye: "بائیں آنکھ", title: "درست آنکھ، درست انتخاب۔",
   anatomyTitle: "دونوں آنکھوں کی ساخت", threeD: "تھری ڈی منظر", twoD: "دو جہتی خاکہ", resetView: "منظر بحال کریں",
   planTitle: "علاج کا منصوبہ", addToPlan: "منتخب حصے منصوبے میں شامل کریں", noPatient: "مریض کا ریکارڈ منسلک نہیں",

@@ -31,7 +31,7 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Stable MRN and encrypted identity correction history
 - [x] Appointment booking, cancellation, rescheduling, and no-show handling
 - [x] Walk-in registration and arrival
-- [x] Check-in, live queue, workup, dilation, consultation handoff, and completion
+- [x] Check-in, full live queue, focused ophthalmic workup queue, dilation, consultation handoff, and direct clinical completion
 - [x] Bilateral visual acuity, IOP, refraction, and logMAR workup
 - [x] Patient 360/history timeline backed by saved encounters
 - [~] Configurable clinic pathways and worklists
@@ -109,8 +109,9 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 
 ### Reporting and production operations
 
-- [x] Operational CSV and printable reports
-- [x] Audit viewer and facility-scoped operational dashboards
+- [x] Clinical operational CSV and printable reports
+- [x] Audit viewer and facility-scoped clinical and surgery dashboards
+- [x] Retired pharmacy, cashier, billing, inventory preview routes, permissions, navigation, and runtime database access
 - [x] Automated domain, database, and browser test foundations
 - [~] Production prescription PDF runtime and Urdu font validation
 - [ ] Private S3/KMS evidence and document storage
@@ -186,5 +187,3 @@ Technical implementation is complete. Hospital approval of the marker catalogue 
 ## Definition of OpenEyes-equivalent scope
 
 The target is equivalent hospital workflow coverage and ophthalmology depth, with a simpler tablet experience and modern integrations. Completion means the hospital can configure and run its required ophthalmology clinics without depending on demo fixtures or the retired pharmacy, cashier, billing, and inventory functions. It does not require duplicating every historical OpenEyes module before launch; modules are delivered according to hospital-approved specialty priority.
-
-

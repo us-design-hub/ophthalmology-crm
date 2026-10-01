@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     await consumeLimit(`audit:${user.tenantId}:${user.id}`, 60, 60);
     const page = Number(new URL(request.url).searchParams.get("page") ?? 1);
     const group = new URL(request.url).searchParams.get("group") ?? 'all';
-    const predicates: Record<string, string> = { all: 'true', clinical: "a.action IN ('clinical.signed','prescription.signed','clinical.addendum')", previews: "a.action LIKE 'preview.%'", examples: "a.action='security.break_glass_example' AND a.metadata->>'synthetic'='true'" };
+    const predicates: Record<string, string> = { all: 'true', clinical: "a.action IN ('clinical.signed','prescription.signed','clinical.addendum')", examples: "a.action='security.break_glass_example' AND a.metadata->>'synthetic'='true'" };
     if (!Object.hasOwn(predicates, group)) throw new ApiError(400, 'invalidRequest');
     if (!Number.isInteger(page) || page < 1 || page > 10000) throw new ApiError(400, "invalidRequest");
     const data = await withTenant(user.tenantId, user.id, async db => {

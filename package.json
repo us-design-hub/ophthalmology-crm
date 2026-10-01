@@ -18,7 +18,6 @@
     "check": "npm run typecheck && npm test && npm run build",
     "db:seed:intake": "tsx scripts/seed-intake.ts",
     "db:seed:clinical": "tsx scripts/seed-clinical.ts",
-    "db:seed:operations": "tsx scripts/seed-operations.ts",
     "db:seed:live": "tsx scripts/seed-live-operations.ts",
     "preflight:production": "tsx scripts/production-preflight.ts",
     "db:migrate:production": "tsx scripts/migrate-production.ts",

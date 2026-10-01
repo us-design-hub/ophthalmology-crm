@@ -8,7 +8,7 @@ Patient 360 displays actual encounter history. The additive seed supplies 246 ex
 
 Doctors edit only their own assigned, open consultation encounters in authorized clinics. Nurse/technician clinical access is read-only. Pharmacists see signed prescriptions for the hospital, without access to Doctor Events. Reception cannot access clinical content. Tenant isolation applies to clinical parents, child rows, formulary, and addenda.
 
-Doctor Events retain complaint, bilateral findings, explicitly eye-labelled diagnoses, anatomy-site/eye plans, referral, follow-up, and workup context. The existing eleven procedural anatomy structures and selectable 2D fallback attach the same stable site identifiers. The separate Anatomy practice page remains unsaved practice.
+Doctor Events retain complaint, bilateral findings, explicitly eye-labelled diagnoses, anatomy-site/eye plans, referral, follow-up, and workup context. The existing eleven procedural anatomy structures and selectable 2D fallback attach the same stable site identifiers. Anatomy selection and persistent bilateral drawing are available only inside a patient-linked Doctor Event.
 
 ## Signing and amendments
 

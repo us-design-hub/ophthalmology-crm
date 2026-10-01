@@ -123,7 +123,7 @@ test("operations snapshots require tenant context and reject all runtime writes"
   } finally {await app.query('ROLLBACK');}
 });
 
-test('new operational tables enforce RLS and financial and stock ledgers are append-only',async()=>{const names=['stock_batch','stock_movement','dispense','invoice','invoice_line','payment','refund','cashier_session','surgery_case','consent_document','patient_history','prescription_evidence'];for(const name of names){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}for(const statement of ['UPDATE app.stock_movement SET quantity=1 WHERE false','DELETE FROM app.payment WHERE false','UPDATE app.invoice SET total_paisa=0 WHERE false','UPDATE app.dispense SET actor_id=gen_random_uuid() WHERE false','DELETE FROM app.consent_document WHERE false',"UPDATE app.patient_history SET text='tampered' WHERE false"])await assert.rejects(app.query(statement),(e:{code?:string})=>e.code==='42501');});
+test('active clinical operations tables enforce RLS and immutable evidence',async()=>{const names=['surgery_case','consent_document','patient_history','prescription_evidence'];for(const name of names){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}for(const statement of ['DELETE FROM app.consent_document WHERE false',"UPDATE app.patient_history SET text='tampered' WHERE false"])await assert.rejects(app.query(statement),(e:{code?:string})=>e.code==='42501');});
 
 test('Odoo identity mappings enforce tenant isolation and retired access is absent', async () => {
   const security = (await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='app.patient_external_identity'::regclass")).rows[0];
@@ -135,7 +135,12 @@ test('Odoo identity mappings enforce tenant isolation and retired access is abse
   await app.query('BEGIN');
   try {
     await app.query("SELECT set_config('app.tenant_id',$1,true)", [tenantId]);
-    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('pharmacist','cashier','inventory_officer') OR permission_code IN ('patient:create','patient:edit','pharmacy:dispense','billing:write')")).rows[0].total, 0);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('pharmacist','cashier','inventory_officer') OR permission_code IN ('patient:create','patient:edit','anatomy:use','preview:inventory','preview:billing','preview:surgery','preview:management','preview:admin','inventory:write','pharmacy:dispense','billing:write','billing:discount','billing:approve_refund')")).rows[0].total, 0);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.permission WHERE code IN ('surgery:read','management:read')")).rows[0].total, 2);
+    assert.equal((await admin.query("SELECT has_table_privilege('openeyes_app','app.invoice','SELECT') AS allowed")).rows[0].allowed, false);
+    assert.equal((await admin.query("SELECT has_table_privilege('openeyes_app','app.stock_batch','SELECT') AS allowed")).rows[0].allowed, false);
+    const encounterStage = (await admin.query("SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='app.encounter'::regclass AND conname='encounter_stage_check'")).rows[0].definition;
+    assert.equal(encounterStage.includes('pharmacy_billing'), false);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.user_role WHERE role_code IN ('pharmacist','cashier','inventory_officer')")).rows[0].total, 0);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.doctor_event WHERE jsonb_typeof(drawings)<>'object' OR drawings IS NULL")).rows[0].total, 0);
   } finally { await app.query('ROLLBACK'); }
