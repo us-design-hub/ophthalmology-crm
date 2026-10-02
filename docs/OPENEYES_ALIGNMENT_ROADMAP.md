@@ -48,7 +48,7 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Required, optional, ordered, role-visible, and conditionally visible examination fields
 - [ ] Structured ophthalmic history and systemic/ocular disorder sections
 - [~] Initial structured anterior-segment, cornea, lens, fundus, optic-disc, gonioscopy, and motility fields are implemented; clinical refinement remains
-- [ ] Cataract, retina, glaucoma, cornea, paediatric, and optometry examination templates
+- [~] Cataract assessment template is published; retina, glaucoma, cornea, paediatric, and optometry templates remain
 - [ ] Outcome, next-step, recall, and management-plan configuration
 
 ### Anatomy and clinical drawing
@@ -84,11 +84,11 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Sequential surgery stages, scheduling, history, and cancellation
 - [x] Uploaded consent evidence with witness and laterality checks
 - [~] Basic surgery lifecycle and theatre association
-- [ ] Configurable procedure catalogue
-- [ ] Preoperative assessment and checklist templates
-- [ ] Procedure-specific operation notes, beginning with cataract
-- [ ] Intraoperative devices, complications, anaesthesia, and personnel
-- [ ] Postoperative instructions, medication, outcome, and follow-up
+- [~] Procedure catalogue foundation with the active cataract phaco/IOL procedure; administration UI remains
+- [~] Structured cataract biometry, IOL planning, clearance, and dilation checks; configurable checklist templates remain
+- [x] Cataract-specific operation note with technique, IOL, anaesthesia, complications, and postoperative instructions
+- [~] Cataract complications and anaesthesia are structured; device catalogue and theatre personnel remain
+- [x] Cataract postoperative instructions and structured day-one, week-one, month-one, and additional follow-up records
 - [ ] Structured consent signatories, withdrawal, confirmation, and version history
 - [ ] Theatre list and surgical worklist views
 - [-] Surgery pricing, estimates, invoicing, and cashier workflow
@@ -164,15 +164,15 @@ Technical implementation is complete. Hospital approval of the marker catalogue 
 
 ### Phase 4 - Specialty templates and longitudinal record
 
-- [ ] Add cataract, retina, glaucoma, cornea, optometry, and follow-up templates in the order approved by the hospital
+- [~] Cataract assessment is published; retina, glaucoma, cornea, optometry, and general follow-up templates remain
 - [ ] Present a chronological timeline of typed clinical events, drawings, investigations, prescriptions, consent, and surgery
 - [ ] Add configurable clinic pathways and worklists
 - [ ] Add comparison views for measurements and drawings across visits
 
 ### Phase 5 - Surgery depth
 
-- [ ] Add procedure catalogue and cataract operation note
-- [ ] Add preoperative checks, theatre list, intraoperative record, and postoperative plan
+- [~] Cataract catalogue entry and operation note are complete; catalogue administration remains
+- [~] Cataract preoperative checks, intraoperative note, postoperative instructions, and follow-ups are complete; theatre list remains
 - [ ] Add further procedure templates based on hospital volume
 - [ ] Expand consent into structured signatories and versioned confirmation
 

@@ -123,7 +123,7 @@ test("operations snapshots require tenant context and reject all runtime writes"
   } finally {await app.query('ROLLBACK');}
 });
 
-test('active clinical operations tables enforce RLS and immutable evidence',async()=>{const names=['surgery_case','consent_document','patient_history','prescription_evidence'];for(const name of names){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}for(const statement of ['DELETE FROM app.consent_document WHERE false',"UPDATE app.patient_history SET text='tampered' WHERE false"])await assert.rejects(app.query(statement),(e:{code?:string})=>e.code==='42501');});
+test('active clinical operations tables enforce RLS and immutable evidence',async()=>{const names=['surgery_case','consent_document','patient_history','prescription_evidence','procedure_catalogue','surgery_preop_assessment','surgery_operation_note','surgery_followup'];for(const name of names){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}for(const statement of ['DELETE FROM app.consent_document WHERE false',"UPDATE app.patient_history SET text='tampered' WHERE false"])await assert.rejects(app.query(statement),(e:{code?:string})=>e.code==='42501');});
 
 test('Odoo identity mappings enforce tenant isolation and retired access is absent', async () => {
   const security = (await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='app.patient_external_identity'::regclass")).rows[0];
@@ -200,4 +200,16 @@ test('clinical drawing documents contain structured marker arrays', async () => 
        OR jsonb_typeof(drawings->'OS'->'sectionId') <> 'string'
        OR jsonb_typeof(drawings->'OS'->'sectionLabel') <> 'string'`);
   assert.equal(invalid.rows[0].total, 0);
+});
+
+test("cataract pathway provisions a catalogue procedure and a valid published examination template", async () => {
+  const procedure = await admin.query("SELECT code,name,specialty FROM app.procedure_catalogue WHERE tenant_id=$1 AND code='cataract-phaco-iol' AND active", [tenantId]);
+  assert.equal(procedure.rowCount, 1);
+  assert.equal(procedure.rows[0].specialty, "Cataract");
+  const template = (await admin.query("SELECT definition FROM app.examination_template WHERE tenant_id=$1 AND name='Cataract assessment' AND status='published'", [tenantId])).rows[0];
+  assert.ok(template);
+  const definition = examinationTemplateDefinitionSchema.parse(template.definition);
+  assert.ok(definition.sections.some(section => section.id === "cataract_history"));
+  assert.ok(definition.sections.some(section => section.id === "cataract_examination"));
+  assert.ok(definition.sections.some(section => section.id === "cataract_decision"));
 });

@@ -45,9 +45,46 @@ test('appointments cancel and reschedule atomically without losing the old booki
 test('clinic configuration drives slot availability without removing historical roster references',async({page,baseURL})=>{
  await loginAs(page.request,baseURL!,'omar.siddiqui');let d=await(await page.request.get('/api/administration/overview')).json();const f=d.facilities.find((f:{name:string})=>f.name==='General Ophthalmology');const tomorrow=new Date(Date.parse(todayKarachi())+86400000).toISOString().slice(0,10);await ok(page.request,baseURL!,'/api/administration/facility',{...f,closedDates:[tomorrow]});const slots=await(await page.request.get(`/api/intake/slots?facilityId=${f.id}&doctorId=${f.doctorIds[0]}&date=${tomorrow}`)).json();expect(slots.slots).toHaveLength(0);await ok(page.request,baseURL!,'/api/administration/facility',{...f,version:f.version+1});
 });
-test('surgery requires actual consent storage and matching eye before sequential progression',async({page,baseURL})=>{
- await loginAs(page.request,baseURL!,'sara.khan');const d=await(await page.request.get('/api/operations/surgery')).json();const theatre=d.facilities.find((f:{type:string})=>f.type==='theatre');expect(theatre).toBeTruthy();const c=await ok(page.request,baseURL!,'/api/operations/surgery',{action:'create',encounterId:d.encounters[0].id,facilityId:theatre.id,eye:'OD',procedure:'Synthetic cataract case'});const stage={action:'advance',id:c.id,version:1,stage:'consent',eye:'OD',notes:'Consent verified for synthetic case'};expect((await post(page.request,baseURL!,'/api/operations/surgery',stage)).status()).toBe(409);expect((await post(page.request,baseURL!,'/api/operations/surgery',{...stage,stage:'scheduled'})).status()).toBe(409);
- const file={name:'synthetic-consent.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6GtMAAAAASUVORK5CYII=','base64')};const uploaded=await page.request.post('/api/operations/consent',{headers:{Origin:baseURL!},multipart:{caseId:c.id,eye:'OD',witness:'Synthetic witness',file}});expect(uploaded.status(),await uploaded.text()).toBe(200);await ok(page.request,baseURL!,'/api/operations/surgery',stage);await ok(page.request,baseURL!,'/api/operations/surgery',{...stage,version:2,stage:'preop',notes:'Pre-operative clearance recorded'});const scheduled=new Date(Date.now()+86400000).toISOString();expect((await post(page.request,baseURL!,'/api/operations/surgery',{...stage,version:3,stage:'scheduled',eye:'OS',scheduled})).status()).toBe(409);await ok(page.request,baseURL!,'/api/operations/surgery',{...stage,version:3,stage:'scheduled',scheduled});await page.goto('/');await page.getByRole('button',{name:'Surgery lifecycle',exact:true}).click();await expect(page.getByRole('heading',{name:'Surgery cases',exact:true})).toBeVisible();await page.screenshot({path:'test-results/usable-surgery.png',fullPage:true});
+test('cataract surgery requires consent, verified pre-op, operation note and follow-up records',async({page,baseURL})=>{
+ const db=new pg.Client({connectionString:process.env.DATABASE_ADMIN_URL});
+ await db.connect();
+ try {
+  await db.query("INSERT INTO app.user_facility(tenant_id,user_id,facility_id) SELECT u.tenant_id,u.id,f.id FROM app.user_account u JOIN app.facility f ON f.tenant_id=u.tenant_id WHERE u.email='sara.khan@demo.openeyes.local' AND f.type='theatre' ON CONFLICT DO NOTHING");
+ } finally { await db.end(); }
+ await loginAs(page.request,baseURL!,'sara.khan');
+ const data=await(await page.request.get('/api/operations/surgery')).json();
+ const theatre=data.facilities.find((facility:{type:string})=>facility.type==='theatre');
+ const procedure=data.procedures.find((item:{code:string})=>item.code==='cataract-phaco-iol');
+ expect(theatre).toBeTruthy();
+ expect(procedure).toBeTruthy();
+ const created=await ok(page.request,baseURL!,'/api/operations/surgery',{action:'create',encounterId:data.encounters[0].id,facilityId:theatre.id,eye:'OD',procedureCode:procedure.code});
+ const stage={action:'advance',id:created.id,version:1,stage:'consent',eye:'OD',notes:'Consent verified for cataract pathway'};
+ expect((await post(page.request,baseURL!,'/api/operations/surgery',stage)).status()).toBe(409);
+ const file={name:'synthetic-consent.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6GtMAAAAASUVORK5CYII=','base64')};
+ const uploaded=await page.request.post('/api/operations/consent',{headers:{Origin:baseURL!},multipart:{caseId:created.id,eye:'OD',witness:'Synthetic witness',file}});
+ expect(uploaded.status(),await uploaded.text()).toBe(200);
+ await ok(page.request,baseURL!,'/api/operations/surgery',stage);
+ await ok(page.request,baseURL!,'/api/operations/surgery',{action:'save_preop',id:created.id,version:0,eye:'OD',axialLength:23.45,keratometryK1:43.1,keratometryK2:44.2,targetRefraction:-0.25,iolModel:'Synthetic IOL',iolPower:21.5,anaesthesia:'topical',biometryVerified:true,medicalClearance:true,pupilDilation:true,notes:'Synthetic pre-operative assessment'});
+ await ok(page.request,baseURL!,'/api/operations/surgery',{...stage,version:2,stage:'preop',notes:'Pre-operative assessment verified'});
+ const scheduled=new Date(Date.now()+86400000).toISOString();
+ expect((await post(page.request,baseURL!,'/api/operations/surgery',{...stage,version:3,stage:'scheduled',eye:'OS',scheduled})).status()).toBe(409);
+ await ok(page.request,baseURL!,'/api/operations/surgery',{...stage,version:3,stage:'scheduled',scheduled,notes:'Scheduled after verified assessment'});
+ expect((await post(page.request,baseURL!,'/api/operations/surgery',{...stage,version:4,stage:'operated',notes:'Attempt without operation note'})).status()).toBe(409);
+ await ok(page.request,baseURL!,'/api/operations/surgery',{action:'save_operation',id:created.id,version:0,eye:'OD',procedurePerformed:'Phacoemulsification and IOL',anaesthesia:'topical',incision:'2.4 mm clear corneal',capsulorhexis:'Continuous curvilinear',phacoTechnique:'Divide and conquer',iolModel:'Synthetic IOL',iolPower:21.5,complications:'None',postoperativeInstructions:'Topical medication and protective shield'});
+ await ok(page.request,baseURL!,'/api/operations/surgery',{...stage,version:4,stage:'operated',notes:'Procedure completed without complication'});
+ await ok(page.request,baseURL!,'/api/operations/surgery',{action:'save_followup',id:created.id,version:0,visitType:'day_1',eye:'OD',uncorrectedAcuity:'6/12',correctedAcuity:'6/6',iop:15,wound:'Secure',cornea:'Clear',anteriorChamber:'Deep and quiet',iolPosition:'Centered',medications:'Continue prescribed drops',plan:'Review in one week'});
+ await ok(page.request,baseURL!,'/api/operations/surgery',{action:'save_followup',id:created.id,version:1,visitType:'day_1',eye:'OD',uncorrectedAcuity:'6/9',correctedAcuity:'6/6',iop:14,wound:'Secure',cornea:'Clear',anteriorChamber:'Deep and quiet',iolPosition:'Centered',medications:'Continue prescribed drops',plan:'Corrected review in one week'});
+ const refreshed=await(await page.request.get('/api/operations/surgery')).json();
+ const saved=refreshed.cases.find((item:{id:string})=>item.id===created.id);
+ expect(saved.preop.biometryVerified).toBe(true);
+ expect(saved.operationNote.iolModel).toBe('Synthetic IOL');
+ expect(saved.followups).toHaveLength(1);
+ expect(saved.followups[0].version).toBe(2);
+ expect(saved.followups[0].plan).toBe('Corrected review in one week');
+ await page.goto('/');
+ await page.getByRole('button',{name:'Surgery lifecycle',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Surgery cases',exact:true})).toBeVisible();
+ await page.screenshot({path:'test-results/usable-surgery.png',fullPage:true});
 });
 test('live dashboards derive clinical records and reports enforce roles',async({page,baseURL})=>{
  await loginAs(page.request,baseURL!,'omar.siddiqui');const data=await(await page.request.get('/api/operations/management')).json();expect(data.bookings.total).toBeGreaterThanOrEqual(0);expect(Array.isArray(data.surgery)).toBe(true);expect(Array.isArray(data.waits)).toBe(true);expect(data.documentation.visits).toBeGreaterThanOrEqual(data.documentation.signed);for(const type of ['clinic','staff','events']){const response=await page.request.get('/api/reports/'+type+'?date='+todayKarachi()+'&format=csv');expect(response.status(),await response.text()).toBe(200);expect(response.headers()['content-type']).toContain('text/csv');}for(const retired of ['cashier','dispensing','expiry'])expect((await page.request.get('/api/reports/'+retired+'?date='+todayKarachi()+'&format=csv')).status()).toBe(400);await page.goto('/');await page.getByRole('button',{name:'Management',exact:true}).click();await expect(page.getByRole('heading',{name:'Signed clinical documentation'})).toBeVisible();await page.setViewportSize({width:820,height:1180});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

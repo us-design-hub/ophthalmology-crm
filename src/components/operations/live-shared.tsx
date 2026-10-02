@@ -18,7 +18,11 @@ const errors:Record<string,string>={
  validationFailed:'Check the form entries and required fields.',
  accessDenied:'Your role or facility assignment does not allow this action.',
  signedEventRequired:'A signed doctor event is required.',
- theatreRequired:'Select a theatre facility.'
+ theatreRequired:'Select a theatre facility.',
+ procedureNotFound:'Select an active procedure from the catalogue.',
+ cataractProcedureRequired:'This record is not configured as a cataract procedure.',
+ preopRequired:'Complete and verify the cataract preoperative assessment before scheduling.',
+ operationNoteRequired:'Save the cataract operation note before recording the surgery as completed.'
 };
 
 export function operationError(e:unknown){return e instanceof ClientApiError?(errors[e.code]||'Unable to save ('+e.code+').'):'Unable to connect. Please try again.';}

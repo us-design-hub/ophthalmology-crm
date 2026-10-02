@@ -7,6 +7,7 @@ import { audit, type AuditContext } from "./audit";
 import { ApiError } from "./http";
 import { parseInput, requireAction } from "./administration-service";
 import { todayKarachi } from "@/lib/patients";
+import { cataractAction, isCataractAction } from "./cataract-service";
 
 const uuid = z.uuid();
 const text = (max = 500) => z.string().trim().max(max);
@@ -29,12 +30,23 @@ export async function operationsData(user: AuthUser, resource: string, context: 
   return withTenant(user.tenantId, user.id, async db => {
     let result: Record<string, unknown>;
     if (resource === "surgery") {
-      const [facilities, encounters, cases] = await readBatch(db, [
+      const [facilities, encounters, procedures, cases] = await readBatch(db, [
         { text: "SELECT id,name,type FROM app.facility WHERE active AND id=ANY($1::uuid[]) ORDER BY name", values: [user.facilityIds] },
         { text: `SELECT e.id,p.mrn,p.given_name||' '||p.family_name AS patient,e.facility_id AS "facilityId" FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id JOIN app.doctor_event d ON d.encounter_id=e.id AND d.status='signed' WHERE e.facility_id=ANY($1::uuid[]) ORDER BY e.checked_in_at DESC LIMIT 200`, values: [user.facilityIds] },
-        { text: `SELECT c.id,c.version,c.eye,c.procedure,CASE WHEN c.stage='estimate' THEN 'planning' ELSE c.stage END AS stage,c.scheduled_at AS scheduled,c.facility_id AS "facilityId",p.mrn,p.given_name||' '||p.family_name AS patient,(SELECT coalesce(jsonb_agg(jsonb_build_object('stage',CASE WHEN t.stage='estimate' THEN 'planning' ELSE t.stage END,'eye',t.eye,'notes',t.notes,'at',t.at,'actor',u.full_name) ORDER BY t.at),'[]') FROM app.surgery_transition t JOIN app.user_account u ON u.id=t.actor_id WHERE t.case_id=c.id) AS history,(SELECT coalesce(jsonb_agg(jsonb_build_object('id',d.id,'filename',d.filename,'eye',d.eye,'witness',d.witness,'at',d.at)),'[]') FROM app.consent_document d WHERE d.case_id=c.id) AS documents FROM app.surgery_case c JOIN app.encounter e ON e.id=c.encounter_id JOIN app.patient p ON p.id=e.patient_id WHERE c.facility_id=ANY($1::uuid[]) ORDER BY c.created_at DESC LIMIT 200`, values: [user.facilityIds] },
+        { text: "SELECT code,name,specialty FROM app.procedure_catalogue WHERE active ORDER BY specialty,name" },
+        { text: `SELECT c.id,c.version,c.eye,c.procedure,pc.code AS "procedureCode",CASE WHEN c.stage='estimate' THEN 'planning' ELSE c.stage END AS stage,c.scheduled_at AS scheduled,c.facility_id AS "facilityId",p.mrn,p.given_name||' '||p.family_name AS patient,
+          (SELECT coalesce(jsonb_agg(jsonb_build_object('stage',CASE WHEN t.stage='estimate' THEN 'planning' ELSE t.stage END,'eye',t.eye,'notes',t.notes,'at',t.at,'actor',u.full_name) ORDER BY t.at),'[]') FROM app.surgery_transition t JOIN app.user_account u ON u.id=t.actor_id WHERE t.case_id=c.id) AS history,
+          (SELECT coalesce(jsonb_agg(jsonb_build_object('id',d.id,'filename',d.filename,'eye',d.eye,'witness',d.witness,'at',d.at)),'[]') FROM app.consent_document d WHERE d.case_id=c.id) AS documents,
+          (SELECT jsonb_build_object('version',a.version,'axialLength',a.axial_length,'keratometryK1',a.keratometry_k1,'keratometryK2',a.keratometry_k2,'targetRefraction',a.target_refraction,'iolModel',a.iol_model,'iolPower',a.iol_power,'anaesthesia',a.anaesthesia,'biometryVerified',a.biometry_verified,'medicalClearance',a.medical_clearance,'pupilDilation',a.pupil_dilation,'notes',a.notes) FROM app.surgery_preop_assessment a WHERE a.case_id=c.id) AS preop,
+          (SELECT jsonb_build_object('version',n.version,'procedurePerformed',n.procedure_performed,'anaesthesia',n.anaesthesia,'incision',n.incision,'capsulorhexis',n.capsulorhexis,'phacoTechnique',n.phaco_technique,'iolModel',n.iol_model,'iolPower',n.iol_power,'complications',n.complications,'postoperativeInstructions',n.postoperative_instructions) FROM app.surgery_operation_note n WHERE n.case_id=c.id) AS "operationNote",
+          (SELECT coalesce(jsonb_agg(jsonb_build_object('version',f.version,'visitType',f.visit_type,'uncorrectedAcuity',f.uncorrected_acuity,'correctedAcuity',f.corrected_acuity,'iop',f.iop,'wound',f.wound,'cornea',f.cornea,'anteriorChamber',f.anterior_chamber,'iolPosition',f.iol_position,'medications',f.medications,'plan',f.plan,'nextReview',f.next_review) ORDER BY f.created_at),'[]') FROM app.surgery_followup f WHERE f.case_id=c.id) AS followups
+         FROM app.surgery_case c
+         JOIN app.encounter e ON e.id=c.encounter_id
+         JOIN app.patient p ON p.id=e.patient_id
+         LEFT JOIN app.procedure_catalogue pc ON pc.id=c.procedure_catalogue_id
+         WHERE c.facility_id=ANY($1::uuid[]) ORDER BY c.created_at DESC LIMIT 200`, values: [user.facilityIds] },
       ]);
-      result = { facilities, encounters, cases };
+      result = { facilities, encounters, procedures, cases };
     } else {
       result = await dashboard(db, user);
     }
@@ -46,8 +58,9 @@ export async function operationsData(user: AuthUser, resource: string, context: 
 export const SURGERY_STAGES = ["estimate", "consent", "preop", "scheduled", "operated", "discharged", "followup"] as const;
 export async function surgeryAction(user: AuthUser, input: unknown, context: AuditContext) {
   requireAction(user, "surgery:write");
+  if (isCataractAction(input)) return cataractAction(user, input, context);
   const data = parseInput(z.discriminatedUnion("action", [
-    z.object({ action: z.literal("create"), encounterId: uuid, facilityId: uuid, eye: z.enum(["OD", "OS"]), procedure: text(200).min(1) }).strict(),
+    z.object({ action: z.literal("create"), encounterId: uuid, facilityId: uuid, eye: z.enum(["OD", "OS"]), procedureCode: text(80).optional(), procedure: text(200).optional() }).strict(),
     z.object({ action: z.literal("advance"), id: uuid, version: z.number().int().positive(), stage: z.enum([...SURGERY_STAGES, "cancelled"]), eye: z.enum(["OD", "OS"]), notes: reason, scheduled: z.iso.datetime({ offset: true }).optional() }).strict(),
   ]), input);
   return withTenant(user.tenantId, user.id, async db => {
@@ -56,7 +69,10 @@ export async function surgeryAction(user: AuthUser, input: unknown, context: Aud
       await facility(db, user, data.facilityId);
       if (!(await db.query("SELECT 1 FROM app.facility WHERE id=$1 AND type='theatre'", [data.facilityId])).rowCount) throw new ApiError(400, "theatreRequired");
       if (!(await db.query("SELECT 1 FROM app.encounter e JOIN app.doctor_event v ON v.encounter_id=e.id WHERE e.id=$1 AND e.facility_id=ANY($2::uuid[]) AND v.status='signed'", [data.encounterId, user.facilityIds])).rowCount) throw new ApiError(400, "signedEventRequired");
-      const created = (await db.query("INSERT INTO app.surgery_case(tenant_id,encounter_id,facility_id,eye,procedure,estimate_paisa,created_by) VALUES($1,$2,$3,$4,$5,0,$6) RETURNING id", [user.tenantId, data.encounterId, data.facilityId, data.eye, data.procedure, user.id])).rows[0];
+      if (!data.procedureCode && !data.procedure) throw new ApiError(400, "validationFailed");
+      const catalogue = data.procedureCode ? (await db.query("SELECT id,name FROM app.procedure_catalogue WHERE code=$1 AND active", [data.procedureCode])).rows[0] : null;
+      if (data.procedureCode && !catalogue) throw new ApiError(400, "procedureNotFound");
+      const created = (await db.query("INSERT INTO app.surgery_case(tenant_id,encounter_id,facility_id,eye,procedure,procedure_catalogue_id,estimate_paisa,created_by) VALUES($1,$2,$3,$4,$5,$6,0,$7) RETURNING id", [user.tenantId, data.encounterId, data.facilityId, data.eye, catalogue?.name ?? data.procedure, catalogue?.id ?? null, user.id])).rows[0];
       await db.query("INSERT INTO app.surgery_transition(tenant_id,case_id,stage,eye,notes,actor_id) VALUES($1,$2,'estimate',$3,'Case created',$4)", [user.tenantId, created.id, data.eye, user.id]);
       await log(db, user, context, "surgery.created", created.id);
       return created;
@@ -70,6 +86,8 @@ export async function surgeryAction(user: AuthUser, input: unknown, context: Aud
       if (["operated", "discharged", "followup", "cancelled"].includes(surgeryCase.stage)) throw new ApiError(409, "stageConflict");
     } else if (SURGERY_STAGES[SURGERY_STAGES.indexOf(surgeryCase.stage) + 1] !== data.stage) throw new ApiError(409, "stageConflict");
     if (["consent", "scheduled"].includes(data.stage) && !(await db.query("SELECT 1 FROM app.consent_document WHERE case_id=$1 AND eye=$2", [surgeryCase.id, surgeryCase.eye])).rowCount) throw new ApiError(409, "consentDocumentRequired");
+    if (data.stage === "scheduled" && surgeryCase.procedure_catalogue_id && !(await db.query("SELECT 1 FROM app.surgery_preop_assessment WHERE case_id=$1 AND biometry_verified AND medical_clearance", [surgeryCase.id])).rowCount) throw new ApiError(409, "preopRequired");
+    if (data.stage === "operated" && surgeryCase.procedure_catalogue_id && !(await db.query("SELECT 1 FROM app.surgery_operation_note WHERE case_id=$1", [surgeryCase.id])).rowCount) throw new ApiError(409, "operationNoteRequired");
     if (data.stage === "scheduled" && (!data.scheduled || Date.parse(data.scheduled) < Date.now())) throw new ApiError(400, "futureSurgeryRequired");
     if (["operated", "discharged", "followup", "preop"].includes(data.stage) && !user.roles.includes("doctor")) throw new ApiError(403, "doctorRequired");
     await db.query("UPDATE app.surgery_case SET stage=$2,version=version+1,scheduled_at=coalesce($3,scheduled_at) WHERE id=$1", [surgeryCase.id, data.stage, data.scheduled ?? null]);
