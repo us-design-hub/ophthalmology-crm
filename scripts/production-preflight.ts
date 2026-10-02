@@ -36,7 +36,8 @@ async function main() {
   if (!/^(true|false)$/.test(required("TRUST_PROXY"))) throw new Error("TRUST_PROXY must be true or false");
 
   const runtimeUrl = new URL(required("DATABASE_URL"));
-  if (decodeURIComponent(runtimeUrl.username) !== "openeyes_app") throw new Error("DATABASE_URL must use the restricted openeyes_app role");
+  const runtimeUsername = decodeURIComponent(runtimeUrl.username);
+  if (runtimeUsername !== "openeyes_app" && !/^openeyes_app.[a-z0-9]+$/i.test(runtimeUsername)) throw new Error("DATABASE_URL must use the restricted openeyes_app role");
   const adminUrl = new URL(required("DATABASE_ADMIN_URL"));
   const keys = [key("IDENTIFIER_ENCRYPTION_KEY"), key("IDENTIFIER_INDEX_KEY"), key("SESSION_PEPPER")];
   if (new Set(keys.map(value => value.toString("hex"))).size !== keys.length) throw new Error("Encryption, index, and session keys must be independent values");
