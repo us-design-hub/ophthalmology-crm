@@ -347,7 +347,48 @@ export type Timeline = {
     workupVersion: number;
     addendumCount: number;
   }[];
+  activity: PatientTimelineActivity[];
 };
+export type PatientTimelineActivity = {
+  id: string;
+  kind: 'appointment' | 'checkin' | 'workup' | 'doctor_event' | 'drawing' | 'prescription' | 'prescription_evidence' | 'addendum' | 'consent' | 'surgery' | 'operation_note' | 'surgery_followup' | 'problem';
+  at: string;
+  summary: string;
+  clinic: string;
+  author: string;
+  status: string;
+  encounterId: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type ClinicalProblemTransition = {
+  id: string;
+  fromStatus: 'active' | 'resolved' | null;
+  toStatus: 'active' | 'resolved';
+  reason: string;
+  actor: string;
+  at: string;
+};
+export type ClinicalProblem = {
+  id: string;
+  patientId: string;
+  sourceEventId: string;
+  latestEventId: string;
+  eye: 'OD' | 'OS' | 'OU';
+  label: string;
+  codeSystem: 'ICD-10' | 'SNOMED CT' | null;
+  code: string | null;
+  status: 'active' | 'resolved';
+  onsetAt: string;
+  resolvedAt: string | null;
+  resolutionReason: string | null;
+  version: number;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+  history: ClinicalProblemTransition[];
+};
+export type ClinicalProblemList = { problems: ClinicalProblem[] };
 export type Review = { snapshot: Record<string, unknown>; hash: string; warnings: string[] };
 
 export function prescriptionWarnings(

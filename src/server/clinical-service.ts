@@ -13,6 +13,9 @@ import { consumeLimit,configuredTenant } from './auth';
 import { ApiError } from './http';
 import { audit,type AuditContext } from './audit';
 import { appOrigin } from './config';
+import { patientTimelineActivities } from './patient-timeline-service';
+import { problemList, syncSignedProblems, updateProblemStatus } from './clinical-problem-service';
+export { problemList, updateProblemStatus };
 function parse<T>(schema:z.ZodType<T>,input:unknown):T {const result=schema.safeParse(input);if(!result.success)throw new ApiError(400,'clinicalInvalid');return result.data;}
 const flags=`(SELECT coalesce(jsonb_agg(jsonb_build_object('type',f.type,'value',f.value)),'[]') FROM app.patient_flag f WHERE f.tenant_id=p.tenant_id AND f.patient_id=p.id AND f.resolved_at IS NULL)`;
 const encounterSelect=`SELECT e.id,e.patient_id AS "patientId",p.given_name||' '||p.family_name AS name,p.mrn,p.dob,p.gender,${flags} AS flags,e.facility_id AS "facilityId",f.name AS clinic,f.specialty,e.visit_type AS "visitType",e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.closed_at AS "closedAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.encounter_id=e.id AND w.tenant_id=e.tenant_id),0) AS "workupVersion",d.status AS "eventStatus" FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id LEFT JOIN app.doctor_event d ON d.encounter_id=e.id AND d.tenant_id=e.tenant_id`;
@@ -61,7 +64,8 @@ export async function clinicalDetail(user:AuthUser,id:unknown,context:AuditConte
 export async function timeline(user:AuthUser,id:unknown,context:AuditContext){const patientId=parse(z.uuid(),id);return withTenant(user.tenantId,user.id,async db=>{
  if(!(await db.query('SELECT id FROM app.patient WHERE id=$1',[patientId])).rowCount)throw new ApiError(404,'patientNotFound');
  const entries=(await db.query(`SELECT e.id,e.checked_in_at AS date,f.name AS clinic,u.full_name AS author,d.id AS "eventId",d.status,coalesce(d.synthetic,false) AS synthetic,coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.encounter_id=e.id),0) AS "workupVersion",(SELECT count(*)::int FROM app.clinical_addendum a WHERE a.event_id=d.id OR a.prescription_id IN (SELECT r.id FROM app.prescription r WHERE r.event_id=d.id)) AS "addendumCount" FROM app.encounter e JOIN app.facility f ON f.id=e.facility_id JOIN app.user_account u ON u.id=e.doctor_id LEFT JOIN app.doctor_event d ON d.encounter_id=e.id WHERE e.patient_id=$1 AND e.facility_id=ANY($2::uuid[]) ORDER BY e.checked_in_at DESC LIMIT 100`,[patientId,user.facilityIds])).rows;
- await log(db,user,context,'clinical.timeline','patient',patientId,{count:entries.length});return {entries};});}
+ const activity=await patientTimelineActivities(db,user,patientId);
+ await log(db,user,context,'clinical.timeline','patient',patientId,{count:entries.length,activityCount:activity.length});return {entries,activity};});}
 export async function drawingHistory(user:AuthUser,id:unknown,current:unknown,context:AuditContext){const patientId=parse(z.uuid(),id),currentEncounterId=current?parse(z.uuid(),current):null;return withTenant(user.tenantId,user.id,async db=>{
  if(!(await db.query('SELECT id FROM app.patient WHERE id=$1',[patientId])).rowCount)throw new ApiError(404,'patientNotFound');
  const entries=(await db.query(`SELECT d.id AS "eventId",e.id AS "encounterId",d.signed_at AS "signedAt",f.name AS clinic,u.full_name AS author,d.drawings
@@ -125,7 +129,8 @@ export async function sign(user:AuthUser,input:unknown,context:AuditContext){con
  await checkReauth(db,user,proof);const result=await reviewInTransaction(db,user,data.kind,data.id,data.version);
  if(result.hash!==data.reviewHash)throw new ApiError(409,'reviewChanged');if(result.warnings.length&&data.warningReason.length<8)throw new ApiError(400,'warningReasonRequired');
  const table=data.kind==='event'?'doctor_event':'prescription';await db.query(`UPDATE app.${table} SET status='signed',signed_at=now(),signed_by=$2,snapshot_text=$3,content_hash=$4,updated_at=now() WHERE id=$1`,[data.id,user.id,canonicalJson(result.snapshot),result.hash]);
- await log(db,user,context,`${data.kind==='event'?'clinical':'prescription'}.signed`,table,data.id,{contentHash:result.hash,version:data.version,warnings:result.warnings,warningReason:data.warningReason});return loadDetail(db,user,result.encounterId);
+ const problemsCreated=data.kind==='event'?await syncSignedProblems(db,user,data.id):0;
+ await log(db,user,context,`${data.kind==='event'?'clinical':'prescription'}.signed`,table,data.id,{contentHash:result.hash,version:data.version,warnings:result.warnings,warningReason:data.warningReason,problemsCreated});return loadDetail(db,user,result.encounterId);
  });}
 export async function addendum(user:AuthUser,input:unknown,context:AuditContext){const data=parse(addendumSchema,input);const proof=await reauthenticate(user,data.password,context);return withTenant(user.tenantId,user.id,async db=>{
  await checkReauth(db,user,proof);const encounterId=await locate(db,user,data.kind,data.id,false);const detail=await loadDetail(db,user,encounterId);const record=data.kind==='event'?detail.event:detail.prescription;

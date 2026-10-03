@@ -19,3 +19,51 @@
 .examination-boolean{display:flex!important;grid-template-columns:auto 1fr;align-items:center}
 .examination-boolean input{width:auto!important}
 @media(max-width:700px){.examination-template-header{align-items:flex-start}.examination-template-header small{white-space:nowrap}}
+
+/* Longitudinal Patient 360 */
+.history-dialog{width:min(960px,96vw)}
+.history-dialog>.intake-dialog-body{padding:0}
+.patient-activity{min-width:0}
+.patient-activity-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:22px 26px;border-bottom:1px solid var(--border-subtle)}
+.patient-activity-intro h3{display:flex;align-items:center;gap:9px;margin:0;font-size:var(--text-2xl)}
+.patient-activity-intro p{margin:7px 0 0;color:var(--text-muted);font-size:var(--text-md);line-height:1.5}
+.patient-activity-intro>span{white-space:nowrap;border:1px solid var(--border-default);border-radius:999px;padding:6px 10px;color:var(--sage-700);font-size:var(--text-base)}
+.patient-activity-loading,.patient-activity>.intake-empty{padding:30px 26px}
+.patient-activity-list{display:grid;padding:8px 26px 28px}
+.patient-activity-item{position:relative;display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:12px;padding:17px 0;border-bottom:1px solid var(--border-subtle)}
+.patient-activity-item:last-child{border-bottom:0}
+.patient-activity-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;color:var(--brand-700);background:var(--surface-subtle);border:1px solid var(--border-default)}
+.patient-activity-item.kind-surgery .patient-activity-icon,.patient-activity-item.kind-operation_note .patient-activity-icon,.patient-activity-item.kind-surgery_followup .patient-activity-icon{color:var(--burgundy-600);background:var(--danger-50)}
+.patient-activity-heading{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.patient-activity-heading strong{font-size:var(--text-lg)}
+.patient-activity-heading time{color:var(--text-muted);font-size:var(--text-base)}
+.patient-activity-content p{margin:6px 0;font-size:var(--text-lg);line-height:1.45;overflow-wrap:anywhere}
+.patient-activity-content small{color:var(--sage-700);font-size:var(--text-base)}
+.patient-activity-action{display:grid;align-content:center;justify-items:end;gap:8px;min-width:120px}
+.patient-activity-action>span{text-transform:capitalize;color:var(--text-muted);font-size:var(--text-base)}
+.patient-activity-action .text-button{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+@media(max-width:700px){.patient-activity-intro{padding:18px}.patient-activity-intro>span{display:none}.patient-activity-list{padding:6px 18px 22px}.patient-activity-item{grid-template-columns:36px minmax(0,1fr)}.patient-activity-action{grid-column:2;display:flex;align-items:center;justify-content:space-between;min-width:0}.patient-activity-icon{width:32px;height:32px}.patient-activity-heading{display:grid;gap:4px}}
+
+
+/* Longitudinal diagnosis/problem episodes */
+.patient-problems{padding:22px 26px;border-bottom:1px solid var(--border-subtle);background:var(--surface-sunken)}
+.patient-problems-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.patient-problems-heading h3{display:flex;align-items:center;gap:9px;margin:0;font-size:var(--text-2xl)}
+.patient-problems-heading p{margin:7px 0 0;color:var(--text-muted);font-size:var(--text-md);line-height:1.5}
+.patient-problems-heading>span{white-space:nowrap;border-radius:999px;padding:6px 10px;background:var(--danger-50);color:var(--burgundy-600);font-size:var(--text-base);font-weight:600}
+.patient-problem-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+.patient-problem-card{background:var(--surface-panel);border:1px solid var(--border-default);border-inline-start:3px solid var(--burgundy-500);border-radius:var(--radius-md);padding:14px;min-width:0}
+.patient-problem-card.resolved{border-inline-start-color:var(--sage-500);opacity:.9}
+.patient-problem-card>div{display:flex;align-items:flex-start;gap:9px}
+.patient-problem-card>div>span{flex-shrink:0;border-radius:var(--radius-xs);background:var(--surface-subtle);padding:3px 6px;color:var(--brand-700);font-weight:700}
+.patient-problem-card>div>strong{font-size:var(--text-lg);line-height:1.4;overflow-wrap:anywhere}
+.patient-problem-card>p{margin:8px 0;font-size:var(--text-md)}
+.patient-problem-card>small{display:block;color:var(--text-muted);line-height:1.5}
+.patient-problem-card details{margin-top:10px}
+.patient-problem-card details summary,.resolved-problems summary{cursor:pointer;color:var(--sage-700);font-size:var(--text-base)}
+.patient-problem-card details p{padding:8px;background:var(--surface-page);line-height:1.5}
+.patient-problem-card>.text-button{display:inline-flex;align-items:center;gap:5px;margin-top:10px}
+.problem-resolution{padding:8px;background:var(--surface-subtle);border-radius:var(--radius-xs)}
+.patient-problem-empty{display:flex;align-items:center;gap:7px;color:var(--sage-700);margin:16px 0 0}
+.resolved-problems{margin-top:18px}.resolved-problems>summary{display:flex;align-items:center;gap:7px}
+@media(max-width:700px){.patient-problems{padding:18px}.patient-problem-grid{grid-template-columns:1fr}.patient-problems-heading>span{display:none}}
