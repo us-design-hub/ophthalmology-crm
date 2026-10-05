@@ -67,6 +67,7 @@ export async function timeline(user:AuthUser,id:unknown,context:AuditContext){co
  const activity=await patientTimelineActivities(db,user,patientId);
  await log(db,user,context,'clinical.timeline','patient',patientId,{count:entries.length,activityCount:activity.length});return {entries,activity};});}
 export async function comparison(user:AuthUser,id:unknown,context:AuditContext):Promise<ClinicalComparison>{const patientId=parse(z.uuid(),id);return withTenant(user.tenantId,user.id,async db=>{
+ if(!(await db.query('SELECT id FROM app.patient WHERE id=$1',[patientId])).rowCount)throw new ApiError(404,'patientNotFound');
  const rows=(await db.query(`SELECT e.id AS "encounterId",e.checked_in_at AS date,f.name AS clinic,doctor.full_name AS doctor,
   w.id AS "workupId",w.version AS "workupVersion",w.author_id AS "workupAuthorId",workup_author.full_name AS "workupAuthor",w.saved_at AS "workupSavedAt",w.notes AS "workupNotes",
   od.uncorrected AS "odUncorrected",od.pinhole AS "odPinhole",od.corrected AS "odCorrected",od.iop::float8 AS "odIop",od.method AS "odMethod",od.measured_at AS "odMeasuredAt",od.refraction AS "odRefraction",od.logmar AS "odLogmar",
@@ -83,7 +84,6 @@ export async function comparison(user:AuthUser,id:unknown,context:AuditContext):
  LEFT JOIN app.user_account event_author ON event_author.id=d.author_id AND event_author.tenant_id=d.tenant_id
  WHERE e.patient_id=$1 AND e.facility_id=ANY($2::uuid[])
  ORDER BY e.checked_in_at DESC LIMIT 20`,[patientId,user.facilityIds])).rows as Record<string,unknown>[];
- if(!rows.length)throw new ApiError(404,'patientNotFound');
  const eye=(row:Record<string,unknown>,prefix:'od'|'os')=>({
   uncorrected:row[prefix+'Uncorrected'],pinhole:row[prefix+'Pinhole'],corrected:row[prefix+'Corrected'],iop:row[prefix+'Iop'],method:row[prefix+'Method'],measuredAt:row[prefix+'MeasuredAt'],refraction:row[prefix+'Refraction'],logmar:row[prefix+'Logmar'],
  });

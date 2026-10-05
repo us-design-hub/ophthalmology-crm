@@ -17,8 +17,8 @@ const problemStatusSchema=z.object({
 
 async function accessiblePatient(db:PoolClient,user:AuthUser,patientId:string){
   const result=await db.query(
-    'SELECT 1 FROM app.encounter WHERE patient_id=$1 AND facility_id=ANY($2::uuid[]) LIMIT 1',
-    [patientId,user.facilityIds],
+    'SELECT 1 FROM app.patient WHERE id=$1 LIMIT 1',
+    [patientId],
   );
   if(!result.rowCount)throw new ApiError(404,'patientNotFound');
 }
@@ -44,8 +44,14 @@ async function rows(db:PoolClient,user:AuthUser,patientId:string){
     JOIN app.user_account creator ON creator.id=p.created_by AND creator.tenant_id=p.tenant_id
     JOIN app.user_account updater ON updater.id=p.updated_by AND updater.tenant_id=p.tenant_id
     WHERE p.patient_id=$1
+      AND EXISTS (
+        SELECT 1 FROM app.doctor_event event
+        JOIN app.encounter encounter ON encounter.id=event.encounter_id AND encounter.tenant_id=event.tenant_id
+        WHERE event.id IN (p.source_event_id,p.latest_event_id)
+          AND encounter.facility_id=ANY($2::uuid[])
+      )
     ORDER BY (p.status='active') DESC,p.updated_at DESC,p.id DESC
-  `,[patientId])).rows;
+  `,[patientId,user.facilityIds])).rows;
 }
 
 export async function problemList(user:AuthUser,input:unknown,context:AuditContext){
@@ -67,8 +73,10 @@ export async function updateProblemStatus(user:AuthUser,input:unknown,context:Au
       SELECT p.*
       FROM app.clinical_problem p
       WHERE p.id=$1 AND EXISTS (
-        SELECT 1 FROM app.encounter e
-        WHERE e.patient_id=p.patient_id AND e.facility_id=ANY($2::uuid[])
+        SELECT 1 FROM app.doctor_event event
+        JOIN app.encounter encounter ON encounter.id=event.encounter_id AND encounter.tenant_id=event.tenant_id
+        WHERE event.id IN (p.source_event_id,p.latest_event_id)
+          AND encounter.facility_id=ANY($2::uuid[])
       )
       FOR UPDATE
     `,[data.id,user.facilityIds])).rows[0];

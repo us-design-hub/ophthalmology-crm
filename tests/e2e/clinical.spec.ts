@@ -66,6 +66,16 @@ test('signed prescription guards protect parent and items; addenda appear withou
  await login(page.request,baseURL!,'other');const record=await(await page.request.get(`/api/clinical/prescription?id=${rx.id}`)).json();expect(record.addenda).toHaveLength(1);const anonymous=await browser.newContext({baseURL});const check=await anonymous.request.get(record.verificationUrl);expect(check.status()).toBe(200);const html=await check.text();expect(html).toContain(rx.contentHash);expect(html).not.toContain(record.snapshot.patient.name);expect(html).not.toContain(record.snapshot.patient.mrn);expect(html).not.toContain(drug.name);expect((await anonymous.request.get(record.verificationUrl.replace(/token=.*/,'token='+'0'.repeat(64)))).status()).toBe(404);expect((await anonymous.request.get(`/api/clinical/pdf?id=${rx.id}`)).status()).toBe(401);await anonymous.close();
 });
 
+
+test('Patient 360 returns empty clinical sections for a registered patient without encounters',async({page,baseURL})=>{
+ const suffix=String(Date.now()).slice(-7);
+ const synced=await page.request.post('/api/integrations/odoo/patients',{headers:{Authorization:'Bearer '+process.env.ODOO_WEBHOOK_SECRET},data:{externalId:'e2e-empty-'+suffix,externalUpdatedAt:new Date().toISOString(),givenName:'Empty',familyName:'History'+suffix,gender:'unknown',dob:'1990-01-01',dobEstimated:false,phone:'+92301'+suffix,identifierType:'cnic',identifier:'8'+suffix.padStart(12,'0'),city:'Karachi'}});
+ expect(synced.status(),await synced.text()).toBe(201);const patientId=(await synced.json()).patientId;
+ await login(page.request,baseURL!,'doctor');
+ const problems=await page.request.get('/api/clinical/problems?patientId='+patientId);expect(problems.status()).toBe(200);expect((await problems.json()).problems).toEqual([]);
+ const comparison=await page.request.get('/api/clinical/comparison?patientId='+patientId);expect(comparison.status()).toBe(200);expect((await comparison.json()).visits).toEqual([]);
+ const timeline=await page.request.get('/api/clinical/timeline?patientId='+patientId);expect(timeline.status()).toBe(200);expect((await timeline.json()).activity).toEqual([]);
+});
 test('patient timelines distinguish seeded history from a new patient and respect facility access',async({page,baseURL})=>{
  const {id,patient}=await prepare(page.request,baseURL!);const history=await(await page.request.get(`/api/clinical/timeline?patientId=${patient.id}`)).json();expect(history.entries).toHaveLength(1);expect(history.entries[0].synthetic).toBe(false);expect(history.activity.map((row:{kind:string})=>row.kind)).toEqual(expect.arrayContaining(['appointment','checkin','workup']));
  const db=new pg.Client({connectionString:process.env.DATABASE_ADMIN_URL});await db.connect();try{const original=(await db.query("SELECT id FROM app.patient WHERE right(mrn,6)='000007' AND tenant_id=(SELECT id FROM app.tenant WHERE code='DEMO')")).rows[0];const seeded=await(await page.request.get(`/api/clinical/timeline?patientId=${original.id}`)).json();expect(seeded.entries.filter((row:{synthetic:boolean})=>row.synthetic)).toHaveLength(6);
