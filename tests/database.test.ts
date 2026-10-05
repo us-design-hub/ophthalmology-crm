@@ -243,3 +243,31 @@ test('Glaucoma clinics use a valid published specialty template for supported vi
   assert.ok(fields.some(field=>field.id==='visual_field_status'));
   assert.ok(fields.some(field=>field.id==='oct_rnfl_status'));
 });
+
+test('Retina clinics use a valid published specialty template for supported visit types', async () => {
+  const facility = (await admin.query("SELECT id,specialty FROM app.facility WHERE tenant_id=$1 AND type='clinic' AND lower(name)='retina'", [tenantId])).rows[0];
+  assert.ok(facility);
+  assert.equal(facility.specialty, 'Retina');
+  const assignments = await admin.query(`SELECT a.visit_type,t.code,t.version,t.status,t.definition
+    FROM app.examination_template_assignment a
+    JOIN app.examination_template t ON t.id=a.template_id AND t.tenant_id=a.tenant_id
+    WHERE a.tenant_id=$1 AND a.facility_id=$2 AND a.active
+    ORDER BY a.visit_type`, [tenantId, facility.id]);
+  assert.deepEqual(assignments.rows.map(row=>row.visit_type), ['follow_up','general','new']);
+  for (const row of assignments.rows) {
+    assert.equal(row.code, 'retina');
+    assert.equal(row.version, 1);
+    assert.equal(row.status, 'published');
+  }
+  const definition = examinationTemplateDefinitionSchema.parse(assignments.rows[0].definition);
+  assert.deepEqual(definition.sections.map(section=>section.id), [
+    'retina_history','retina_workup','retina_examination','retina_imaging','retina_assessment','retina_management','retina_handoff'
+  ]);
+  const fields = definition.sections.flatMap(section=>section.fields);
+  assert.deepEqual(fields.find(field=>field.id==='central_subfield_thickness'), {
+    id:'central_subfield_thickness',label:'Central subfield thickness',type:'number',laterality:'bilateral',required:false,min:50,max:2000,step:1,unit:'micrometres',roles:['doctor','optometrist']
+  });
+  assert.ok(fields.some(field=>field.id==='retina_progression'));
+  assert.ok(fields.some(field=>field.id==='retinal_fluid'));
+  assert.ok(fields.some(field=>field.id==='retina_treatment_decision'));
+});

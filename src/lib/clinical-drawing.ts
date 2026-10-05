@@ -4,7 +4,11 @@ export type DrawingTemplate = (typeof DRAWING_TEMPLATES)[number];
 export const CLINICAL_MARKER_TYPES = [
   'retinal_tear',
   'retinal_haemorrhage',
+  'microaneurysm',
+  'cotton_wool_spot',
   'hard_exudate',
+  'retinal_neovascularisation',
+  'retinal_detachment',
   'laser_spot',
   'optic_disc_cupping',
   'corneal_scar',
@@ -27,7 +31,11 @@ export type ClinicalMarkerDefinition = {
 export const CLINICAL_MARKER_CATALOGUE: readonly ClinicalMarkerDefinition[] = [
   { type: 'retinal_tear', label: 'Retinal tear', shortLabel: 'Tear', color: '#b91c1c', templates: ['fundus', 'blank'] },
   { type: 'retinal_haemorrhage', label: 'Retinal haemorrhage', shortLabel: 'Haemorrhage', color: '#7f1d1d', templates: ['fundus', 'blank'] },
+  { type: 'microaneurysm', label: 'Microaneurysm', shortLabel: 'MA', color: '#9f1239', templates: ['fundus', 'blank'] },
+  { type: 'cotton_wool_spot', label: 'Cotton-wool spot', shortLabel: 'CWS', color: '#64748b', templates: ['fundus', 'blank'] },
   { type: 'hard_exudate', label: 'Hard exudate', shortLabel: 'Exudate', color: '#ca8a04', templates: ['fundus', 'blank'] },
+  { type: 'retinal_neovascularisation', label: 'Retinal neovascularisation', shortLabel: 'NV', color: '#be123c', templates: ['fundus', 'blank'] },
+  { type: 'retinal_detachment', label: 'Retinal detachment', shortLabel: 'RD', color: '#7c2d12', templates: ['fundus', 'blank'] },
   { type: 'laser_spot', label: 'Laser treatment area', shortLabel: 'Laser', color: '#ea580c', templates: ['fundus', 'blank'] },
   { type: 'optic_disc_cupping', label: 'Optic disc cupping', shortLabel: 'Cupping', color: '#7c3aed', templates: ['fundus', 'blank'] },
   { type: 'corneal_scar', label: 'Corneal scar', shortLabel: 'Scar', color: '#64748b', templates: ['anterior', 'blank'] },
@@ -52,10 +60,14 @@ export function markerAllowedOnTemplate(type: ClinicalMarkerType, template: Draw
 
 export function suggestedDrawingSection(sections: readonly DrawingSection[], template: DrawingTemplate) {
   if (!sections.length) return { id: 'clinical_drawing', title: 'Clinical drawing' };
-  const pattern = template === 'anterior'
-    ? /anterior|cornea|lens/i
+  const patterns = template === 'anterior'
+    ? [/anterior|cornea|lens/i]
     : template === 'fundus'
-      ? /posterior|fundus|retina|optic/i
-      : /examination|finding/i;
-  return sections.find(section => pattern.test(`${section.id} ${section.title}`)) ?? sections[0];
+      ? [/posterior|fundus|macula|optic/i, /retina/i]
+      : [/examination|finding/i];
+  for (const pattern of patterns) {
+    const section = sections.find(candidate => pattern.test(`${candidate.id} ${candidate.title}`));
+    if (section) return section;
+  }
+  return sections[0];
 }

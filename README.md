@@ -57,7 +57,7 @@ The idempotent seed creates one fictional hospital, four facilities, nine named 
 - Odoo-owned demographics with authenticated, idempotent synchronization, deterministic matching, encrypted identifiers, masked summaries, and attributed history/flag amendments.
 - Appointments, rescheduling, cancellations, no-shows, walk-ins, check-in, queue priority, departure, and clinical visit completion.
 - Bilateral VA/IOP, refraction, optional logMAR values, immutable workup revisions, and configurable dilation timing.
-- Patient 360, Doctor Events, configurable general, cataract, and glaucoma examinations, coded diagnoses, anatomy plans, persistent bilateral drawing sheets, longitudinal comparison, separate event/prescription signatures, handwritten-prescription evidence, addenda, and prescription PDFs with limited QR verification.
+- Patient 360, Doctor Events, configurable general, cataract, glaucoma, and retina examinations, coded diagnoses, anatomy plans, persistent bilateral drawing sheets, longitudinal comparison, separate event/prescription signatures, handwritten-prescription evidence, addenda, and prescription PDFs with limited QR verification.
 - Eye-specific surgery cases with stored consent documents and gated preoperative, scheduled, operated, discharged and follow-up stages.
 - Live attendance, queue timing, documentation and surgery dashboards; CSV and printable operational reports.
 - Attributed audit records and forced row-level security on tenant-owned data.

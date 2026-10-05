@@ -57,11 +57,22 @@ function eyeAnswer(visit:ClinicalComparisonVisit,key:string,eye:Eye){
   const value=visit.event?.answers[key];
   return value!==null&&typeof value==='object'&&!Array.isArray(value)?String(value[eye]??'-'):'-';
 }
+function scalarAnswer(visit:ClinicalComparisonVisit,key:string){
+  const value=visit.event?.answers[key];
+  return ['string','number'].includes(typeof value)?String(value):'-';
+}
 function GlaucomaMonitoring({visits}:{visits:ClinicalComparisonVisit[]}){
   if(!visits.length)return null;
   return <section><h4>Glaucoma monitoring history</h4><div className="comparison-table-wrap"><table className="comparison-table glaucoma-comparison-table">
     <thead><tr><th>Visit</th><th>OD stage</th><th>OD C/D</th><th>OD target</th><th>OD progression</th><th>OS stage</th><th>OS C/D</th><th>OS target</th><th>OS progression</th><th>Visual field OD / OS</th><th>OCT RNFL OD / OS</th></tr></thead>
     <tbody>{visits.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.event!.signedAt)}</strong><small>{visit.clinic}</small></th><td>{eyeAnswer(visit,'glaucoma_stage','OD')}</td><td>{eyeAnswer(visit,'cup_disc_ratio','OD')}</td><td>{eyeAnswer(visit,'target_iop','OD')}</td><td>{eyeAnswer(visit,'progression_status','OD')}</td><td>{eyeAnswer(visit,'glaucoma_stage','OS')}</td><td>{eyeAnswer(visit,'cup_disc_ratio','OS')}</td><td>{eyeAnswer(visit,'target_iop','OS')}</td><td>{eyeAnswer(visit,'progression_status','OS')}</td><td>{eyeAnswer(visit,'visual_field_status','OD')} / {eyeAnswer(visit,'visual_field_status','OS')}</td><td>{eyeAnswer(visit,'oct_rnfl_status','OD')} / {eyeAnswer(visit,'oct_rnfl_status','OS')}</td></tr>)}</tbody>
+  </table></div></section>;
+}
+function RetinaMonitoring({visits}:{visits:ClinicalComparisonVisit[]}){
+  if(!visits.length)return null;
+  return <section><h4>Retina monitoring history</h4><div className="comparison-table-wrap"><table className="comparison-table retina-comparison-table">
+    <thead><tr><th>Visit</th><th>OD diagnosis</th><th>OD severity</th><th>OD activity</th><th>OD progression</th><th>OD OCT / fluid</th><th>OD CST</th><th>OS diagnosis</th><th>OS severity</th><th>OS activity</th><th>OS progression</th><th>OS OCT / fluid</th><th>OS CST</th><th>Treatment</th></tr></thead>
+    <tbody>{visits.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.event!.signedAt)}</strong><small>{visit.clinic}</small></th><td>{eyeAnswer(visit,'retina_diagnosis','OD')}</td><td>{eyeAnswer(visit,'retina_severity','OD')}</td><td>{eyeAnswer(visit,'retina_activity','OD')}</td><td>{eyeAnswer(visit,'retina_progression','OD')}</td><td>{eyeAnswer(visit,'oct_macula_status','OD')} / {eyeAnswer(visit,'retinal_fluid','OD')}</td><td>{eyeAnswer(visit,'central_subfield_thickness','OD')}</td><td>{eyeAnswer(visit,'retina_diagnosis','OS')}</td><td>{eyeAnswer(visit,'retina_severity','OS')}</td><td>{eyeAnswer(visit,'retina_activity','OS')}</td><td>{eyeAnswer(visit,'retina_progression','OS')}</td><td>{eyeAnswer(visit,'oct_macula_status','OS')} / {eyeAnswer(visit,'retinal_fluid','OS')}</td><td>{eyeAnswer(visit,'central_subfield_thickness','OS')}</td><td>{scalarAnswer(visit,'retina_treatment_decision')}<small>{scalarAnswer(visit,'treatment_laterality')}</small></td></tr>)}</tbody>
   </table></div></section>;
 }
 function VisitSelect({label,visits,value,onChange}:{label:string;visits:ClinicalComparisonVisit[];value:string;onChange:(value:string)=>void}){
@@ -99,16 +110,18 @@ export function PatientComparison({patientId}:{patientId:string}){
   const workups=data?.visits.filter(visit=>visit.workup)??[];
   const eventVisits=data?.visits.filter(visit=>visit.event)??[];
   const glaucomaVisits=eventVisits.filter(visit=>['glaucoma_stage','cup_disc_ratio','target_iop','progression_status'].some(key=>visit.event?.answers[key]!==undefined));
+  const retinaVisits=eventVisits.filter(visit=>['retina_diagnosis','retina_severity','retina_activity','retina_progression'].some(key=>visit.event?.answers[key]!==undefined));
   const leftVisit=eventVisits.find(visit=>visit.encounterId===left)||null;
   const rightVisit=eventVisits.find(visit=>visit.encounterId===right)||null;
   return <section className="patient-comparison">
-    <button type="button" className="patient-comparison-toggle" aria-expanded={open} onClick={toggle}><span><GitCompareArrows size={19}/><strong>Compare visits</strong><small>VA, IOP, refraction, glaucoma monitoring, findings, diagnoses, and drawings</small></span>{open?<ChevronUp size={18}/>:<ChevronDown size={18}/>}</button>
+    <button type="button" className="patient-comparison-toggle" aria-expanded={open} onClick={toggle}><span><GitCompareArrows size={19}/><strong>Compare visits</strong><small>VA, IOP, refraction, specialty monitoring, findings, diagnoses, and drawings</small></span>{open?<ChevronUp size={18}/>:<ChevronDown size={18}/>}</button>
     {open&&<div className="patient-comparison-body">
       {busy&&<p role="status">Loading longitudinal comparison...</p>}
       {failed&&<p role="alert">The comparison could not be loaded. Close this section and try again.</p>}
       {data&&<>
         <section className="comparison-trend-section"><h4><TrendingUp size={18}/>IOP trend</h4><IopTrend visits={data.visits}/></section>
         <GlaucomaMonitoring visits={glaucomaVisits}/>
+        <RetinaMonitoring visits={retinaVisits}/>
         <section><h4>Visual acuity and refraction history</h4>
           {workups.length===0?<p className="comparison-empty">No saved workups are available.</p>:<div className="comparison-table-wrap"><table className="comparison-table"><thead><tr><th>Visit</th><th>OD VA</th><th>OD IOP</th><th>OD refraction</th><th>OS VA</th><th>OS IOP</th><th>OS refraction</th><th>Diagnoses</th></tr></thead><tbody>{workups.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.date)}</strong><small>{visit.clinic}</small></th><td>{visualAcuity(visit.workup!.OD)}</td><td className={visit.workup!.OD.iop>21?'elevated':''}>{visit.workup!.OD.iop} <small>{visit.workup!.OD.method}</small></td><td>{refraction(visit.workup!.OD)}</td><td>{visualAcuity(visit.workup!.OS)}</td><td className={visit.workup!.OS.iop>21?'elevated':''}>{visit.workup!.OS.iop} <small>{visit.workup!.OS.method}</small></td><td>{refraction(visit.workup!.OS)}</td><td>{diagnoses(visit)}</td></tr>)}</tbody></table></div>}
         </section>

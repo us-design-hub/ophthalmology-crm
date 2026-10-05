@@ -72,6 +72,8 @@ test('structured clinical markers enforce catalogue, template and placement boun
  const base={encounterId:randomUUID(),version:0,complaint:'Demo',findings:{OD:'Right',OS:'Left'},diagnoses:[{eye:'OD',label:'Retinal tear'}],plans:[],referral:'',followUp:'',drawings:valid};
  assert.equal(eventInputSchema.safeParse(base).success,true);
  assert.ok(clinicalMarkersForTemplate('fundus').some(marker=>marker.type==='retinal_tear'));
+ assert.ok(clinicalMarkersForTemplate('fundus').some(marker=>marker.type==='retinal_neovascularisation'));
+ assert.ok(clinicalMarkersForTemplate('fundus').some(marker=>marker.type==='retinal_detachment'));
  assert.equal(eventInputSchema.safeParse({...base,drawings:{...valid,OD:{...valid.OD,markers:[{...valid.OD.markers[0],type:'script'}]}}}).success,false);
  assert.equal(eventInputSchema.safeParse({...base,drawings:{...valid,OD:{...valid.OD,markers:[{...valid.OD.markers[0],x:1001}]}}}).success,false);
  assert.equal(eventInputSchema.safeParse({...base,drawings:{...valid,OD:{...valid.OD,template:'anterior'}}}).success,false);
@@ -82,5 +84,6 @@ test('drawing sheets bind fundus and anterior views to the matching examination 
  const sections=[{id:'visit_history',title:'Presenting complaint'},{id:'anterior_segment',title:'Anterior segment examination'},{id:'posterior_segment',title:'Posterior segment and motility'}];
  assert.equal(suggestedDrawingSection(sections,'fundus').id,'posterior_segment');
  assert.equal(suggestedDrawingSection(sections,'anterior').id,'anterior_segment');
+ assert.equal(suggestedDrawingSection([{id:'retina_history',title:'Retina history and risk'},{id:'retina_examination',title:'Vitreous, macula and peripheral retina'}],'fundus').id,'retina_examination');
  assert.equal(suggestedDrawingSection([], 'blank').id,'clinical_drawing');
 });
