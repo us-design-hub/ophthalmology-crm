@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg';
 import { verify } from '@node-rs/argon2';
 import { timingSafeEqual } from 'node:crypto';
 import type { AuthUser } from '@/lib/access';
-import { eventInputSchema,rxInputSchema,reviewSchema,signSchema,addendumSchema,prescriptionWarnings,examinationTemplateDefinitionSchema,validateExaminationAnswers,type ClinicalDetail,type ClinicalDrawings,type DoctorEvent,type ExaminationTemplate,type Prescription,type Review } from '@/lib/clinical';
+import { eventInputSchema,rxInputSchema,reviewSchema,signSchema,addendumSchema,prescriptionWarnings,examinationTemplateDefinitionSchema,validateExaminationAnswers,type ClinicalComparison,type ClinicalDetail,type ClinicalDrawings,type DoctorEvent,type ExaminationTemplate,type Prescription,type Review } from '@/lib/clinical';
 import { canonicalJson,contentHash } from './clinical-hash';
 import { privateHash } from './crypto';
 import { withTenant } from './db';
@@ -66,6 +66,34 @@ export async function timeline(user:AuthUser,id:unknown,context:AuditContext){co
  const entries=(await db.query(`SELECT e.id,e.checked_in_at AS date,f.name AS clinic,u.full_name AS author,d.id AS "eventId",d.status,coalesce(d.synthetic,false) AS synthetic,coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.encounter_id=e.id),0) AS "workupVersion",(SELECT count(*)::int FROM app.clinical_addendum a WHERE a.event_id=d.id OR a.prescription_id IN (SELECT r.id FROM app.prescription r WHERE r.event_id=d.id)) AS "addendumCount" FROM app.encounter e JOIN app.facility f ON f.id=e.facility_id JOIN app.user_account u ON u.id=e.doctor_id LEFT JOIN app.doctor_event d ON d.encounter_id=e.id WHERE e.patient_id=$1 AND e.facility_id=ANY($2::uuid[]) ORDER BY e.checked_in_at DESC LIMIT 100`,[patientId,user.facilityIds])).rows;
  const activity=await patientTimelineActivities(db,user,patientId);
  await log(db,user,context,'clinical.timeline','patient',patientId,{count:entries.length,activityCount:activity.length});return {entries,activity};});}
+export async function comparison(user:AuthUser,id:unknown,context:AuditContext):Promise<ClinicalComparison>{const patientId=parse(z.uuid(),id);return withTenant(user.tenantId,user.id,async db=>{
+ const rows=(await db.query(`SELECT e.id AS "encounterId",e.checked_in_at AS date,f.name AS clinic,doctor.full_name AS doctor,
+  w.id AS "workupId",w.version AS "workupVersion",w.author_id AS "workupAuthorId",workup_author.full_name AS "workupAuthor",w.saved_at AS "workupSavedAt",w.notes AS "workupNotes",
+  od.uncorrected AS "odUncorrected",od.pinhole AS "odPinhole",od.corrected AS "odCorrected",od.iop::float8 AS "odIop",od.method AS "odMethod",od.measured_at AS "odMeasuredAt",od.refraction AS "odRefraction",od.logmar AS "odLogmar",
+  os.uncorrected AS "osUncorrected",os.pinhole AS "osPinhole",os.corrected AS "osCorrected",os.iop::float8 AS "osIop",os.method AS "osMethod",os.measured_at AS "osMeasuredAt",os.refraction AS "osRefraction",os.logmar AS "osLogmar",
+  d.id AS "eventId",event_author.full_name AS "eventAuthor",d.signed_at AS "eventSignedAt",d.findings,d.diagnoses,d.examination_answers AS answers,d.drawings,d.synthetic
+ FROM app.encounter e
+ JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id
+ JOIN app.user_account doctor ON doctor.id=e.doctor_id AND doctor.tenant_id=e.tenant_id
+ LEFT JOIN LATERAL (SELECT revision.* FROM app.workup_revision revision WHERE revision.encounter_id=e.id AND revision.tenant_id=e.tenant_id ORDER BY revision.version DESC LIMIT 1) w ON true
+ LEFT JOIN app.user_account workup_author ON workup_author.id=w.author_id AND workup_author.tenant_id=w.tenant_id
+ LEFT JOIN app.workup_eye od ON od.revision_id=w.id AND od.tenant_id=w.tenant_id AND od.eye='OD'
+ LEFT JOIN app.workup_eye os ON os.revision_id=w.id AND os.tenant_id=w.tenant_id AND os.eye='OS'
+ LEFT JOIN app.doctor_event d ON d.encounter_id=e.id AND d.tenant_id=e.tenant_id AND d.status='signed'
+ LEFT JOIN app.user_account event_author ON event_author.id=d.author_id AND event_author.tenant_id=d.tenant_id
+ WHERE e.patient_id=$1 AND e.facility_id=ANY($2::uuid[])
+ ORDER BY e.checked_in_at DESC LIMIT 20`,[patientId,user.facilityIds])).rows as Record<string,unknown>[];
+ if(!rows.length)throw new ApiError(404,'patientNotFound');
+ const eye=(row:Record<string,unknown>,prefix:'od'|'os')=>({
+  uncorrected:row[prefix+'Uncorrected'],pinhole:row[prefix+'Pinhole'],corrected:row[prefix+'Corrected'],iop:row[prefix+'Iop'],method:row[prefix+'Method'],measuredAt:row[prefix+'MeasuredAt'],refraction:row[prefix+'Refraction'],logmar:row[prefix+'Logmar'],
+ });
+ const visits=rows.map(row=>({
+  encounterId:row.encounterId,date:row.date,clinic:row.clinic,doctor:row.doctor,
+  workup:row.workupId?{id:row.workupId,encounterId:row.encounterId,version:row.workupVersion,authorId:row.workupAuthorId,author:row.workupAuthor,savedAt:row.workupSavedAt,notes:row.workupNotes,OD:eye(row,'od'),OS:eye(row,'os')}:null,
+  event:row.eventId?{id:row.eventId,author:row.eventAuthor,signedAt:row.eventSignedAt,findings:row.findings,diagnoses:row.diagnoses,answers:row.answers,drawings:row.drawings,synthetic:row.synthetic}:null,
+ })) as ClinicalComparison['visits'];
+ await log(db,user,context,'clinical.comparison','patient',patientId,{count:visits.length});return {visits};
+ });}
 export async function drawingHistory(user:AuthUser,id:unknown,current:unknown,context:AuditContext){const patientId=parse(z.uuid(),id),currentEncounterId=current?parse(z.uuid(),current):null;return withTenant(user.tenantId,user.id,async db=>{
  if(!(await db.query('SELECT id FROM app.patient WHERE id=$1',[patientId])).rowCount)throw new ApiError(404,'patientNotFound');
  const entries=(await db.query(`SELECT d.id AS "eventId",e.id AS "encounterId",d.signed_at AS "signedAt",f.name AS clinic,u.full_name AS author,d.drawings

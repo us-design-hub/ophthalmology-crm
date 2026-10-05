@@ -389,6 +389,25 @@ export type ClinicalProblem = {
   history: ClinicalProblemTransition[];
 };
 export type ClinicalProblemList = { problems: ClinicalProblem[] };
+export type ClinicalComparisonEvent = {
+  id: string;
+  author: string;
+  signedAt: string;
+  findings: { OD: string; OS: string };
+  diagnoses: EventInput['diagnoses'];
+  answers: ExaminationAnswers;
+  drawings: ClinicalDrawings;
+  synthetic: boolean;
+};
+export type ClinicalComparisonVisit = {
+  encounterId: string;
+  date: string;
+  clinic: string;
+  doctor: string;
+  workup: Workup | null;
+  event: ClinicalComparisonEvent | null;
+};
+export type ClinicalComparison = { visits: ClinicalComparisonVisit[] };
 export type Review = { snapshot: Record<string, unknown>; hash: string; warnings: string[] };
 
 export function prescriptionWarnings(

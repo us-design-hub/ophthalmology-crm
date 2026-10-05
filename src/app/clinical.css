@@ -67,3 +67,46 @@
 .patient-problem-empty{display:flex;align-items:center;gap:7px;color:var(--sage-700);margin:16px 0 0}
 .resolved-problems{margin-top:18px}.resolved-problems>summary{display:flex;align-items:center;gap:7px}
 @media(max-width:700px){.patient-problems{padding:18px}.patient-problem-grid{grid-template-columns:1fr}.patient-problems-heading>span{display:none}}
+
+
+/* Longitudinal visit comparison */
+.history-dialog{width:min(1220px,97vw)}
+.patient-comparison{border-bottom:1px solid var(--border-subtle);background:var(--surface-panel)}
+.patient-comparison-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 26px;border:0;background:transparent;color:var(--text-primary);text-align:start;cursor:pointer}
+.patient-comparison-toggle>span{display:grid;grid-template-columns:auto 1fr;align-items:center;column-gap:9px}
+.patient-comparison-toggle strong{font-size:var(--text-2xl)}
+.patient-comparison-toggle small{grid-column:2;color:var(--text-muted);font-size:var(--text-md);margin-top:5px}
+.patient-comparison-body{display:grid;gap:24px;padding:0 26px 26px}
+.patient-comparison-body>section{min-width:0;border-top:1px solid var(--border-subtle);padding-top:20px}
+.patient-comparison-body h4{display:flex;align-items:center;gap:8px;margin:0 0 14px;font-size:var(--text-xl)}
+.comparison-empty{color:var(--text-muted)}
+.iop-trend{overflow-x:auto;border:1px solid var(--border-default);border-radius:var(--radius-md);padding:12px;background:var(--surface-sunken)}
+.iop-trend svg{display:block;width:100%;min-width:620px;height:auto}
+.iop-trend text{font-size:11px;fill:var(--text-muted)}
+.iop-line{fill:none;stroke-width:3}.iop-line.od{stroke:var(--brand-600)}.iop-line.os{stroke:var(--burgundy-500)}
+.iop-point{stroke:white;stroke-width:2}.iop-point.od{fill:var(--brand-600)}.iop-point.os{fill:var(--burgundy-500)}
+.iop-limit{stroke:var(--amber-500);stroke-width:2;stroke-dasharray:7 5}
+.trend-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:var(--text-base);margin-bottom:8px}
+.trend-legend span:before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-inline-end:6px}
+.trend-legend .od:before{background:var(--brand-600)}.trend-legend .os:before{background:var(--burgundy-500)}.trend-legend .limit:before{background:var(--amber-500)}
+.comparison-table-wrap{overflow:auto;border:1px solid var(--border-default);border-radius:var(--radius-md)}
+.comparison-table{width:100%;min-width:1120px;border-collapse:collapse;font-size:var(--text-base)}
+.comparison-table th,.comparison-table td{padding:11px;border-bottom:1px solid var(--border-subtle);text-align:start;vertical-align:top}
+.comparison-table thead th{position:sticky;top:0;background:var(--surface-sunken);color:var(--sage-900)}
+.comparison-table tbody th{min-width:130px}.comparison-table tbody th small,.comparison-table td small{display:block;color:var(--text-muted);margin-top:3px}
+.comparison-table td.elevated{color:var(--burgundy-600);font-weight:700}
+.comparison-selectors{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.comparison-selectors label{display:grid;gap:6px;font-size:var(--text-base);font-weight:600}.comparison-selectors select{width:100%}
+.comparison-findings{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.comparison-findings-card{min-width:0;border:1px solid var(--border-default);border-radius:var(--radius-md);padding:15px;background:var(--surface-sunken)}
+.comparison-findings-card header{display:grid;gap:3px;border-bottom:1px solid var(--border-subtle);padding-bottom:10px;margin-bottom:12px}
+.comparison-findings-card header span,.comparison-findings-card header small{color:var(--text-muted);font-size:var(--text-base)}
+.comparison-eyes{display:grid;grid-template-columns:1fr 1fr;gap:10px}.comparison-findings-card section{min-width:0}
+.comparison-findings-card h5{font-size:var(--text-md);margin:8px 0}.comparison-findings-card p,.comparison-findings-card li{font-size:var(--text-md);line-height:1.5;overflow-wrap:anywhere}
+.comparison-findings-card ul{padding-inline-start:20px}.comparison-findings-card details{margin-top:12px}.comparison-findings-card summary,.comparison-drawings>summary{cursor:pointer;color:var(--brand-700);font-weight:600}
+.comparison-findings-card dl>div{display:grid;grid-template-columns:minmax(100px,1fr) 2fr;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-subtle)}
+.comparison-findings-card dt{text-transform:capitalize;color:var(--text-muted)}.comparison-findings-card dd{margin:0;overflow-wrap:anywhere}
+.comparison-drawings{margin-top:18px}.comparison-drawings>div{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.comparison-drawings>div>section{min-width:0;border:1px solid var(--border-default);border-radius:var(--radius-md);padding:12px}
+.comparison-drawings .clinical-drawing-sheet{margin:8px 0 0}
+@media(max-width:800px){.patient-comparison-toggle{padding:18px}.patient-comparison-body{padding:0 18px 22px}.comparison-selectors,.comparison-findings,.comparison-drawings>div,.comparison-eyes{grid-template-columns:1fr}}

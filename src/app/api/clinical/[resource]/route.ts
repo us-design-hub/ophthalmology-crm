@@ -4,12 +4,13 @@ import { ApiError,checkOrigin,errorResponse,json,readJson } from '@/server/http'
 import * as clinical from '@/server/clinical-service';
 type Context={params:Promise<{resource:string}>};
 export async function GET(request:Request,context:Context){try{
- const {resource}=await context.params;if(!['list','detail','timeline','problems','drawing-history','formulary','prescriptions','prescription','pdf'].includes(resource))throw new ApiError(404,'invalidRequest');
+ const {resource}=await context.params;if(!['list','detail','timeline','comparison','problems','drawing-history','formulary','prescriptions','prescription','pdf'].includes(resource))throw new ApiError(404,'invalidRequest');
  const {user}=await requestSession(request,['prescriptions','prescription','pdf'].includes(resource)?'prescription:read':'clinical:read',false);await consumeLimit(`clinical-read:${user.tenantId}:${user.id}`,120,60);
  const query=new URL(request.url).searchParams,audit=requestContext(request);
  if(resource==='list')return json(await clinical.clinicalList(user,audit));
  if(resource==='detail')return json(await clinical.clinicalDetail(user,query.get('encounterId'),audit));
  if(resource==='timeline')return json(await clinical.timeline(user,query.get('patientId'),audit));
+ if(resource==='comparison')return json(await clinical.comparison(user,query.get('patientId'),audit));
  if(resource==='problems')return json(await clinical.problemList(user,query.get('patientId'),audit));
  if(resource==='drawing-history')return json(await clinical.drawingHistory(user,query.get('patientId'),query.get('encounterId'),audit));
  if(resource==='formulary')return json(await clinical.formulary(user));
