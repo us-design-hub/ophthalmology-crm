@@ -75,6 +75,9 @@ export const examinationFieldSchema = z.object({
   laterality: z.enum(['none', 'bilateral']),
   required: z.boolean(),
   maxLength: z.number().int().min(1).max(5000).optional(),
+  min: z.number().finite().optional(),
+  max: z.number().finite().optional(),
+  step: z.number().finite().positive().optional(),
   options: z.array(text(120).min(1)).max(40).optional(),
   unit: text(30).optional(),
   roles: z.array(z.enum(CLINICAL_TEMPLATE_ROLES)).min(1).max(3).optional(),
@@ -85,6 +88,12 @@ export const examinationFieldSchema = z.object({
   }
   if (field.type !== 'select' && field.options) {
     context.addIssue({ code: 'custom', message: 'Only select fields accept options' });
+  }
+  if (field.type !== 'number' && (field.min !== undefined || field.max !== undefined || field.step !== undefined)) {
+    context.addIssue({ code: 'custom', message: 'Only number fields accept numeric bounds' });
+  }
+  if (field.min !== undefined && field.max !== undefined && field.min > field.max) {
+    context.addIssue({ code: 'custom', message: 'Number field minimum cannot exceed maximum' });
   }
 });
 
@@ -201,6 +210,8 @@ export function validateExaminationAnswers(
       if (field.required && empty) errors.push(`${field.id}:required`);
       if (empty) continue;
       if (field.type === 'number' && typeof value !== 'number') errors.push(`${field.id}:number`);
+      if (field.type === 'number' && typeof value === 'number' && field.min !== undefined && value < field.min) errors.push(`${field.id}:min`);
+      if (field.type === 'number' && typeof value === 'number' && field.max !== undefined && value > field.max) errors.push(`${field.id}:max`);
       if (field.type === 'boolean' && typeof value !== 'boolean') errors.push(`${field.id}:boolean`);
       if (['text', 'textarea', 'select'].includes(field.type) && typeof value !== 'string') {
         errors.push(`${field.id}:text`);

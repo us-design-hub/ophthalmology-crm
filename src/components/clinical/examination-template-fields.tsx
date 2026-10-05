@@ -43,7 +43,7 @@ function FieldControl({
   if (field.type === 'boolean') {
     return <label className="examination-boolean"><input aria-label={label} disabled={disabled} type="checkbox" checked={value === true} onChange={event => onChange(event.target.checked)}/><span>{label}</span></label>;
   }
-  return <label><span>{label}{required ? ' *' : ''}{field.unit ? ` (${field.unit})` : ''}</span><input aria-label={label} disabled={disabled} required={required} type={field.type === 'number' ? 'number' : 'text'} maxLength={field.maxLength} value={value === '' ? '' : String(value)} onChange={event => onChange(field.type === 'number' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value)}/></label>;
+  return <label><span>{label}{required ? ' *' : ''}{field.unit ? ` (${field.unit})` : ''}</span><input aria-label={label} disabled={disabled} required={required} type={field.type === 'number' ? 'number' : 'text'} maxLength={field.maxLength} min={field.min} max={field.max} step={field.step} value={value === '' ? '' : String(value)} onChange={event => onChange(field.type === 'number' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value)}/></label>;
 }
 
 export function ExaminationTemplateFields({

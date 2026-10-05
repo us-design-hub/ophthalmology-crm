@@ -19,13 +19,18 @@ test('examination templates enforce unique fields, laterality, required values a
  const definition={sections:[{id:'ocular_exam',title:'Ocular examination',fields:[
   {id:'fundus',label:'Fundus',type:'textarea',laterality:'bilateral',required:true,maxLength:100},
   {id:'outcome',label:'Outcome',type:'select',laterality:'none',required:false,options:['Follow-up','Discharge']},
+  {id:'cup_disc_ratio',label:'Cup-to-disc ratio',type:'number',laterality:'bilateral',required:false,min:0,max:1,step:0.05},
  ]}]};
  const template=examinationTemplateDefinitionSchema.parse(definition);
- assert.deepEqual(validateExaminationAnswers(template,{fundus:{OD:'Normal',OS:'Normal'},outcome:'Follow-up'}),[]);
+ assert.deepEqual(validateExaminationAnswers(template,{fundus:{OD:'Normal',OS:'Normal'},outcome:'Follow-up',cup_disc_ratio:{OD:0.4,OS:0.5}}),[]);
  assert.ok(validateExaminationAnswers(template,{fundus:{OD:'',OS:'Normal'},outcome:'Unknown'}).includes('fundus:required'));
  assert.ok(validateExaminationAnswers(template,{fundus:'Normal'}).includes('fundus:laterality'));
  assert.ok(validateExaminationAnswers(template,{fundus:{OD:'Normal',OS:'Normal'},unexpected:'value'}).includes('unexpected:unknown'));
+ assert.ok(validateExaminationAnswers(template,{fundus:{OD:'Normal',OS:'Normal'},cup_disc_ratio:{OD:-0.05,OS:1.05}}).includes('cup_disc_ratio:min'));
+ assert.ok(validateExaminationAnswers(template,{fundus:{OD:'Normal',OS:'Normal'},cup_disc_ratio:{OD:-0.05,OS:1.05}}).includes('cup_disc_ratio:max'));
  assert.equal(examinationTemplateDefinitionSchema.safeParse({sections:[...definition.sections,{id:'duplicate',title:'Duplicate',fields:[definition.sections[0].fields[0]]}]}).success,false);
+ assert.equal(examinationTemplateDefinitionSchema.safeParse({sections:[{id:'bad',title:'Bad',fields:[{id:'text',label:'Text',type:'text',laterality:'none',required:false,min:0}]}]}).success,false);
+ assert.equal(examinationTemplateDefinitionSchema.safeParse({sections:[{id:'bad',title:'Bad',fields:[{id:'number',label:'Number',type:'number',laterality:'none',required:false,min:2,max:1}]}]}).success,false);
 });
 
 

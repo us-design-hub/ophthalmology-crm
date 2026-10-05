@@ -215,3 +215,31 @@ test("cataract pathway provisions a catalogue procedure and a valid published ex
   assert.ok(definition.sections.some(section => section.id === "cataract_examination"));
   assert.ok(definition.sections.some(section => section.id === "cataract_decision"));
 });
+
+test('Glaucoma clinics use a valid published specialty template for supported visit types', async () => {
+  const facility = (await admin.query("SELECT id,specialty FROM app.facility WHERE tenant_id=$1 AND type='clinic' AND lower(name)='glaucoma'", [tenantId])).rows[0];
+  assert.ok(facility);
+  assert.equal(facility.specialty, 'Glaucoma');
+  const assignments = await admin.query(`SELECT a.visit_type,t.code,t.version,t.status,t.definition
+    FROM app.examination_template_assignment a
+    JOIN app.examination_template t ON t.id=a.template_id AND t.tenant_id=a.tenant_id
+    WHERE a.tenant_id=$1 AND a.facility_id=$2 AND a.active
+    ORDER BY a.visit_type`, [tenantId, facility.id]);
+  assert.deepEqual(assignments.rows.map(row=>row.visit_type), ['follow_up','general','new']);
+  for (const row of assignments.rows) {
+    assert.equal(row.code, 'glaucoma');
+    assert.equal(row.version, 1);
+    assert.equal(row.status, 'published');
+  }
+  const definition = examinationTemplateDefinitionSchema.parse(assignments.rows[0].definition);
+  assert.deepEqual(definition.sections.map(section=>section.id), [
+    'glaucoma_history','glaucoma_workup','glaucoma_examination','glaucoma_investigations','glaucoma_assessment','glaucoma_management','glaucoma_handoff'
+  ]);
+  const fields = definition.sections.flatMap(section=>section.fields);
+  assert.deepEqual(fields.find(field=>field.id==='cup_disc_ratio'), {
+    id:'cup_disc_ratio',label:'Vertical cup-to-disc ratio',type:'number',laterality:'bilateral',required:false,min:0,max:1,step:0.05,roles:['doctor','optometrist']
+  });
+  assert.ok(fields.some(field=>field.id==='progression_status'));
+  assert.ok(fields.some(field=>field.id==='visual_field_status'));
+  assert.ok(fields.some(field=>field.id==='oct_rnfl_status'));
+});

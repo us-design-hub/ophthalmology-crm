@@ -91,6 +91,7 @@
 .trend-legend .od:before{background:var(--brand-600)}.trend-legend .os:before{background:var(--burgundy-500)}.trend-legend .limit:before{background:var(--amber-500)}
 .comparison-table-wrap{overflow:auto;border:1px solid var(--border-default);border-radius:var(--radius-md)}
 .comparison-table{width:100%;min-width:1120px;border-collapse:collapse;font-size:var(--text-base)}
+.glaucoma-comparison-table{min-width:1500px}
 .comparison-table th,.comparison-table td{padding:11px;border-bottom:1px solid var(--border-subtle);text-align:start;vertical-align:top}
 .comparison-table thead th{position:sticky;top:0;background:var(--surface-sunken);color:var(--sage-900)}
 .comparison-table tbody th{min-width:130px}.comparison-table tbody th small,.comparison-table td small{display:block;color:var(--text-muted);margin-top:3px}

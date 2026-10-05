@@ -48,7 +48,7 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Required, optional, ordered, role-visible, and conditionally visible examination fields
 - [ ] Structured ophthalmic history and systemic/ocular disorder sections
 - [~] Initial structured anterior-segment, cornea, lens, fundus, optic-disc, gonioscopy, and motility fields are implemented; clinical refinement remains
-- [~] Cataract assessment template is published; retina, glaucoma, cornea, paediatric, and optometry templates remain
+- [~] Cataract and glaucoma assessment templates are published; retina, cornea, paediatric, and optometry templates remain
 - [ ] Outcome, next-step, recall, and management-plan configuration
 
 ### Anatomy and clinical drawing
@@ -164,11 +164,11 @@ Technical implementation is complete. Hospital approval of the marker catalogue 
 
 ### Phase 4 - Specialty templates and longitudinal record
 
-- [~] Cataract assessment is published; retina, glaucoma, cornea, optometry, and general follow-up templates remain
+- [~] Cataract and glaucoma assessments are published; retina, cornea, optometry, and general follow-up templates remain
 - [x] Present a chronological timeline of typed clinical events, drawings, investigations, prescriptions, consent, and surgery
 - [x] Promote signed diagnoses into longitudinal active/resolved problem episodes with attributed status history
 - [ ] Add configurable clinic pathways and worklists
-- [ ] Add comparison views for measurements and drawings across visits
+- [x] Add comparison views for measurements and drawings across visits, including glaucoma stage and progression history
 
 ### Phase 5 - Surgery depth
 
