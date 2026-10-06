@@ -8,10 +8,17 @@ import { todayKarachi } from '../../src/lib/patients';
 const roles={reception:'aisha.malik',nurse:'nadia.raza',doctor:'sara.khan',other:'hamza.ali'};
 async function login(request:APIRequestContext,origin:string,role:keyof typeof roles){const response=await request.post('/api/auth/login',{headers:{Origin:origin},data:{email:`${roles[role]}@demo.openeyes.local`,password:process.env.DEMO_ACCOUNT_PASSWORD}});expect(response.status()).toBe(200);}
 async function post(request:APIRequestContext,origin:string,path:string,data:unknown){return request.post(path,{headers:{Origin:origin},data});}
-async function addInvestigation(request:APIRequestContext,origin:string,id:string,stage:'testing'|'imaging'){const response=await post(request,origin,'/api/intake/investigations',{encounterId:id,stage,kind:stage==='testing'?'visual_field':'oct_macula',eye:'OU',performedAt:new Date().toISOString(),device:'Synthetic device',findings:'Synthetic investigation completed',measurements:stage==='testing'?{visualFieldIndex:90}:{centralSubfieldThickness:255}});expect(response.status(),await response.text()).toBe(201);}
-async function prepare(request:APIRequestContext,origin:string,clinicName='General Ophthalmology',doctorName='Sara',doctorRole:keyof typeof roles='doctor'){
+async function addInvestigation(request:APIRequestContext,origin:string,id:string,stage:'testing'|'imaging',kind=stage==='testing'?'visual_field':'oct_macula'){const response=await post(request,origin,'/api/intake/investigations',{encounterId:id,stage,kind,eye:'OU',performedAt:new Date().toISOString(),device:'Synthetic device',findings:'Synthetic investigation completed',measurements:kind==='pachymetry'?{centralCornealThickness:540}:stage==='testing'?{visualFieldIndex:90}:{centralSubfieldThickness:255}});expect(response.status(),await response.text()).toBe(201);}
+async function prepare(request:APIRequestContext,origin:string,clinicName='General Ophthalmology',doctorName='Sara',doctorRole:keyof typeof roles='doctor',visitType?:'follow_up'){
  const suffix=String(Date.now()).slice(-7);const input={externalId:`e2e-clinical-${suffix}`,externalUpdatedAt:new Date().toISOString(),givenName:'Clinical',familyName:`Review${suffix}`,gender:'female',dob:'1965-01-01',dobEstimated:false,phone:`+92300${suffix}`,identifierType:'cnic',identifier:`00000${suffix}0`,city:'Karachi'};
- const synced=await request.post('/api/integrations/odoo/patients',{headers:{Authorization:`Bearer ${process.env.ODOO_WEBHOOK_SECRET}`},data:input});expect(synced.status()).toBe(201);const sync=await synced.json();const patient={id:sync.patientId,mrn:sync.mrn,familyName:input.familyName};
+ let patient:{id:string;mrn:string;familyName:string};
+ if(visitType){const db=new pg.Client({connectionString:process.env.DATABASE_ADMIN_URL});await db.connect();try{patient=(await db.query(`SELECT p.id,p.mrn,p.family_name AS "familyName" FROM app.patient p
+   WHERE p.tenant_id=(SELECT id FROM app.tenant WHERE code='DEMO')
+     AND EXISTS(SELECT 1 FROM app.encounter prior WHERE prior.tenant_id=p.tenant_id AND prior.patient_id=p.id AND prior.closed_at IS NOT NULL)
+     AND NOT EXISTS(SELECT 1 FROM app.encounter active WHERE active.tenant_id=p.tenant_id AND active.patient_id=p.id AND active.closed_at IS NULL)
+     AND NOT EXISTS(SELECT 1 FROM app.appointment booked WHERE booked.tenant_id=p.tenant_id AND booked.patient_id=p.id AND booked.appointment_date=(now() AT TIME ZONE 'Asia/Karachi')::date)
+   ORDER BY p.mrn DESC LIMIT 1`)).rows[0];expect(patient).toBeTruthy();}finally{await db.end();}}
+ else{const synced=await request.post('/api/integrations/odoo/patients',{headers:{Authorization:`Bearer ${process.env.ODOO_WEBHOOK_SECRET}`},data:input});expect(synced.status()).toBe(201);const sync=await synced.json();patient={id:sync.patientId,mrn:sync.mrn,familyName:input.familyName};}
  await login(request,origin,'reception');const clinic=(await(await request.get('/api/intake/clinics')).json()).clinics.find((item:{name:string})=>item.name===clinicName);expect(clinic).toBeTruthy();const doctor=clinic.doctors.find((item:{name:string})=>item.name.includes(doctorName))??clinic.doctors[0];expect(doctor).toBeTruthy();const date=todayKarachi();const slots=await(await request.get(`/api/intake/slots?facilityId=${clinic.id}&doctorId=${doctor.id}&date=${date}`)).json();
  let id:string;
  if(slots.slots.length){
@@ -22,6 +29,7 @@ async function prepare(request:APIRequestContext,origin:string,clinicName='Gener
  }
  await post(request,origin,'/api/intake/transition',{encounterId:id,version:1,to:'workup'});await login(request,origin,'nurse');const eye={uncorrected:'6/12',pinhole:'6/9',corrected:'6/6',iop:16,method:'NCT',measuredAt:new Date().toISOString()};expect((await post(request,origin,'/api/intake/workup',{encounterId:id,version:0,OD:eye,OS:eye,notes:'Synthetic workup'})).status()).toBe(201);
  if(clinicName==='Glaucoma'){expect((await post(request,origin,'/api/intake/transition',{encounterId:id,version:2,to:'testing'})).status()).toBe(200);await addInvestigation(request,origin,id,'testing');expect((await post(request,origin,'/api/intake/transition',{encounterId:id,version:3,to:'consultation',reason:'Synthetic glaucoma tests completed'})).status()).toBe(200);}
+ else if(clinicName==='Cornea'){expect((await post(request,origin,'/api/intake/transition',{encounterId:id,version:2,to:'testing'})).status()).toBe(200);await addInvestigation(request,origin,id,'testing','pachymetry');expect((await post(request,origin,'/api/intake/transition',{encounterId:id,version:3,to:'consultation',reason:'Synthetic corneal measurements completed'})).status()).toBe(200);}
  else if(clinicName==='Retina'){expect((await post(request,origin,'/api/intake/transition',{encounterId:id,version:2,to:'imaging'})).status()).toBe(200);await addInvestigation(request,origin,id,'imaging');expect((await post(request,origin,'/api/intake/transition',{encounterId:id,version:3,to:'dilation',reason:'Synthetic retinal imaging completed'})).status()).toBe(200);expect((await post(request,origin,'/api/intake/transition',{encounterId:id,version:4,to:'consultation',reason:'Synthetic authorized early release'})).status()).toBe(200);}
  else expect((await post(request,origin,'/api/intake/transition',{encounterId:id,version:2,to:'consultation'})).status()).toBe(200);await login(request,origin,doctorRole);return {id,patient};
 }
@@ -45,6 +53,27 @@ test('Retina clinics select the published specialty template for Dr. Hamza and r
  expect(detail.template).toMatchObject({code:'retina',version:1,name:'Retina assessment',specialty:'Retina'});expect(detail.encounter.doctor).toContain('Hamza');
  const fields=detail.template.definition.sections.flatMap((section:{fields:unknown[]})=>section.fields);expect(fields.find((field:{id?:string})=>field.id==='central_subfield_thickness')).toMatchObject({laterality:'bilateral',min:50,max:2000,step:1});
  await page.goto('/');const card=page.locator('.clinical-encounter').filter({hasText:patient.mrn});await card.getByRole('button',{name:'Open Doctor Event',exact:true}).click();const editor=page.getByRole('dialog',{name:`Clinical ${patient.familyName}`,exact:true});await expect(editor.locator('summary').filter({hasText:'Retina history and risk'})).toBeVisible();await expect(editor.getByLabel('OD - OCT macula assessment',{exact:true})).toBeVisible();await expect(editor.getByLabel('OS - Central subfield thickness',{exact:true})).toHaveAttribute('max','2000');await expect(editor.getByLabel('OD examination section',{exact:true})).toHaveValue('retina_examination');
+});
+
+test('Cornea clinics select the corneal assessment and expose longitudinal measurement fields',async({page,baseURL})=>{
+ const {id,patient}=await prepare(page.request,baseURL!,'Cornea');
+ const detail=await(await page.request.get(`/api/clinical/detail?encounterId=${id}`)).json();
+ expect(detail.template).toMatchObject({code:'cornea',version:1,name:'Cornea assessment',specialty:'Cornea'});
+ await page.goto('/');const card=page.locator('.clinical-encounter').filter({hasText:patient.mrn});await card.getByRole('button',{name:'Open Doctor Event',exact:true}).click();const editor=page.getByRole('dialog',{name:`Clinical ${patient.familyName}`,exact:true});await expect(editor.locator('summary').filter({hasText:'Cornea history and risk'})).toBeVisible();await expect(editor.getByLabel('OD - Central corneal thickness',{exact:true})).toHaveAttribute('min','300');await expect(editor.getByLabel('OS - Progression status',{exact:true})).toBeVisible();
+});
+
+test('Optometry clinics select the optometry assessment and render refraction outcomes',async({page,baseURL})=>{
+ const {id,patient}=await prepare(page.request,baseURL!,'Optometry');
+ const detail=await(await page.request.get(`/api/clinical/detail?encounterId=${id}`)).json();
+ expect(detail.template).toMatchObject({code:'optometry',version:1,name:'Optometry assessment',specialty:'Optometry'});
+ await page.goto('/');const card=page.locator('.clinical-encounter').filter({hasText:patient.mrn});await card.getByRole('button',{name:'Open Doctor Event',exact:true}).click();const editor=page.getByRole('dialog',{name:`Clinical ${patient.familyName}`,exact:true});await expect(editor.locator('summary').filter({hasText:'Refraction and best-corrected vision'})).toBeVisible();await expect(editor.getByLabel('OD - Subjective refraction',{exact:true})).toBeVisible();await expect(editor.getByLabel('Refraction outcome',{exact:true})).toBeVisible();
+});
+
+test('General Ophthalmology follow-up visits select the focused follow-up template',async({page,baseURL})=>{
+ const {id,patient}=await prepare(page.request,baseURL!,'General Ophthalmology','Sara','doctor','follow_up');
+ const detail=await(await page.request.get(`/api/clinical/detail?encounterId=${id}`)).json();
+ expect(detail.template).toMatchObject({code:'general-follow-up',version:1,name:'General follow-up assessment',specialty:'Ophthalmology'});
+ await page.goto('/');const card=page.locator('.clinical-encounter').filter({hasText:patient.mrn});await card.getByRole('button',{name:'Open Doctor Event',exact:true}).click();const editor=page.locator('.doctor-dialog');await expect(editor.locator('summary').filter({hasText:'Interval history and treatment adherence'})).toBeVisible();await expect(editor.getByLabel('Change since the previous visit',{exact:true})).toBeVisible();await expect(editor.getByLabel('OD - Clinical course',{exact:true})).toBeVisible();
 });
 
 test('doctor UI saves anatomy-linked findings, signs both records, appends an addendum and produces a PDF',async({page,baseURL})=>{

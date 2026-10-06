@@ -30,7 +30,7 @@ async function examinationTemplate(db:PoolClient,id?:string,context?:{facilityId
     JOIN app.examination_template assigned ON assigned.id=a.template_id AND assigned.tenant_id=a.tenant_id
     WHERE a.active AND assigned.status='published' AND a.specialty=$3 AND a.visit_type IN ($4,'general')
       AND (a.facility_id=$2::uuid OR a.facility_id IS NULL)
-    ORDER BY (a.facility_id=$2::uuid) DESC,(a.visit_type=$4) DESC,a.updated_at DESC LIMIT 1),
+    ORDER BY coalesce(a.facility_id=$2::uuid,false) DESC,(a.visit_type=$4) DESC,a.updated_at DESC LIMIT 1),
    (SELECT id FROM app.examination_template WHERE is_default AND status='published' LIMIT 1)
   ) AND status='published'`,[id??null,context?.facilityId??null,context?.specialty??'Ophthalmology',context?.visitType??'general'])).rows[0];
  const definition=examinationTemplateDefinitionSchema.safeParse(row?.definition);if(!row||!definition.success)throw new ApiError(503,'clinicalTemplateUnavailable');

@@ -60,6 +60,7 @@ function eyeAnswer(visit:ClinicalComparisonVisit,key:string,eye:Eye){
 }
 function scalarAnswer(visit:ClinicalComparisonVisit,key:string){
   const value=visit.event?.answers[key];
+  if(typeof value==='boolean')return value?'Yes':'No';
   return ['string','number'].includes(typeof value)?String(value):'-';
 }
 function GlaucomaMonitoring({visits}:{visits:ClinicalComparisonVisit[]}){
@@ -74,6 +75,27 @@ function RetinaMonitoring({visits}:{visits:ClinicalComparisonVisit[]}){
   return <section><h4>Retina monitoring history</h4><div className="comparison-table-wrap"><table className="comparison-table retina-comparison-table">
     <thead><tr><th>Visit</th><th>OD diagnosis</th><th>OD severity</th><th>OD activity</th><th>OD progression</th><th>OD OCT / fluid</th><th>OD CST</th><th>OS diagnosis</th><th>OS severity</th><th>OS activity</th><th>OS progression</th><th>OS OCT / fluid</th><th>OS CST</th><th>Treatment</th></tr></thead>
     <tbody>{visits.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.event!.signedAt)}</strong><small>{visit.clinic}</small></th><td>{eyeAnswer(visit,'retina_diagnosis','OD')}</td><td>{eyeAnswer(visit,'retina_severity','OD')}</td><td>{eyeAnswer(visit,'retina_activity','OD')}</td><td>{eyeAnswer(visit,'retina_progression','OD')}</td><td>{eyeAnswer(visit,'oct_macula_status','OD')} / {eyeAnswer(visit,'retinal_fluid','OD')}</td><td>{eyeAnswer(visit,'central_subfield_thickness','OD')}</td><td>{eyeAnswer(visit,'retina_diagnosis','OS')}</td><td>{eyeAnswer(visit,'retina_severity','OS')}</td><td>{eyeAnswer(visit,'retina_activity','OS')}</td><td>{eyeAnswer(visit,'retina_progression','OS')}</td><td>{eyeAnswer(visit,'oct_macula_status','OS')} / {eyeAnswer(visit,'retinal_fluid','OS')}</td><td>{eyeAnswer(visit,'central_subfield_thickness','OS')}</td><td>{scalarAnswer(visit,'retina_treatment_decision')}<small>{scalarAnswer(visit,'treatment_laterality')}</small></td></tr>)}</tbody>
+  </table></div></section>;
+}
+function CorneaMonitoring({visits}:{visits:ClinicalComparisonVisit[]}){
+  if(!visits.length)return null;
+  return <section><h4>Cornea monitoring history</h4><div className="comparison-table-wrap"><table className="comparison-table">
+    <thead><tr><th>Visit</th><th>OD diagnosis</th><th>OD severity</th><th>OD activity</th><th>OD progression</th><th>OD topography</th><th>OD CCT</th><th>OS diagnosis</th><th>OS severity</th><th>OS activity</th><th>OS progression</th><th>OS topography</th><th>OS CCT</th><th>Treatment</th></tr></thead>
+    <tbody>{visits.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.event!.signedAt)}</strong><small>{visit.clinic}</small></th><td>{eyeAnswer(visit,'corneal_diagnosis_context','OD')}</td><td>{eyeAnswer(visit,'corneal_severity','OD')}</td><td>{eyeAnswer(visit,'corneal_activity','OD')}</td><td>{eyeAnswer(visit,'corneal_progression','OD')}</td><td>{eyeAnswer(visit,'corneal_topography_status','OD')}</td><td>{eyeAnswer(visit,'central_corneal_thickness','OD')}</td><td>{eyeAnswer(visit,'corneal_diagnosis_context','OS')}</td><td>{eyeAnswer(visit,'corneal_severity','OS')}</td><td>{eyeAnswer(visit,'corneal_activity','OS')}</td><td>{eyeAnswer(visit,'corneal_progression','OS')}</td><td>{eyeAnswer(visit,'corneal_topography_status','OS')}</td><td>{eyeAnswer(visit,'central_corneal_thickness','OS')}</td><td>{scalarAnswer(visit,'cornea_treatment_decision')}</td></tr>)}</tbody>
+  </table></div></section>;
+}
+function OptometryMonitoring({visits}:{visits:ClinicalComparisonVisit[]}){
+  if(!visits.length)return null;
+  return <section><h4>Optometry assessment history</h4><div className="comparison-table-wrap"><table className="comparison-table">
+    <thead><tr><th>Visit</th><th>OD subjective refraction</th><th>OD best-corrected VA</th><th>OD near add</th><th>OS subjective refraction</th><th>OS best-corrected VA</th><th>OS near add</th><th>Outcome</th><th>Referral</th><th>Recall</th></tr></thead>
+    <tbody>{visits.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.event!.signedAt)}</strong><small>{visit.clinic}</small></th><td>{eyeAnswer(visit,'subjective_refraction','OD')}</td><td>{eyeAnswer(visit,'best_corrected_va','OD')}</td><td>{eyeAnswer(visit,'near_add','OD')}</td><td>{eyeAnswer(visit,'subjective_refraction','OS')}</td><td>{eyeAnswer(visit,'best_corrected_va','OS')}</td><td>{eyeAnswer(visit,'near_add','OS')}</td><td>{scalarAnswer(visit,'refraction_outcome')}</td><td>{scalarAnswer(visit,'clinical_referral_required')}</td><td>{scalarAnswer(visit,'follow_up_interval')}</td></tr>)}</tbody>
+  </table></div></section>;
+}
+function FollowUpMonitoring({visits}:{visits:ClinicalComparisonVisit[]}){
+  if(!visits.length)return null;
+  return <section><h4>General follow-up history</h4><div className="comparison-table-wrap"><table className="comparison-table">
+    <thead><tr><th>Visit</th><th>Symptoms</th><th>Adherence</th><th>OD course / response</th><th>OS course / response</th><th>Decision</th><th>Recall</th></tr></thead>
+    <tbody>{visits.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.event!.signedAt)}</strong><small>{visit.clinic}</small></th><td>{scalarAnswer(visit,'symptom_change')}</td><td>{scalarAnswer(visit,'treatment_adherence')}</td><td>{eyeAnswer(visit,'clinical_course','OD')} / {eyeAnswer(visit,'treatment_response','OD')}</td><td>{eyeAnswer(visit,'clinical_course','OS')} / {eyeAnswer(visit,'treatment_response','OS')}</td><td>{scalarAnswer(visit,'management_decision')}</td><td>{scalarAnswer(visit,'follow_up_interval')}</td></tr>)}</tbody>
   </table></div></section>;
 }
 function InvestigationHistory({visits}:{visits:ClinicalComparisonVisit[]}){
@@ -117,6 +139,9 @@ export function PatientComparison({patientId}:{patientId:string}){
   const eventVisits=data?.visits.filter(visit=>visit.event)??[];
   const glaucomaVisits=eventVisits.filter(visit=>['glaucoma_stage','cup_disc_ratio','target_iop','progression_status'].some(key=>visit.event?.answers[key]!==undefined));
   const retinaVisits=eventVisits.filter(visit=>['retina_diagnosis','retina_severity','retina_activity','retina_progression'].some(key=>visit.event?.answers[key]!==undefined));
+  const corneaVisits=eventVisits.filter(visit=>['corneal_diagnosis_context','corneal_severity','corneal_activity','corneal_progression'].some(key=>visit.event?.answers[key]!==undefined));
+  const optometryVisits=eventVisits.filter(visit=>['subjective_refraction','best_corrected_va','refraction_outcome'].some(key=>visit.event?.answers[key]!==undefined));
+  const followUpVisits=eventVisits.filter(visit=>['symptom_change','treatment_adherence','clinical_course','management_decision'].some(key=>visit.event?.answers[key]!==undefined));
   const leftVisit=eventVisits.find(visit=>visit.encounterId===left)||null;
   const rightVisit=eventVisits.find(visit=>visit.encounterId===right)||null;
   return <section className="patient-comparison">
@@ -128,6 +153,9 @@ export function PatientComparison({patientId}:{patientId:string}){
         <section className="comparison-trend-section"><h4><TrendingUp size={18}/>IOP trend</h4><IopTrend visits={data.visits}/></section>
         <GlaucomaMonitoring visits={glaucomaVisits}/>
         <RetinaMonitoring visits={retinaVisits}/>
+        <CorneaMonitoring visits={corneaVisits}/>
+        <OptometryMonitoring visits={optometryVisits}/>
+        <FollowUpMonitoring visits={followUpVisits}/>
         <InvestigationHistory visits={data.visits}/>
         <section><h4>Visual acuity and refraction history</h4>
           {workups.length===0?<p className="comparison-empty">No saved workups are available.</p>:<div className="comparison-table-wrap"><table className="comparison-table"><thead><tr><th>Visit</th><th>OD VA</th><th>OD IOP</th><th>OD refraction</th><th>OS VA</th><th>OS IOP</th><th>OS refraction</th><th>Diagnoses</th></tr></thead><tbody>{workups.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.date)}</strong><small>{visit.clinic}</small></th><td>{visualAcuity(visit.workup!.OD)}</td><td className={visit.workup!.OD.iop>21?'elevated':''}>{visit.workup!.OD.iop} <small>{visit.workup!.OD.method}</small></td><td>{refraction(visit.workup!.OD)}</td><td>{visualAcuity(visit.workup!.OS)}</td><td className={visit.workup!.OS.iop>21?'elevated':''}>{visit.workup!.OS.iop} <small>{visit.workup!.OS.method}</small></td><td>{refraction(visit.workup!.OS)}</td><td>{diagnoses(visit)}</td></tr>)}</tbody></table></div>}

@@ -41,21 +41,29 @@ async function main() {
     await db.query("INSERT INTO app.tenant(id,code,name,mrn_prefix,is_demo) VALUES($1,'DEMO','Demo Eye Hospital','DEH',true)", [tenantId]);
     const facilityIds: string[] = [];
     const facilities = [
-      {name:"General Ophthalmology",type:"clinic",specialty:"Ophthalmology",pathway:["workup"]},
-      {name:"Retina",type:"clinic",specialty:"Retina",pathway:["workup","imaging","dilation"]},
-      {name:"Glaucoma",type:"clinic",specialty:"Glaucoma",pathway:["workup","testing"]},
-      {name:"Theatre",type:"theatre",specialty:"Ophthalmology",pathway:["workup"]},
+      {name:"General Ophthalmology",type:"clinic",specialty:"Ophthalmology",pathway:["workup"],targetMinutes:30},
+      {name:"Retina",type:"clinic",specialty:"Retina",pathway:["workup","imaging","dilation"],targetMinutes:30},
+      {name:"Glaucoma",type:"clinic",specialty:"Glaucoma",pathway:["workup","testing"],targetMinutes:30},
+      {name:"Cornea",type:"clinic",specialty:"Cornea",pathway:["workup","testing"],targetMinutes:35},
+      {name:"Optometry",type:"clinic",specialty:"Optometry",pathway:["workup"],targetMinutes:25},
+      {name:"Theatre",type:"theatre",specialty:"Ophthalmology",pathway:["workup"],targetMinutes:30},
     ];
-    for (const {name,type,specialty,pathway} of facilities) {
+    for (const {name,type,specialty,pathway,targetMinutes} of facilities) {
       const facilityId = randomUUID(); facilityIds.push(facilityId);
-      await db.query("INSERT INTO app.facility(id,tenant_id,name,type,specialty,pathway_steps) VALUES($1,$2,$3,$4,$5,$6)", [facilityId, tenantId, name, type, specialty, pathway]);
+      await db.query("INSERT INTO app.facility(id,tenant_id,name,type,specialty,pathway_steps,pathway_target_minutes) VALUES($1,$2,$3,$4,$5,$6,$7)", [facilityId, tenantId, name, type, specialty, pathway, targetMinutes]);
     }
     await db.query(`INSERT INTO app.examination_template_assignment(tenant_id,template_id,facility_id,specialty,visit_type)
       SELECT f.tenant_id,t.id,f.id,f.specialty,v.visit_type
       FROM app.facility f
       JOIN app.examination_template t ON t.tenant_id=f.tenant_id AND lower(t.specialty)=lower(f.specialty) AND t.status='published'
       CROSS JOIN (VALUES ('general'),('new'),('follow_up')) v(visit_type)
-      WHERE f.tenant_id=$1 AND lower(f.specialty) IN ('glaucoma','retina')
+      WHERE f.tenant_id=$1 AND lower(f.specialty) IN ('glaucoma','retina','cornea','optometry')
+      ON CONFLICT DO NOTHING`,[tenantId]);
+    await db.query(`INSERT INTO app.examination_template_assignment(tenant_id,template_id,facility_id,specialty,visit_type)
+      SELECT f.tenant_id,t.id,f.id,f.specialty,'follow_up'
+      FROM app.facility f
+      JOIN app.examination_template t ON t.tenant_id=f.tenant_id AND t.code='general-follow-up' AND t.version=1 AND t.status='published'
+      WHERE f.tenant_id=$1 AND lower(f.name)='general ophthalmology'
       ON CONFLICT DO NOTHING`,[tenantId]);
     for (const permission of PERMISSIONS) await db.query("INSERT INTO app.permission(code) VALUES($1) ON CONFLICT DO NOTHING", [permission]);
     for (const role of ROLES) {
@@ -89,7 +97,7 @@ async function main() {
     }
     await db.query("INSERT INTO app.mrn_counter(tenant_id,year,sequence) VALUES($1,$2,60)", [tenantId, year]);
     await db.query("COMMIT");
-    console.log(`Seeded 1 demo hospital, 4 facilities, 9 named accounts, and 60 synthetic patients in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
+    console.log(`Seeded 1 demo hospital, 6 facilities, 9 named accounts, and 60 synthetic patients in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
     console.log("Demo account choices are available on the login screen when explicitly enabled. Passwords were not printed.");
   } catch (error) { await db.query("ROLLBACK"); throw error; }
   finally { await db.end(); }

@@ -284,3 +284,64 @@ test('Retina clinics use a valid published specialty template for supported visi
   assert.ok(fields.some(field=>field.id==='retinal_fluid'));
   assert.ok(fields.some(field=>field.id==='retina_treatment_decision'));
 });
+
+test('Cornea and Optometry clinics are provisioned with valid specialty templates and pathways', async () => {
+  const clinics = await admin.query(`SELECT f.id,f.name,f.specialty,f.pathway_steps,f.pathway_target_minutes,
+      EXISTS(SELECT 1 FROM app.clinic_schedule schedule WHERE schedule.tenant_id=f.tenant_id AND schedule.facility_id=f.id) AS scheduled,
+      (SELECT count(*)::int FROM app.clinic_doctor doctor WHERE doctor.tenant_id=f.tenant_id AND doctor.facility_id=f.id AND doctor.active) AS doctors
+    FROM app.facility f
+    WHERE f.tenant_id=$1 AND f.type='clinic' AND f.name IN ('Cornea','Optometry')
+    ORDER BY f.name`, [tenantId]);
+  assert.deepEqual(clinics.rows.map(row=>row.name), ['Cornea','Optometry']);
+  assert.deepEqual(clinics.rows[0].pathway_steps, ['workup','testing']);
+  assert.equal(clinics.rows[0].pathway_target_minutes, 35);
+  assert.deepEqual(clinics.rows[1].pathway_steps, ['workup']);
+  assert.equal(clinics.rows[1].pathway_target_minutes, 25);
+  for (const clinic of clinics.rows) {
+    assert.equal(clinic.scheduled, true);
+    assert.ok(clinic.doctors > 0);
+    const assignments = await admin.query(`SELECT a.visit_type,t.code,t.version,t.status,t.definition
+      FROM app.examination_template_assignment a
+      JOIN app.examination_template t ON t.id=a.template_id AND t.tenant_id=a.tenant_id
+      WHERE a.tenant_id=$1 AND a.facility_id=$2 AND a.active ORDER BY a.visit_type`, [tenantId, clinic.id]);
+    assert.deepEqual(assignments.rows.map(row=>row.visit_type), ['follow_up','general','new']);
+    assert.ok(assignments.rows.every(row=>row.code===clinic.name.toLowerCase() && row.version===1 && row.status==='published'));
+    const definition=examinationTemplateDefinitionSchema.parse(assignments.rows[0].definition);
+    const fields=definition.sections.flatMap(section=>section.fields);
+    if(clinic.name==='Cornea'){
+      assert.ok(fields.some(field=>field.id==='central_corneal_thickness'));
+      assert.ok(fields.some(field=>field.id==='corneal_progression'));
+    }else{
+      assert.ok(fields.some(field=>field.id==='subjective_refraction'));
+      assert.ok(fields.some(field=>field.id==='clinical_referral_required'));
+    }
+  }
+});
+
+test('General Ophthalmology follow-up visits use the valid focused follow-up template', async () => {
+  const row=(await admin.query(`SELECT t.code,t.version,t.status,t.definition
+    FROM app.examination_template_assignment a
+    JOIN app.examination_template t ON t.id=a.template_id AND t.tenant_id=a.tenant_id
+    JOIN app.facility f ON f.id=a.facility_id AND f.tenant_id=a.tenant_id
+    WHERE a.tenant_id=$1 AND a.active AND a.visit_type='follow_up'
+      AND lower(f.name)='general ophthalmology'`,[tenantId])).rows[0];
+  assert.ok(row);
+  assert.equal(row.code,'general-follow-up');
+  assert.equal(row.version,1);
+  assert.equal(row.status,'published');
+  const definition=examinationTemplateDefinitionSchema.parse(row.definition);
+  assert.deepEqual(definition.sections.map(section=>section.id),[
+    'follow_up_history','follow_up_workup','follow_up_examination','follow_up_assessment','follow_up_management','follow_up_handoff'
+  ]);
+  const selected=(await admin.query(`SELECT template.code FROM app.facility facility
+    CROSS JOIN LATERAL (
+      SELECT assigned.code FROM app.examination_template_assignment assignment
+      JOIN app.examination_template assigned ON assigned.id=assignment.template_id AND assigned.tenant_id=assignment.tenant_id
+      WHERE assignment.tenant_id=facility.tenant_id AND assignment.active AND assigned.status='published'
+        AND assignment.specialty=facility.specialty AND assignment.visit_type IN ('follow_up','general')
+        AND (assignment.facility_id=facility.id OR assignment.facility_id IS NULL)
+      ORDER BY coalesce(assignment.facility_id=facility.id,false) DESC,(assignment.visit_type='follow_up') DESC,assignment.updated_at DESC LIMIT 1
+    ) template
+    WHERE facility.tenant_id=$1 AND lower(facility.name)='general ophthalmology'`,[tenantId])).rows[0];
+  assert.equal(selected.code,'general-follow-up');
+});

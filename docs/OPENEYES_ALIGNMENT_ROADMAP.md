@@ -164,10 +164,11 @@ Technical implementation is complete. Hospital approval of the marker catalogue 
 
 ### Phase 4 - Specialty templates and longitudinal record
 
-- [~] Cataract, glaucoma, and retina assessments are published; cornea, optometry, and general follow-up templates remain
+- [x] Cataract, glaucoma, retina, cornea, optometry, and general follow-up assessments are published and assigned
 - [x] Present a chronological timeline of typed clinical events, drawings, investigations, prescriptions, consent, and surgery
 - [x] Promote signed diagnoses into longitudinal active/resolved problem episodes with attributed status history
-- [ ] Add configurable clinic pathways and worklists
+- [x] Add configurable clinic pathways and specialty worklists
+- [x] Capture structured specialty investigations with immutable supporting evidence
 - [x] Add comparison views for measurements and drawings across visits, including glaucoma stage and progression history
 
 ### Phase 5 - Surgery depth
