@@ -15,6 +15,7 @@ import { audit,type AuditContext } from './audit';
 import { appOrigin } from './config';
 import { patientTimelineActivities } from './patient-timeline-service';
 import { problemList, syncSignedProblems, updateProblemStatus } from './clinical-problem-service';
+import { investigationRows } from './investigation-service';
 export { problemList, updateProblemStatus };
 function parse<T>(schema:z.ZodType<T>,input:unknown):T {const result=schema.safeParse(input);if(!result.success)throw new ApiError(400,'clinicalInvalid');return result.data;}
 const flags=`(SELECT coalesce(jsonb_agg(jsonb_build_object('type',f.type,'value',f.value)),'[]') FROM app.patient_flag f WHERE f.tenant_id=p.tenant_id AND f.patient_id=p.id AND f.resolved_at IS NULL)`;
@@ -56,7 +57,7 @@ async function loadDetail(db:PoolClient,user:AuthUser,id:string):Promise<Clinica
   if(prescription){prescription.items=await items(db,prescription.id);prescription.evidence=(await db.query(`SELECT e.id,e.filename,e.mime,e.hash,e.captured_at AS "capturedAt",u.full_name AS actor FROM app.prescription_evidence e JOIN app.user_account u ON u.id=e.actor_id AND u.tenant_id=e.tenant_id WHERE e.prescription_id=$1 ORDER BY e.captured_at,e.id`,[prescription.id])).rows;}
  }
  const addenda=event?(await db.query(`SELECT a.id,CASE WHEN a.event_id IS NOT NULL THEN 'event' ELSE 'prescription' END AS kind,a.text,u.full_name AS author,a.at,a.content_hash AS "contentHash" FROM app.clinical_addendum a JOIN app.user_account u ON u.id=a.author_id AND u.tenant_id=a.tenant_id WHERE a.event_id=$1 OR a.prescription_id=$2 ORDER BY a.at,a.id`,[event.id,prescription?.id??null])).rows:[];
- return {encounter,patient:{id:encounter.patientId,name:encounter.name,mrn:encounter.mrn,dob:encounter.dob,gender:encounter.gender,flags:encounter.flags},workup:await latestWorkup(db,id),template,event:event??null,prescription,addenda};
+ return {encounter,patient:{id:encounter.patientId,name:encounter.name,mrn:encounter.mrn,dob:encounter.dob,gender:encounter.gender,flags:encounter.flags},workup:await latestWorkup(db,id),investigations:await investigationRows(db,[id]),template,event:event??null,prescription,addenda};
 }
 async function items(db:PoolClient,id:string){return(await db.query('SELECT id,quantity,drug_id AS "drugId",name,strength,therapy_group AS "therapyGroup",eye,dose,route,frequency,duration,instructions,instructions_ur AS "instructionsUr" FROM app.prescription_item WHERE prescription_id=$1 ORDER BY position',[id])).rows;}
 export async function clinicalList(user:AuthUser,context:AuditContext){return withTenant(user.tenantId,user.id,async db=>{const encounters=(await db.query(`${encounterSelect} WHERE e.closed_at IS NULL AND e.stage='consultation' AND e.facility_id=ANY($1::uuid[]) ORDER BY (e.doctor_id=$2) DESC,e.checked_in_at`,[user.facilityIds,user.id])).rows;await log(db,user,context,'clinical.list','encounter',undefined,{count:encounters.length});return {encounters};});}
@@ -87,9 +88,11 @@ export async function comparison(user:AuthUser,id:unknown,context:AuditContext):
  const eye=(row:Record<string,unknown>,prefix:'od'|'os')=>({
   uncorrected:row[prefix+'Uncorrected'],pinhole:row[prefix+'Pinhole'],corrected:row[prefix+'Corrected'],iop:row[prefix+'Iop'],method:row[prefix+'Method'],measuredAt:row[prefix+'MeasuredAt'],refraction:row[prefix+'Refraction'],logmar:row[prefix+'Logmar'],
  });
+ const investigationList=await investigationRows(db,rows.map(row=>String(row.encounterId)));const byEncounter=new Map<string,typeof investigationList>();for(const item of investigationList){const list=byEncounter.get(item.encounterId)??[];list.push(item);byEncounter.set(item.encounterId,list);}
  const visits=rows.map(row=>({
   encounterId:row.encounterId,date:row.date,clinic:row.clinic,doctor:row.doctor,
   workup:row.workupId?{id:row.workupId,encounterId:row.encounterId,version:row.workupVersion,authorId:row.workupAuthorId,author:row.workupAuthor,savedAt:row.workupSavedAt,notes:row.workupNotes,OD:eye(row,'od'),OS:eye(row,'os')}:null,
+  investigations:byEncounter.get(String(row.encounterId))??[],
   event:row.eventId?{id:row.eventId,author:row.eventAuthor,signedAt:row.eventSignedAt,findings:row.findings,diagnoses:row.diagnoses,answers:row.answers,drawings:row.drawings,synthetic:row.synthetic}:null,
  })) as ClinicalComparison['visits'];
  await log(db,user,context,'clinical.comparison','patient',patientId,{count:visits.length});return {visits};
@@ -141,7 +144,7 @@ async function reviewInTransaction(db:PoolClient,user:AuthUser,kind:'event'|'pre
  if(!licence)throw new ApiError(409,'licenceRequired');
  const common={schemaVersion:1,kind,id,version,tenantId:user.tenantId,hospital:user.tenantName,encounterId,patient:detail.patient,prescriber:{id:user.id,name:user.name,licence},synthetic:record.synthetic};
  let snapshot:Record<string,unknown>;let warnings:string[]=[];
- if(kind==='event'){const event=detail.event!;if(!event.complaint||!event.findings.OD||!event.findings.OS||!event.diagnoses.length||validateExaminationAnswers(detail.template.definition,event.answers,user.roles).length)throw new ApiError(400,'eventIncomplete');snapshot={...common,examination:{template:{id:detail.template.id,code:detail.template.code,version:detail.template.version,name:detail.template.name,specialty:detail.template.specialty},answers:event.answers},complaint:event.complaint,findings:event.findings,diagnoses:event.diagnoses,plans:event.plans,drawings:event.drawings,referral:event.referral,followUp:event.followUp,workup:detail.workup};}
+ if(kind==='event'){const event=detail.event!;if(!event.complaint||!event.findings.OD||!event.findings.OS||!event.diagnoses.length||validateExaminationAnswers(detail.template.definition,event.answers,user.roles).length)throw new ApiError(400,'eventIncomplete');snapshot={...common,examination:{template:{id:detail.template.id,code:detail.template.code,version:detail.template.version,name:detail.template.name,specialty:detail.template.specialty},answers:event.answers},complaint:event.complaint,findings:event.findings,diagnoses:event.diagnoses,plans:event.plans,drawings:event.drawings,referral:event.referral,followUp:event.followUp,workup:detail.workup,investigations:detail.investigations.map(({id,stage,kind,eye,performedAt,device,findings,measurements,authorId,author,createdAt,evidence})=>({id,stage,kind,eye,performedAt,device,findings,measurements,authorId,author,createdAt,evidence:evidence.map(({id,filename,mime,hash,capturedAt,actor})=>({id,filename,mime,hash,capturedAt,actor}))}))};}
  else {if(detail.event?.status!=='signed')throw new ApiError(409,'signEventFirst');if(!detail.prescription!.items.length)throw new ApiError(400,'prescriptionEmpty');if(!detail.prescription!.evidence.length)throw new ApiError(409,'prescriptionEvidenceRequired');snapshot={...common,eventId:detail.event.id,eventHash:detail.event.contentHash,items:detail.prescription!.items,evidence:detail.prescription!.evidence.map(({id,filename,mime,hash,capturedAt})=>({id,filename,mime,hash,capturedAt}))};warnings=prescriptionWarnings(detail.prescription!.items,detail.patient.flags);}
  return {snapshot,hash:contentHash(snapshot),warnings,encounterId};
 }

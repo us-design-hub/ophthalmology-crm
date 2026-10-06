@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { todayKarachi } from "./patients";
+import type { InvestigationResult } from "./investigations";
 
 export const PATHWAY_STEPS = ["workup", "testing", "imaging", "dilation"] as const;
 export type PathwayStep = typeof PATHWAY_STEPS[number];
@@ -31,4 +32,4 @@ export function slotTimes(start: number, end: number, duration: number) { const 
 export type Clinic = { id: string; name: string; startMinute: number; endMinute: number; slotMinutes: number; doctors: { id: string; name: string }[] };
 export type Appointment = { id: string; patientId: string; name: string; mrn: string; facilityId: string; clinic: string; doctorId: string; doctor: string; date: string; time: string; version:number; status: "booked" | "checked_in" | "cancelled" | "no_show" | "rescheduled"; encounterId: string | null; flags: { type: "allergy" | "risk"; value: string }[] };
 export type Encounter = { id: string; patientId: string; name: string; mrn: string; clinic: string; facilityId: string; specialty: string; visitType: "general"|"new"|"follow_up"|"emergency"|"post_op"; doctor: string; doctorId: string; stage: Stage; pathwaySteps: PathwayStep[]; pathwayTargetMinutes: number; priority?: "routine"|"urgent"; version: number; checkedInAt: string; stageAt: string; dilationReadyAt: string | null; workupVersion: number; flags: Appointment["flags"] };
-export type EncounterDetail = { encounter: Encounter; workup: Workup | null; history: { from: Stage | null; to: Stage; actor: string; at: string; reason: string }[] };
+export type EncounterDetail = { encounter: Encounter; workup: Workup | null; investigations: InvestigationResult[]; history: { from: Stage | null; to: Stage; actor: string; at: string; reason: string }[] };

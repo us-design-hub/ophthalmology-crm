@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bookingDateAllowed, dateSchema, slotTimes, canTransition, nextPathwayStage, pathwayEvidenceRequired, workupSchema, isElevatedIop } from '../src/lib/intake';
 import { ROLE_PERMISSIONS } from '../src/lib/access';
+import { investigationInputSchema } from '../src/lib/investigations';
 test('clinic slots include the opening slot and exclude the closing boundary', () => { const slots = slotTimes(540, 1020, 15); assert.equal(slots.length, 32); assert.equal(slots[0], '09:00'); assert.equal(slots.at(-1), '16:45'); assert.equal(slots.includes('17:00'), false); });
 test('booking dates reject invalid calendar dates and constrain the demo horizon', () => { assert.equal(dateSchema.safeParse('2026-02-30').success, false); assert.equal(bookingDateAllowed('2026-09-13','2026-09-14'), false); assert.equal(bookingDateAllowed('2026-09-14','2026-09-14'), true); assert.equal(bookingDateAllowed('2027-01-01','2026-09-14'), false); });
 test('queue stages follow the configured clinic pathway without skipping checkpoints', () => {
@@ -18,3 +19,10 @@ test('bilateral measurements retain nonnumeric acuity and validate IOP without b
  assert.equal(isElevatedIop(21),false); assert.equal(isElevatedIop(21.1),true);
 });
 test('reception, clinical workup, and doctor review permissions stay separate', () => { assert.ok(ROLE_PERMISSIONS.receptionist.includes('queue:workup')); assert.equal(ROLE_PERMISSIONS.receptionist.includes('workup:read'),false); assert.equal(ROLE_PERMISSIONS.hospital_admin.includes('workup:write'),false); assert.ok(ROLE_PERMISSIONS.nurse.includes('workup:write')); assert.equal(ROLE_PERMISSIONS.doctor.includes('workup:write'),false); assert.ok(ROLE_PERMISSIONS.doctor.includes('workup:read')); });
+test('structured investigations enforce checkpoint modality and safe measurement ranges',()=>{
+ const base={encounterId:crypto.randomUUID(),stage:'testing',kind:'visual_field',eye:'OD',performedAt:new Date().toISOString(),device:'Humphrey',findings:'Stable visual field',measurements:{meanDeviation:-4.2,visualFieldIndex:92}};
+ assert.equal(investigationInputSchema.safeParse(base).success,true);
+ assert.equal(investigationInputSchema.safeParse({...base,stage:'imaging'}).success,false);
+ assert.equal(investigationInputSchema.safeParse({...base,measurements:{visualFieldIndex:101}}).success,false);
+ assert.equal(investigationInputSchema.safeParse({...base,measurements:{unknownMetric:4}}).success,false);
+});

@@ -7,6 +7,7 @@ import { todayKarachi } from "@/lib/patients";
 import { withTenant } from "./db";
 import { audit, type AuditContext } from "./audit";
 import { ApiError } from "./http";
+import { hasInvestigation, investigationRows } from './investigation-service';
 
 function parse<T>(schema: z.ZodType<T>, input: unknown): T { const result = schema.safeParse(input); if (!result.success) throw new ApiError(400, "intakeInvalid"); return result.data; }
 export function intakeDate(value: unknown) { return parse(dateSchema, value ?? todayKarachi()); }
@@ -87,6 +88,7 @@ export async function transition(user: AuthUser, input: unknown, context: AuditC
   const encounter = await lockEncounter(db, user, data.encounterId);
   if (encounter.version !== data.version || !canTransition(encounter.stage, data.to, encounter.pathway_steps)) throw new ApiError(409, "queueConflict");
   if (data.to !== "workup" && !(await latestWorkup(db, data.encounterId))) throw new ApiError(409, "workupRequired");
+  if (pathwayEvidenceRequired(encounter.stage) && !(await hasInvestigation(db,data.encounterId,encounter.stage))) throw new ApiError(409,"investigationRequired");
   if (pathwayEvidenceRequired(encounter.stage) && data.reason.trim().length < 3) throw new ApiError(409, "pathwayEvidenceRequired");
   if (encounter.stage === "dilation" && new Date(encounter.dilation_ready_at).getTime() > Date.now() && data.reason.length < 8) throw new ApiError(409, "dilationReasonRequired");
   await db.query("UPDATE app.encounter SET stage=$2,version=version+1,stage_at=now(),dilation_ready_at=CASE WHEN $2='dilation' THEN now()+make_interval(mins=>coalesce((SELECT (settings->>'dilationMinutes')::int FROM app.tenant WHERE id=app.encounter.tenant_id),20)) ELSE dilation_ready_at END WHERE id=$1", [data.encounterId, data.to]);
@@ -102,7 +104,7 @@ export async function workupDetail(user: AuthUser, id: unknown, context: AuditCo
   const encounter = (await db.query(`${encounterSelect} WHERE e.id=$1`, [encounterId])).rows[0] as Encounter;
   const history = (await db.query('SELECT q.from_stage AS "from",q.to_stage AS "to",u.full_name AS actor,q.at,q.reason FROM app.queue_transition q JOIN app.user_account u ON u.id=q.actor_id AND u.tenant_id=q.tenant_id WHERE q.encounter_id=$1 ORDER BY q.encounter_version', [encounterId])).rows;
   await event(db, user, context, "workup.read", "encounter", encounterId);
-  return { encounter, workup: await latestWorkup(db, encounterId), history };
+  return { encounter, workup: await latestWorkup(db, encounterId), investigations: await investigationRows(db,[encounterId]), history };
  });
 }
 export async function saveWorkup(user: AuthUser, input: unknown, context: AuditContext) {

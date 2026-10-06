@@ -62,6 +62,27 @@ export async function patientTimelineActivities(
 
       UNION ALL
       SELECT
+        'investigation:'||r.id::text,'investigation',r.performed_at,
+        (replace(r.kind,'_',' ')||' - '||r.eye)::text,
+        e.clinic,u.full_name,'recorded',e.id,
+        jsonb_build_object('investigationId',r.id,'stage',r.stage,'kind',r.kind,'eye',r.eye,'findings',r.findings,'measurements',r.measurements)
+      FROM app.investigation_result r
+      JOIN accessible_encounters e ON e.id=r.encounter_id AND e.tenant_id=r.tenant_id
+      JOIN app.user_account u ON u.id=r.author_id AND u.tenant_id=r.tenant_id
+
+      UNION ALL
+      SELECT
+        'investigation-evidence:'||v.id::text,'investigation_evidence',v.captured_at,
+        ('Investigation evidence - '||v.filename)::text,
+        e.clinic,u.full_name,'attached',e.id,
+        jsonb_build_object('investigationId',r.id,'filename',v.filename,'mime',v.mime,'hash',v.hash)
+      FROM app.investigation_evidence v
+      JOIN app.investigation_result r ON r.id=v.investigation_id AND r.tenant_id=v.tenant_id
+      JOIN accessible_encounters e ON e.id=r.encounter_id AND e.tenant_id=r.tenant_id
+      JOIN app.user_account u ON u.id=v.actor_id AND u.tenant_id=v.tenant_id
+
+      UNION ALL
+      SELECT
         'event:'||d.id::text,'doctor_event',coalesce(d.signed_at,d.updated_at),
         CASE WHEN d.complaint<>'' THEN d.complaint ELSE 'Doctor Event' END,
         e.clinic,u.full_name,d.status,e.id,

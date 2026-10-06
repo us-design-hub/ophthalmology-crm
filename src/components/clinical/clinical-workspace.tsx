@@ -20,6 +20,8 @@ const activityLabels:Record<PatientTimelineActivity['kind'],MessageKey>={
   appointment:'timelineAppointment',
   checkin:'timelineCheckin',
   workup:'timelineWorkup',
+  investigation:'timelineInvestigation',
+  investigation_evidence:'timelineInvestigationEvidence',
   doctor_event:'timelineDoctorEvent',
   drawing:'timelineDrawing',
   prescription:'timelinePrescription',
@@ -34,11 +36,11 @@ const activityLabels:Record<PatientTimelineActivity['kind'],MessageKey>={
 function ActivityIcon({kind}:{kind:PatientTimelineActivity['kind']}){
   const props={size:18,'aria-hidden':true as const};
   if(kind==='appointment')return <CalendarDays {...props}/>;
-  if(kind==='checkin'||kind==='workup')return <HeartPulse {...props}/>;
+  if(kind==='checkin'||kind==='workup'||kind==='investigation')return <HeartPulse {...props}/>;
   if(kind==='doctor_event')return <Stethoscope {...props}/>;
   if(kind==='drawing')return <PenTool {...props}/>;
   if(kind==='prescription')return <Pill {...props}/>;
-  if(kind==='prescription_evidence')return <Paperclip {...props}/>;
+  if(kind==='prescription_evidence'||kind==='investigation_evidence')return <Paperclip {...props}/>;
   if(kind==='addendum')return <MessageSquarePlus {...props}/>;
   if(kind==='consent')return <FileSignature {...props}/>;
   if(kind==='surgery')return <Scissors {...props}/>;

@@ -7,6 +7,7 @@ import type { ClinicalComparison,ClinicalComparisonVisit,ExaminationAnswers } fr
 import type { EyeMeasurements } from '@/lib/intake';
 import { formatDate } from '../patients/patients-workspace';
 import { ClinicalDrawingSheet } from './clinical-drawing-sheet';
+import { INVESTIGATION_CATALOGUE } from '@/lib/investigations';
 
 type Eye='OD'|'OS';
 
@@ -75,6 +76,11 @@ function RetinaMonitoring({visits}:{visits:ClinicalComparisonVisit[]}){
     <tbody>{visits.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.event!.signedAt)}</strong><small>{visit.clinic}</small></th><td>{eyeAnswer(visit,'retina_diagnosis','OD')}</td><td>{eyeAnswer(visit,'retina_severity','OD')}</td><td>{eyeAnswer(visit,'retina_activity','OD')}</td><td>{eyeAnswer(visit,'retina_progression','OD')}</td><td>{eyeAnswer(visit,'oct_macula_status','OD')} / {eyeAnswer(visit,'retinal_fluid','OD')}</td><td>{eyeAnswer(visit,'central_subfield_thickness','OD')}</td><td>{eyeAnswer(visit,'retina_diagnosis','OS')}</td><td>{eyeAnswer(visit,'retina_severity','OS')}</td><td>{eyeAnswer(visit,'retina_activity','OS')}</td><td>{eyeAnswer(visit,'retina_progression','OS')}</td><td>{eyeAnswer(visit,'oct_macula_status','OS')} / {eyeAnswer(visit,'retinal_fluid','OS')}</td><td>{eyeAnswer(visit,'central_subfield_thickness','OS')}</td><td>{scalarAnswer(visit,'retina_treatment_decision')}<small>{scalarAnswer(visit,'treatment_laterality')}</small></td></tr>)}</tbody>
   </table></div></section>;
 }
+function InvestigationHistory({visits}:{visits:ClinicalComparisonVisit[]}){
+ const rows=visits.flatMap(visit=>visit.investigations.map(result=>({visit,result})));
+ if(!rows.length)return <section><h4>Diagnostic investigation history</h4><p className="comparison-empty">No structured investigations are available.</p></section>;
+ return <section><h4>Diagnostic investigation history</h4><div className="comparison-table-wrap"><table className="comparison-table"><thead><tr><th>Performed</th><th>Investigation</th><th>Eye</th><th>Measurements</th><th>Findings</th><th>Evidence</th></tr></thead><tbody>{rows.map(({visit,result})=><tr key={result.id}><th><strong>{formatDate(result.performedAt)}</strong><small>{visit.clinic}</small></th><td>{INVESTIGATION_CATALOGUE[result.kind].label}</td><td>{result.eye}</td><td>{Object.entries(result.measurements).map(([key,value])=>key.replace(/([A-Z])/g,' $1')+': '+String(value)).join('; ')||'-'}</td><td>{result.findings}</td><td>{result.evidence.length}</td></tr>)}</tbody></table></div></section>;
+}
 function VisitSelect({label,visits,value,onChange}:{label:string;visits:ClinicalComparisonVisit[];value:string;onChange:(value:string)=>void}){
   return <label>{label}<select value={value} onChange={event=>onChange(event.target.value)}>{visits.map(visit=><option key={visit.encounterId} value={visit.encounterId}>{formatDate(visit.event?.signedAt||visit.date)} - {visit.clinic}</option>)}</select></label>;
 }
@@ -122,6 +128,7 @@ export function PatientComparison({patientId}:{patientId:string}){
         <section className="comparison-trend-section"><h4><TrendingUp size={18}/>IOP trend</h4><IopTrend visits={data.visits}/></section>
         <GlaucomaMonitoring visits={glaucomaVisits}/>
         <RetinaMonitoring visits={retinaVisits}/>
+        <InvestigationHistory visits={data.visits}/>
         <section><h4>Visual acuity and refraction history</h4>
           {workups.length===0?<p className="comparison-empty">No saved workups are available.</p>:<div className="comparison-table-wrap"><table className="comparison-table"><thead><tr><th>Visit</th><th>OD VA</th><th>OD IOP</th><th>OD refraction</th><th>OS VA</th><th>OS IOP</th><th>OS refraction</th><th>Diagnoses</th></tr></thead><tbody>{workups.map(visit=><tr key={visit.encounterId}><th><strong>{formatDate(visit.date)}</strong><small>{visit.clinic}</small></th><td>{visualAcuity(visit.workup!.OD)}</td><td className={visit.workup!.OD.iop>21?'elevated':''}>{visit.workup!.OD.iop} <small>{visit.workup!.OD.method}</small></td><td>{refraction(visit.workup!.OD)}</td><td>{visualAcuity(visit.workup!.OS)}</td><td className={visit.workup!.OS.iop>21?'elevated':''}>{visit.workup!.OS.iop} <small>{visit.workup!.OS.method}</small></td><td>{refraction(visit.workup!.OS)}</td><td>{diagnoses(visit)}</td></tr>)}</tbody></table></div>}
         </section>

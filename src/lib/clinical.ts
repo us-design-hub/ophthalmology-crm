@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ANATOMY_SITES } from './anatomy';
 import { CLINICAL_MARKER_TYPES, DRAWING_TEMPLATES, markerAllowedOnTemplate } from './clinical-drawing';
 import type { Encounter, Workup } from './intake';
+import type { InvestigationResult } from './investigations';
 
 export const laterality = z.enum(['OD', 'OS', 'OU']);
 const text = (length: number) => z.string().trim().max(length);
@@ -328,6 +329,7 @@ export type ClinicalDetail = {
     flags: { type: string; value: string }[];
   };
   workup: Workup | null;
+  investigations: InvestigationResult[];
   template: ExaminationTemplate;
   event: DoctorEvent | null;
   prescription: Prescription | null;
@@ -362,7 +364,7 @@ export type Timeline = {
 };
 export type PatientTimelineActivity = {
   id: string;
-  kind: 'appointment' | 'checkin' | 'workup' | 'doctor_event' | 'drawing' | 'prescription' | 'prescription_evidence' | 'addendum' | 'consent' | 'surgery' | 'operation_note' | 'surgery_followup' | 'problem';
+  kind: 'appointment' | 'checkin' | 'workup' | 'investigation' | 'investigation_evidence' | 'doctor_event' | 'drawing' | 'prescription' | 'prescription_evidence' | 'addendum' | 'consent' | 'surgery' | 'operation_note' | 'surgery_followup' | 'problem';
   at: string;
   summary: string;
   clinic: string;
@@ -416,6 +418,7 @@ export type ClinicalComparisonVisit = {
   clinic: string;
   doctor: string;
   workup: Workup | null;
+  investigations: InvestigationResult[];
   event: ClinicalComparisonEvent | null;
 };
 export type ClinicalComparison = { visits: ClinicalComparisonVisit[] };
