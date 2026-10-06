@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { todayKarachi } from "./patients";
 
-export const STAGES = ["waiting", "workup", "dilation", "consultation"] as const;
+export const PATHWAY_STEPS = ["workup", "testing", "imaging", "dilation"] as const;
+export type PathwayStep = typeof PATHWAY_STEPS[number];
+export const STAGES = ["waiting", ...PATHWAY_STEPS, "consultation"] as const;
 export type Stage = typeof STAGES[number];
 export const VA_VALUES = ["6/4", "6/5", "6/6", "6/9", "6/12", "6/18", "6/24", "6/36", "6/60", "3/60", "1/60", "CF", "HM", "PL", "NPL", "not_tested"] as const;
 export const IOP_METHODS = ["Goldmann", "NCT", "Tonopen"] as const;
@@ -16,10 +18,17 @@ export type EyeMeasurements = z.infer<typeof eyeSchema>;
 export type WorkupInput = z.infer<typeof workupSchema>;
 export type Workup = WorkupInput & { id: string; authorId: string; author: string; savedAt: string };
 export function isElevatedIop(value: number) { return value > 21; }
-export function canTransition(from: Stage, to: Stage) { return (from === "waiting" && to === "workup") || (from === "workup" && (to === "dilation" || to === "consultation")) || (from === "dilation" && to === "consultation"); }
+export function nextPathwayStage(from: Stage, pathway: readonly PathwayStep[] = ["workup"]): Stage | null {
+ if (from === "waiting") return "workup";
+ if (from === "consultation") return null;
+ const index = pathway.indexOf(from as PathwayStep);
+ return index < 0 ? null : pathway[index + 1] ?? "consultation";
+}
+export function canTransition(from: Stage, to: Stage, pathway: readonly PathwayStep[] = ["workup"]) { return nextPathwayStage(from, pathway) === to; }
+export function pathwayEvidenceRequired(stage: Stage) { return stage === "testing" || stage === "imaging"; }
 export function bookingDateAllowed(date: string, today = todayKarachi()) { return date >= today && date <= new Date(new Date(`${today}T00:00:00Z`).getTime() + 90 * 86400000).toISOString().slice(0, 10); }
 export function slotTimes(start: number, end: number, duration: number) { const slots: string[] = []; for (let minute = start; minute + duration <= end; minute += duration) slots.push(`${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`); return slots; }
 export type Clinic = { id: string; name: string; startMinute: number; endMinute: number; slotMinutes: number; doctors: { id: string; name: string }[] };
 export type Appointment = { id: string; patientId: string; name: string; mrn: string; facilityId: string; clinic: string; doctorId: string; doctor: string; date: string; time: string; version:number; status: "booked" | "checked_in" | "cancelled" | "no_show" | "rescheduled"; encounterId: string | null; flags: { type: "allergy" | "risk"; value: string }[] };
-export type Encounter = { id: string; patientId: string; name: string; mrn: string; clinic: string; facilityId: string; specialty: string; visitType: "general"|"new"|"follow_up"|"emergency"|"post_op"; doctor: string; doctorId: string; stage: Stage; priority?: "routine"|"urgent"; version: number; checkedInAt: string; stageAt: string; dilationReadyAt: string | null; workupVersion: number; flags: Appointment["flags"] };
+export type Encounter = { id: string; patientId: string; name: string; mrn: string; clinic: string; facilityId: string; specialty: string; visitType: "general"|"new"|"follow_up"|"emergency"|"post_op"; doctor: string; doctorId: string; stage: Stage; pathwaySteps: PathwayStep[]; pathwayTargetMinutes: number; priority?: "routine"|"urgent"; version: number; checkedInAt: string; stageAt: string; dilationReadyAt: string | null; workupVersion: number; flags: Appointment["flags"] };
 export type EncounterDetail = { encounter: Encounter; workup: Workup | null; history: { from: Stage | null; to: Stage; actor: string; at: string; reason: string }[] };

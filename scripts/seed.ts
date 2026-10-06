@@ -40,10 +40,23 @@ async function main() {
     const tenantId = randomUUID();
     await db.query("INSERT INTO app.tenant(id,code,name,mrn_prefix,is_demo) VALUES($1,'DEMO','Demo Eye Hospital','DEH',true)", [tenantId]);
     const facilityIds: string[] = [];
-    for (const [name, type] of [["General Ophthalmology", "clinic"], ["Retina", "clinic"], ["Glaucoma", "clinic"], ["Theatre", "theatre"]]) {
+    const facilities = [
+      {name:"General Ophthalmology",type:"clinic",specialty:"Ophthalmology",pathway:["workup"]},
+      {name:"Retina",type:"clinic",specialty:"Retina",pathway:["workup","imaging","dilation"]},
+      {name:"Glaucoma",type:"clinic",specialty:"Glaucoma",pathway:["workup","testing"]},
+      {name:"Theatre",type:"theatre",specialty:"Ophthalmology",pathway:["workup"]},
+    ];
+    for (const {name,type,specialty,pathway} of facilities) {
       const facilityId = randomUUID(); facilityIds.push(facilityId);
-      await db.query("INSERT INTO app.facility(id,tenant_id,name,type) VALUES($1,$2,$3,$4)", [facilityId, tenantId, name, type]);
+      await db.query("INSERT INTO app.facility(id,tenant_id,name,type,specialty,pathway_steps) VALUES($1,$2,$3,$4,$5,$6)", [facilityId, tenantId, name, type, specialty, pathway]);
     }
+    await db.query(`INSERT INTO app.examination_template_assignment(tenant_id,template_id,facility_id,specialty,visit_type)
+      SELECT f.tenant_id,t.id,f.id,f.specialty,v.visit_type
+      FROM app.facility f
+      JOIN app.examination_template t ON t.tenant_id=f.tenant_id AND lower(t.specialty)=lower(f.specialty) AND t.status='published'
+      CROSS JOIN (VALUES ('general'),('new'),('follow_up')) v(visit_type)
+      WHERE f.tenant_id=$1 AND lower(f.specialty) IN ('glaucoma','retina')
+      ON CONFLICT DO NOTHING`,[tenantId]);
     for (const permission of PERMISSIONS) await db.query("INSERT INTO app.permission(code) VALUES($1) ON CONFLICT DO NOTHING", [permission]);
     for (const role of ROLES) {
       await db.query("INSERT INTO app.role(tenant_id,code) VALUES($1,$2)", [tenantId, role]);

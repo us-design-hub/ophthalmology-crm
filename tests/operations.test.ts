@@ -3,8 +3,8 @@ import test from "node:test";
 import { ROLE_PERMISSIONS, PERMISSIONS } from "../src/lib/access";
 import { STAGES } from "../src/lib/intake";
 
-test("active queue stages end at consultation", () => {
-  assert.deepEqual(STAGES, ["waiting", "workup", "dilation", "consultation"]);
+test("active queue stages include specialty checkpoints and end at consultation", () => {
+  assert.deepEqual(STAGES, ["waiting", "workup", "testing", "imaging", "dilation", "consultation"]);
 });
 
 test("retired finance, pharmacy, inventory, preview and practice permissions are absent", () => {

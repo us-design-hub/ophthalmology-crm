@@ -11,3 +11,4 @@
 .admin-note{padding:0 22px 18px;margin:0;font-size:var(--text-md);line-height:var(--leading-normal);color:var(--text-muted);max-width:90ch}
 .admin-state{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);flex-wrap:wrap;padding:var(--space-5) 22px}
 .admin-state p{margin:0;font-size:var(--text-md);color:var(--text-muted)}
+.pathway-editor{display:grid;gap:10px}.pathway-editor>p{margin:0 0 8px;color:var(--text-muted)}.pathway-editor>div:not(.admin-actions){display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-sunken)}.pathway-editor>div>strong{margin-inline-end:auto}.pathway-editor .admin-actions{justify-content:flex-start}

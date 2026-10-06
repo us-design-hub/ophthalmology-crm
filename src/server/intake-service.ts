@@ -2,7 +2,7 @@ import "server-only";
 import type { PoolClient } from "pg";
 import { z } from "zod";
 import type { AuthUser } from "@/lib/access";
-import { bookingSchema, bookingDateAllowed, canTransition, dateSchema, slotTimes, transitionSchema, workupSchema, type Encounter, type Workup, type EncounterDetail, type Clinic } from "@/lib/intake";
+import { bookingSchema, bookingDateAllowed, canTransition, dateSchema, pathwayEvidenceRequired, slotTimes, transitionSchema, workupSchema, type Encounter, type Workup, type EncounterDetail, type Clinic } from "@/lib/intake";
 import { todayKarachi } from "@/lib/patients";
 import { withTenant } from "./db";
 import { audit, type AuditContext } from "./audit";
@@ -12,7 +12,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T { const result = sche
 export function intakeDate(value: unknown) { return parse(dateSchema, value ?? todayKarachi()); }
 function facilityAccess(user: AuthUser, facilityId: string) { if (!user.facilityIds.includes(facilityId)) throw new ApiError(403, "accessDenied"); }
 const flags = `(SELECT coalesce(jsonb_agg(jsonb_build_object('type',pf.type,'value',pf.value)),'[]') FROM app.patient_flag pf WHERE pf.tenant_id=p.tenant_id AND pf.patient_id=p.id AND pf.resolved_at IS NULL)`;
-const encounterSelect = `SELECT e.id,e.patient_id AS "patientId",concat_ws(' ',p.given_name,p.family_name) AS name,p.mrn,e.facility_id AS "facilityId",f.name AS clinic,e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.priority,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id),0) AS "workupVersion",${flags} AS flags FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id`;
+const encounterSelect = `SELECT e.id,e.patient_id AS "patientId",concat_ws(' ',p.given_name,p.family_name) AS name,p.mrn,e.facility_id AS "facilityId",f.name AS clinic,f.specialty,e.visit_type AS "visitType",e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.pathway_steps AS "pathwaySteps",e.pathway_target_minutes AS "pathwayTargetMinutes",e.priority,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id),0) AS "workupVersion",${flags} AS flags FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id`;
 async function event(db: PoolClient, user: AuthUser, context: AuditContext, action: string, entityType: string, entityId?: string, metadata?: Record<string, unknown>) { await audit(db, { tenantId: user.tenantId, actorId: user.id, action, entityType, entityId, metadata, context }); }
 async function lockEncounter(db: PoolClient, user: AuthUser, id: string) {
  const result = await db.query('SELECT * FROM app.encounter WHERE id=$1 AND facility_id=ANY($2::uuid[]) FOR UPDATE', [id, user.facilityIds]);
@@ -85,8 +85,9 @@ export async function transition(user: AuthUser, input: unknown, context: AuditC
  if (!user.permissions.includes(permission)) throw new ApiError(403, "accessDenied");
  return withTenant(user.tenantId, user.id, async db => {
   const encounter = await lockEncounter(db, user, data.encounterId);
-  if (encounter.version !== data.version || !canTransition(encounter.stage, data.to)) throw new ApiError(409, "queueConflict");
+  if (encounter.version !== data.version || !canTransition(encounter.stage, data.to, encounter.pathway_steps)) throw new ApiError(409, "queueConflict");
   if (data.to !== "workup" && !(await latestWorkup(db, data.encounterId))) throw new ApiError(409, "workupRequired");
+  if (pathwayEvidenceRequired(encounter.stage) && data.reason.trim().length < 3) throw new ApiError(409, "pathwayEvidenceRequired");
   if (encounter.stage === "dilation" && new Date(encounter.dilation_ready_at).getTime() > Date.now() && data.reason.length < 8) throw new ApiError(409, "dilationReasonRequired");
   await db.query("UPDATE app.encounter SET stage=$2,version=version+1,stage_at=now(),dilation_ready_at=CASE WHEN $2='dilation' THEN now()+make_interval(mins=>coalesce((SELECT (settings->>'dilationMinutes')::int FROM app.tenant WHERE id=app.encounter.tenant_id),20)) ELSE dilation_ready_at END WHERE id=$1", [data.encounterId, data.to]);
   await db.query('INSERT INTO app.queue_transition(tenant_id,encounter_id,from_stage,to_stage,encounter_version,actor_id,reason) VALUES($1,$2,$3,$4,$5,$6,$7)', [user.tenantId, data.encounterId, encounter.stage, data.to, data.version + 1, user.id, data.reason]);

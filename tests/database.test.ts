@@ -148,6 +148,19 @@ test('Odoo identity mappings enforce tenant isolation and retired access is abse
   } finally { await app.query('ROLLBACK'); }
 });
 
+test('clinic pathways are configured by specialty and snapshotted on encounters', async () => {
+  const facilities=await admin.query("SELECT name,pathway_steps,pathway_target_minutes FROM app.facility WHERE tenant_id=$1 AND name IN ('General Ophthalmology','Glaucoma','Retina') ORDER BY name",[tenantId]);
+  assert.deepEqual(Object.fromEntries(facilities.rows.map(row=>[row.name,row.pathway_steps])),{
+    'General Ophthalmology':['workup'],Glaucoma:['workup','testing'],Retina:['workup','imaging','dilation']
+  });
+  assert.ok(facilities.rows.every(row=>row.pathway_target_minutes>=5));
+  const stageConstraint=(await admin.query("SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='app.encounter'::regclass AND conname='encounter_stage_check'")).rows[0].definition;
+  assert.ok(stageConstraint.includes('testing'));assert.ok(stageConstraint.includes('imaging'));
+  const trigger=(await admin.query("SELECT count(*)::int AS total FROM pg_trigger WHERE tgrelid='app.encounter'::regclass AND tgname='encounter_pathway_snapshot' AND NOT tgisinternal")).rows[0];
+  assert.equal(trigger.total,1);
+  assert.equal((await admin.query("SELECT has_function_privilege('openeyes_app','app.valid_clinical_pathway(text[])','EXECUTE') AS allowed")).rows[0].allowed,true);
+});
+
 test('signed prescriptions reject new evidence', async () => {
   await admin.query('BEGIN');
   try {
