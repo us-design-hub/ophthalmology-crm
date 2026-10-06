@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useSession } from "../session-provider";
 import { useLocale } from "../locale-provider";
 import { ActionForm, LiveHeading, useOperations, choice, type Facility, type Field } from "./live-shared";
+import { karachiDate, type SurgeryReadiness } from "@/lib/surgery-worklist";
+import { todayKarachi } from "@/lib/patients";
 
 const stages = ["planning", "consent", "preop", "scheduled", "operated", "discharged", "followup"];
 const stageLabel = (stage: string) => stage === "estimate" ? "planning" : stage;
@@ -34,7 +36,8 @@ type Followup = {
 };
 type SurgeryCase = {
   id: string; version: number; eye: "OD" | "OS"; procedure: string; procedureCode: string | null;
-  stage: string; scheduled: string | null; patient: string; mrn: string;
+  stage: string; scheduled: string | null; patient: string; mrn: string; facilityId: string;
+  theatre: string; surgeonId: string; surgeon: string; createdAt: string; readiness: SurgeryReadiness;
   history: { stage: string; eye: string; notes: string; actor: string; at: string }[];
   documents: { id: string; filename: string; eye: string; witness: string; at: string }[];
   preop: Preop | null; operationNote: OperationNote | null; followups: Followup[];
@@ -43,6 +46,7 @@ type Surgery = {
   facilities: Facility[];
   encounters: { id: string; patient: string; mrn: string }[];
   procedures: { code: string; name: string; specialty: string }[];
+  surgeons: { id: string; name: string }[];
   cases: SurgeryCase[];
 };
 
@@ -56,6 +60,11 @@ export function SurgeryWorkspace() {
   const { t } = useLocale();
   const user = useSession();
   const live = useOperations<Surgery>("surgery");
+  const [worklistScope, setWorklistScope] = useState<"scheduled" | "active">("scheduled");
+  const [worklistDate, setWorklistDate] = useState(todayKarachi());
+  const [worklistTheatre, setWorklistTheatre] = useState("all");
+  const [worklistReadiness, setWorklistReadiness] = useState("all");
+  const [selectedCase, setSelectedCase] = useState<string | null>(null);
   if (!live.data) return <LiveHeading {...live}/>;
   const data = live.data;
   const write = user.permissions.includes("surgery:write");
@@ -63,6 +72,22 @@ export function SurgeryWorkspace() {
 
   return <div className="ops-workspace">
     <LiveHeading {...live}/>
+    <TheatreWorklist
+      cases={data.cases}
+      theatres={data.facilities.filter(facility => facility.type === "theatre")}
+      scope={worklistScope}
+      date={worklistDate}
+      theatre={worklistTheatre}
+      readiness={worklistReadiness}
+      onScope={setWorklistScope}
+      onDate={setWorklistDate}
+      onTheatre={setWorklistTheatre}
+      onReadiness={setWorklistReadiness}
+      onOpen={id => {
+        setSelectedCase(id);
+        setTimeout(() => document.getElementById(`surgery-case-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }}
+    />
     {write && <ActionForm
       title="surgeryCreate"
       resource="surgery"
@@ -70,16 +95,18 @@ export function SurgeryWorkspace() {
       fields={[
         choice("encounterId", "surgeryEncounter", data.encounters.map(encounter => ({ value: encounter.id, label: encounter.patient + " / " + encounter.mrn }))),
         choice("facilityId", "surgeryTheatre", data.facilities.filter(facility => facility.type === "theatre").map(facility => ({ value: facility.id, label: facility.name }))),
+        choice("surgeonId", "surgerySurgeon", data.surgeons.map(surgeon => ({ value: surgeon.id, label: surgeon.name }))),
         choice("eye", "surgeryEye", eyes),
         choice("procedureCode", "surgeryProcedure", data.procedures.map(procedure => ({ value: procedure.code, label: procedure.name }))),
       ]}
-      body={form => ({ action: "create", encounterId: form.get("encounterId"), facilityId: form.get("facilityId"), eye: form.get("eye"), procedureCode: form.get("procedureCode") })}
+      body={form => ({ action: "create", encounterId: form.get("encounterId"), facilityId: form.get("facilityId"), surgeonId: form.get("surgeonId"), eye: form.get("eye"), procedureCode: form.get("procedureCode") })}
     />}
     <section className="panel ops-chart-panel">
       <h2>{t("surgeryCases")}</h2>
       {!data.cases.length && <p>{t("surgeryEmpty")}</p>}
-      {data.cases.map(surgeryCase => <details key={surgeryCase.id} className="ops-daily-table">
+      {data.cases.map(surgeryCase => <details id={`surgery-case-${surgeryCase.id}`} key={surgeryCase.id} className="ops-daily-table" open={selectedCase === surgeryCase.id || undefined} onToggle={event => { if (!event.currentTarget.open && selectedCase === surgeryCase.id) setSelectedCase(null); }}>
         <summary>{surgeryCase.patient} / {surgeryCase.mrn} / {surgeryCase.eye} / {surgeryCase.procedure} / {stageLabel(surgeryCase.stage)}</summary>
+        <p>{surgeryCase.theatre} / {surgeryCase.surgeon}</p>
         {surgeryCase.scheduled && <p>{new Date(surgeryCase.scheduled).toLocaleString()}</p>}
         <h3>{t("surgeryHistory")}</h3>
         <ol className="ops-stage-history">{surgeryCase.history.map((history, index) => <li key={index}><strong>{stageLabel(history.stage)} / {history.eye}</strong><span>{history.notes}<small>{history.actor} / {new Date(history.at).toLocaleString()}</small></span></li>)}</ol>
@@ -110,6 +137,46 @@ export function SurgeryWorkspace() {
       </details>)}
     </section>
   </div>;
+}
+
+function TheatreWorklist({ cases, theatres, scope, date, theatre, readiness, onScope, onDate, onTheatre, onReadiness, onOpen }: {
+  cases: SurgeryCase[]; theatres: Facility[]; scope: "scheduled" | "active"; date: string; theatre: string; readiness: string;
+  onScope: (value: "scheduled" | "active") => void; onDate: (value: string) => void; onTheatre: (value: string) => void;
+  onReadiness: (value: string) => void; onOpen: (id: string) => void;
+}) {
+  const visible = cases.filter(surgeryCase => {
+    if (theatre !== "all" && surgeryCase.facilityId !== theatre) return false;
+    if (readiness !== "all" && surgeryCase.readiness.status !== readiness) return false;
+    if (scope === "scheduled") return Boolean(surgeryCase.scheduled && karachiDate(surgeryCase.scheduled) === date);
+    return !["cancelled", "followup"].includes(surgeryCase.stage);
+  }).sort((a, b) => (a.scheduled ?? a.createdAt).localeCompare(b.scheduled ?? b.createdAt));
+  const counts = {
+    total: visible.length,
+    ready: visible.filter(item => item.readiness.status === "ready").length,
+    action: visible.filter(item => item.readiness.status === "action_required").length,
+    completed: visible.filter(item => item.readiness.status === "completed").length,
+  };
+  return <section className="panel surgery-worklist" aria-labelledby="theatre-worklist-title">
+    <header><div><p className="ops-live-label">SURGERY OPERATIONS</p><h2 id="theatre-worklist-title">Theatre worklist</h2><p>Review the daily operating list, named surgeon, and readiness blockers before a patient enters theatre.</p></div></header>
+    <div className="ops-filters surgery-worklist-filters">
+      <label>View<select value={scope} onChange={event => onScope(event.target.value as "scheduled" | "active")}><option value="scheduled">Scheduled theatre list</option><option value="active">All active cases</option></select></label>
+      {scope === "scheduled" && <label>Date<input type="date" value={date} onChange={event => onDate(event.target.value)}/></label>}
+      <label>Theatre<select value={theatre} onChange={event => onTheatre(event.target.value)}><option value="all">All theatres</option>{theatres.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label>Readiness<select value={readiness} onChange={event => onReadiness(event.target.value)}><option value="all">All states</option><option value="ready">Ready</option><option value="action_required">Action required</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></label>
+    </div>
+    <div className="surgery-worklist-metrics" aria-label="Visible worklist summary"><span><strong>{counts.total}</strong> cases</span><span><strong>{counts.ready}</strong> ready</span><span><strong>{counts.action}</strong> need action</span><span><strong>{counts.completed}</strong> completed</span></div>
+    {!visible.length ? <div className="surgery-worklist-empty"><strong>No cases match this worklist.</strong><p>Choose another date or switch to all active cases.</p></div> : <div className="patient-table-wrap"><table className="patient-table surgery-worklist-table">
+      <thead><tr><th>Time</th><th>Patient</th><th>Procedure</th><th>Theatre / surgeon</th><th>Readiness</th><th>Case</th></tr></thead>
+      <tbody>{visible.map(surgeryCase => <tr key={surgeryCase.id}>
+        <td>{surgeryCase.scheduled ? new Date(surgeryCase.scheduled).toLocaleTimeString("en-PK", { timeZone: "Asia/Karachi", hour: "2-digit", minute: "2-digit" }) : "Unscheduled"}</td>
+        <td><strong>{surgeryCase.patient}</strong><small>{surgeryCase.mrn}</small></td>
+        <td><strong>{surgeryCase.procedure}</strong><small>{surgeryCase.eye} / {stageLabel(surgeryCase.stage)}</small></td>
+        <td><strong>{surgeryCase.theatre}</strong><small>{surgeryCase.surgeon}</small></td>
+        <td><span className={`ops-tag ${surgeryCase.readiness.status === "action_required" ? "warning" : surgeryCase.readiness.status}`}>{surgeryCase.readiness.status.replace("_", " ")}</span>{surgeryCase.readiness.blockers.length > 0 && <small>{surgeryCase.readiness.blockers.join("; ")}</small>}</td>
+        <td><button type="button" className="secondary-button" onClick={() => onOpen(surgeryCase.id)}>Open case</button></td>
+      </tr>)}</tbody>
+    </table></div>}
+  </section>;
 }
 
 function CataractPathway({ surgeryCase, canWrite, onSaved }: { surgeryCase: SurgeryCase; canWrite: boolean; onSaved: () => void }) {

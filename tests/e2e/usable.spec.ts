@@ -55,9 +55,11 @@ test('cataract surgery requires consent, verified pre-op, operation note and fol
  const data=await(await page.request.get('/api/operations/surgery')).json();
  const theatre=data.facilities.find((facility:{type:string})=>facility.type==='theatre');
  const procedure=data.procedures.find((item:{code:string})=>item.code==='cataract-phaco-iol');
+ const surgeon=data.surgeons.find((item:{name:string})=>item.name==='Dr. Sara Khan');
  expect(theatre).toBeTruthy();
  expect(procedure).toBeTruthy();
- const created=await ok(page.request,baseURL!,'/api/operations/surgery',{action:'create',encounterId:data.encounters[0].id,facilityId:theatre.id,eye:'OD',procedureCode:procedure.code});
+ expect(surgeon).toBeTruthy();
+ const created=await ok(page.request,baseURL!,'/api/operations/surgery',{action:'create',encounterId:data.encounters[0].id,facilityId:theatre.id,surgeonId:surgeon.id,eye:'OD',procedureCode:procedure.code});
  const stage={action:'advance',id:created.id,version:1,stage:'consent',eye:'OD',notes:'Consent verified for cataract pathway'};
  expect((await post(page.request,baseURL!,'/api/operations/surgery',stage)).status()).toBe(409);
  const file={name:'synthetic-consent.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6GtMAAAAASUVORK5CYII=','base64')};
@@ -77,12 +79,15 @@ test('cataract surgery requires consent, verified pre-op, operation note and fol
  const refreshed=await(await page.request.get('/api/operations/surgery')).json();
  const saved=refreshed.cases.find((item:{id:string})=>item.id===created.id);
  expect(saved.preop.biometryVerified).toBe(true);
+ expect(saved.surgeon).toBe('Dr. Sara Khan');
+ expect(saved.readiness.status).toBe('completed');
  expect(saved.operationNote.iolModel).toBe('Synthetic IOL');
  expect(saved.followups).toHaveLength(1);
  expect(saved.followups[0].version).toBe(2);
  expect(saved.followups[0].plan).toBe('Corrected review in one week');
  await page.goto('/');
  await page.getByRole('button',{name:'Surgery lifecycle',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Theatre worklist',exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Surgery cases',exact:true})).toBeVisible();
  await page.screenshot({path:'test-results/usable-surgery.png',fullPage:true});
 });

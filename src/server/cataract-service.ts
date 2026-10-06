@@ -126,7 +126,7 @@ export async function cataractAction(user: AuthUser, input: unknown, context: Au
 
     if (data.action === "save_operation") {
       if (currentCase.stage !== "scheduled") throw new ApiError(409, "stageConflict");
-      const ready = (await db.query("SELECT 1 FROM app.surgery_preop_assessment WHERE case_id=$1 AND biometry_verified AND medical_clearance", [data.id])).rowCount;
+      const ready = (await db.query("SELECT 1 FROM app.surgery_preop_assessment WHERE case_id=$1 AND biometry_verified AND medical_clearance AND pupil_dilation", [data.id])).rowCount;
       if (!ready) throw new ApiError(409, "preopRequired");
       const existing = (await db.query("SELECT version FROM app.surgery_operation_note WHERE case_id=$1 FOR UPDATE", [data.id])).rows[0];
       if ((existing?.version ?? 0) !== data.version) throw new ApiError(409, "recordChanged");

@@ -19,6 +19,7 @@ const errors:Record<string,string>={
  accessDenied:'Your role or facility assignment does not allow this action.',
  signedEventRequired:'A signed doctor event is required.',
  theatreRequired:'Select a theatre facility.',
+ surgeonUnavailable:'Select an active doctor assigned to this theatre.',
  procedureNotFound:'Select an active procedure from the catalogue.',
  cataractProcedureRequired:'This record is not configured as a cataract procedure.',
  preopRequired:'Complete and verify the cataract preoperative assessment before scheduling.',
