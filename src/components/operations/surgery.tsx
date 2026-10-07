@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useSession } from "../session-provider";
 import { useLocale } from "../locale-provider";
 import { ActionForm, LiveHeading, useOperations, choice, type Facility, type Field } from "./live-shared";
+import { operationError } from "./live-shared";
 import { karachiDate, type SurgeryReadiness } from "@/lib/surgery-worklist";
 import { todayKarachi } from "@/lib/patients";
+import { api } from "@/lib/api-client";
 
 const stages = ["planning", "consent", "preop", "scheduled", "operated", "discharged", "followup"];
 const stageLabel = (stage: string) => stage === "estimate" ? "planning" : stage;
@@ -34,12 +36,21 @@ type Followup = {
   iop: number; wound: string; cornea: string; anteriorChamber: string; iolPosition: string;
   medications: string; plan: string; nextReview: string | null;
 };
+type ConsentVersion = {
+  id: string; version: number; eye: "OD" | "OS"; procedure: string; statementVersion: string;
+  signatoryType: "patient" | "guardian"; signatoryName: string; relationship: string;
+  witnessName: string; witnessRole: string; source: "structured" | "legacy"; recordHash: string;
+  createdAt: string; createdBy: string; status: "created" | "confirmed" | "withdrawn";
+  confirmedBy: string | null; confirmedAt: string | null; withdrawnBy: string | null; withdrawnAt: string | null;
+  withdrawalReason: string | null; document: { id: string; filename: string };
+};
 type SurgeryCase = {
   id: string; version: number; eye: "OD" | "OS"; procedure: string; procedureCode: string | null;
   stage: string; scheduled: string | null; patient: string; mrn: string; facilityId: string;
   theatre: string; surgeonId: string; surgeon: string; createdAt: string; readiness: SurgeryReadiness;
   history: { stage: string; eye: string; notes: string; actor: string; at: string }[];
   documents: { id: string; filename: string; eye: string; witness: string; at: string }[];
+  consents: ConsentVersion[];
   preop: Preop | null; operationNote: OperationNote | null; followups: Followup[];
 };
 type Surgery = {
@@ -111,8 +122,8 @@ export function SurgeryWorkspace() {
         <h3>{t("surgeryHistory")}</h3>
         <ol className="ops-stage-history">{surgeryCase.history.map((history, index) => <li key={index}><strong>{stageLabel(history.stage)} / {history.eye}</strong><span>{history.notes}<small>{history.actor} / {new Date(history.at).toLocaleString()}</small></span></li>)}</ol>
         <h3>{t("surgeryConsent")}</h3>
-        {surgeryCase.documents.map(document => <p key={document.id}><a href={"/api/operations/consent?id=" + document.id}>{document.filename}</a> / {document.eye} / {document.witness}</p>)}
-        {write && ["planning", "consent", "preop"].includes(surgeryCase.stage) && <ConsentUpload surgeryCase={surgeryCase} onSaved={live.refresh}/>}
+        <ConsentHistory surgeryCase={surgeryCase} canWrite={write} doctorWrite={doctorWrite} onSaved={live.refresh}/>
+        {write && ["planning", "consent", "preop", "scheduled"].includes(surgeryCase.stage) && <ConsentUpload surgeryCase={surgeryCase} onSaved={live.refresh}/>}
         {surgeryCase.procedureCode === "cataract-phaco-iol" && <CataractPathway surgeryCase={surgeryCase} canWrite={doctorWrite} onSaved={live.refresh}/>}
         {write && !["followup", "cancelled"].includes(surgeryCase.stage) && <ActionForm
           key={"advance-" + surgeryCase.version}
@@ -287,10 +298,50 @@ function FollowupForm({ surgeryCase, choices, current, onSaved }: { surgeryCase:
   })}/>;
 }
 
+function ConsentHistory({ surgeryCase, canWrite, doctorWrite, onSaved }: { surgeryCase: SurgeryCase; canWrite: boolean; doctorWrite: boolean; onSaved: () => void }) {
+  const latest = surgeryCase.consents[0];
+  if (!surgeryCase.consents.length) return <p className="consent-empty">No structured consent has been recorded.</p>;
+  return <div className="consent-history">{surgeryCase.consents.map(consent => <article key={consent.id} className="consent-version">
+    <header><div><strong>Consent version {consent.version}</strong><span className={`ops-tag ${consent.status === "created" ? "warning" : consent.status === "confirmed" ? "ready" : "cancelled"}`}>{consent.status === "created" ? "Awaiting confirmation" : consent.status}</span></div><small>{consent.source === "legacy" ? "Legacy evidence" : consent.statementVersion}</small></header>
+    <dl>
+      <div><dt>Procedure and eye</dt><dd>{consent.procedure} / {consent.eye}</dd></div>
+      <div><dt>{consent.signatoryType === "guardian" ? "Guardian" : "Patient signatory"}</dt><dd>{consent.signatoryName}{consent.relationship ? ` / ${consent.relationship}` : ""}</dd></div>
+      <div><dt>Witness</dt><dd>{consent.witnessName} / {consent.witnessRole}</dd></div>
+      <div><dt>Created</dt><dd>{consent.createdBy} / {new Date(consent.createdAt).toLocaleString()}</dd></div>
+      {consent.confirmedAt && <div><dt>Doctor confirmation</dt><dd>{consent.confirmedBy} / {new Date(consent.confirmedAt).toLocaleString()}</dd></div>}
+      {consent.withdrawnAt && <div><dt>Withdrawal</dt><dd>{consent.withdrawnBy} / {new Date(consent.withdrawnAt).toLocaleString()} / {consent.withdrawalReason}</dd></div>}
+    </dl>
+    <div className="admin-actions"><a className="secondary-button" href={`/api/operations/consent?id=${consent.document.id}`}>Open signed evidence</a>
+      {canWrite && doctorWrite && latest?.id === consent.id && consent.status === "created" && <ConsentAction consentVersionId={consent.id} action="confirm" onSaved={onSaved}/>}
+    </div>
+    {canWrite && doctorWrite && latest?.id === consent.id && consent.status === "confirmed" && <ConsentAction consentVersionId={consent.id} action="withdraw" onSaved={onSaved}/>}
+  </article>)}</div>;
+}
+
+function ConsentAction({ consentVersionId, action, onSaved }: { consentVersionId: string; action: "confirm" | "withdraw"; onSaved: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return <form className={action === "withdraw" ? "consent-withdraw" : ""} onSubmit={async event => {
+    event.preventDefault(); setBusy(true); setError("");
+    const form = new FormData(event.currentTarget);
+    try {
+      await api("/api/operations/consent", { action, consentVersionId, ...(action === "withdraw" ? { reason: form.get("reason") } : {}) });
+      onSaved();
+    } catch (caught) { setError(operationError(caught)); }
+    finally { setBusy(false); }
+  }}>
+    {action === "withdraw" && <label>Withdrawal reason<textarea name="reason" required minLength={8} maxLength={500}/></label>}
+    {error && <p className="form-error" role="alert">{error}</p>}
+    <button className={action === "confirm" ? "primary-button" : "secondary-button"} disabled={busy}>{action === "confirm" ? "Confirm consent as doctor" : "Withdraw current consent"}</button>
+  </form>;
+}
+
 function ConsentUpload({ surgeryCase, onSaved }: { surgeryCase: SurgeryCase; onSaved: () => void }) {
   const { t } = useLocale();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [signatoryType, setSignatoryType] = useState<"patient" | "guardian">("patient");
+  const [signatoryName, setSignatoryName] = useState(surgeryCase.patient);
   return <form className="admin-form" onSubmit={async event => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -305,6 +356,8 @@ function ConsentUpload({ surgeryCase, onSaved }: { surgeryCase: SurgeryCase; onS
         throw new Error(body.error);
       }
       form.reset();
+      setSignatoryType("patient");
+      setSignatoryName(surgeryCase.patient);
       onSaved();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Upload failed");
@@ -313,9 +366,15 @@ function ConsentUpload({ surgeryCase, onSaved }: { surgeryCase: SurgeryCase; onS
     }
   }}>
     <h4>{t("surgeryUpload")}</h4>
-    <label>{t("surgeryEye")}<select name="eye" required defaultValue=""><option value="">Select...</option><option>OD</option><option>OS</option></select></label>
-    <label>{t("surgeryWitness")}<input name="witness" required minLength={3} maxLength={160}/></label>
+    <p>This creates a new immutable consent version for <strong>{surgeryCase.procedure} / {surgeryCase.eye}</strong>. A doctor must confirm it before surgery can progress.</p>
+    <input type="hidden" name="eye" value={surgeryCase.eye}/>
+    <label>Signatory<select name="signatoryType" value={signatoryType} onChange={event => { const next = event.target.value as "patient" | "guardian"; setSignatoryType(next); setSignatoryName(next === "patient" ? surgeryCase.patient : ""); }}><option value="patient">Patient</option><option value="guardian">Guardian</option></select></label>
+    <label>Signatory name<input name="signatoryName" required minLength={2} maxLength={160} value={signatoryName} onChange={event => setSignatoryName(event.target.value)}/></label>
+    {signatoryType === "guardian" && <label>Relationship to patient<input name="relationship" required minLength={2} maxLength={120}/></label>}
+    <label>Witness name<input name="witnessName" required minLength={2} maxLength={160}/></label>
+    <label>Witness role<input name="witnessRole" required minLength={2} maxLength={120}/></label>
     <label>{t("surgeryFile")}<input type="file" name="file" accept="application/pdf,image/png,image/jpeg" required/></label>
+    <label className="admin-check"><input type="checkbox" name="accepted" value="true" required/>The signatory and witness confirmed this procedure, surgical eye, risks, benefits, and alternatives.</label>
     {error && <p className="form-error" role="alert">{error}</p>}
     <button className="secondary-button" disabled={busy}>{t("surgeryUpload")}</button>
   </form>;

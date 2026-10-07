@@ -89,7 +89,7 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Cataract-specific operation note with technique, IOL, anaesthesia, complications, and postoperative instructions
 - [~] Cataract complications and anaesthesia are structured; device catalogue and theatre personnel remain
 - [x] Cataract postoperative instructions and structured day-one, week-one, month-one, and additional follow-up records
-- [ ] Structured consent signatories, withdrawal, confirmation, and version history
+- [x] Structured consent signatories, immutable version history, doctor confirmation, withdrawal, and procedure/laterality locking
 - [x] Daily and active-case theatre worklists with named surgeons, facility filters, readiness blockers, and direct case opening
 - [-] Surgery pricing, estimates, invoicing, and cashier workflow
 
@@ -176,7 +176,7 @@ Technical implementation is complete. Hospital approval of the marker catalogue 
 - [~] Cataract catalogue entry and operation note are complete; catalogue administration remains
 - [x] Cataract preoperative checks, theatre worklist, intraoperative note, postoperative instructions, and follow-ups
 - [ ] Add further procedure templates based on hospital volume
-- [ ] Expand consent into structured signatories and versioned confirmation
+- [x] Expand consent into structured signatories and versioned confirmation
 
 ### Phase 6 - Production platform
 

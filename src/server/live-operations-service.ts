@@ -9,6 +9,7 @@ import { parseInput, requireAction } from "./administration-service";
 import { todayKarachi } from "@/lib/patients";
 import { cataractAction, isCataractAction } from "./cataract-service";
 import { surgeryReadiness } from "@/lib/surgery-worklist";
+import { hasActiveSurgicalConsent } from "./surgery-consent-service";
 
 const uuid = z.uuid();
 const text = (max = 500) => z.string().trim().max(max);
@@ -44,6 +45,19 @@ export async function operationsData(user: AuthUser, resource: string, context: 
         { text: `SELECT c.id,c.version,c.eye,c.procedure,pc.code AS "procedureCode",CASE WHEN c.stage='estimate' THEN 'planning' ELSE c.stage END AS stage,c.scheduled_at AS scheduled,c.facility_id AS "facilityId",f.name AS theatre,c.surgeon_id AS "surgeonId",s.full_name AS surgeon,c.created_at AS "createdAt",p.mrn,p.given_name||' '||p.family_name AS patient,
           (SELECT coalesce(jsonb_agg(jsonb_build_object('stage',CASE WHEN t.stage='estimate' THEN 'planning' ELSE t.stage END,'eye',t.eye,'notes',t.notes,'at',t.at,'actor',u.full_name) ORDER BY t.at),'[]') FROM app.surgery_transition t JOIN app.user_account u ON u.id=t.actor_id WHERE t.case_id=c.id) AS history,
           (SELECT coalesce(jsonb_agg(jsonb_build_object('id',d.id,'filename',d.filename,'eye',d.eye,'witness',d.witness,'at',d.at)),'[]') FROM app.consent_document d WHERE d.case_id=c.id) AS documents,
+          (SELECT coalesce(jsonb_agg(jsonb_build_object(
+            'id',v.id,'version',v.version,'eye',v.eye,'procedure',v.procedure_snapshot,'statementVersion',v.statement_version,
+            'signatoryType',v.signatory_type,'signatoryName',v.signatory_name,'relationship',v.relationship,
+            'witnessName',v.witness_name,'witnessRole',v.witness_role,'source',v.source,'recordHash',v.record_hash,'createdAt',v.created_at,
+            'createdBy',creator.full_name,
+            'status',(SELECT ce.action FROM app.surgery_consent_event ce WHERE ce.consent_version_id=v.id ORDER BY ce.sequence DESC LIMIT 1),
+            'confirmedBy',(SELECT ua.full_name FROM app.surgery_consent_event ce JOIN app.user_account ua ON ua.tenant_id=ce.tenant_id AND ua.id=ce.actor_id WHERE ce.consent_version_id=v.id AND ce.action='confirmed'),
+            'confirmedAt',(SELECT ce.at FROM app.surgery_consent_event ce WHERE ce.consent_version_id=v.id AND ce.action='confirmed'),
+            'withdrawnBy',(SELECT ua.full_name FROM app.surgery_consent_event ce JOIN app.user_account ua ON ua.tenant_id=ce.tenant_id AND ua.id=ce.actor_id WHERE ce.consent_version_id=v.id AND ce.action='withdrawn'),
+            'withdrawnAt',(SELECT ce.at FROM app.surgery_consent_event ce WHERE ce.consent_version_id=v.id AND ce.action='withdrawn'),
+            'withdrawalReason',(SELECT ce.reason FROM app.surgery_consent_event ce WHERE ce.consent_version_id=v.id AND ce.action='withdrawn'),
+            'document',(SELECT jsonb_build_object('id',d.id,'filename',d.filename) FROM app.consent_document d WHERE d.consent_version_id=v.id)
+          ) ORDER BY v.version DESC),'[]') FROM app.surgery_consent_version v JOIN app.user_account creator ON creator.tenant_id=v.tenant_id AND creator.id=v.created_by WHERE v.case_id=c.id) AS consents,
           (SELECT jsonb_build_object('version',a.version,'axialLength',a.axial_length,'keratometryK1',a.keratometry_k1,'keratometryK2',a.keratometry_k2,'targetRefraction',a.target_refraction,'iolModel',a.iol_model,'iolPower',a.iol_power,'anaesthesia',a.anaesthesia,'biometryVerified',a.biometry_verified,'medicalClearance',a.medical_clearance,'pupilDilation',a.pupil_dilation,'notes',a.notes) FROM app.surgery_preop_assessment a WHERE a.case_id=c.id) AS preop,
           (SELECT jsonb_build_object('version',n.version,'procedurePerformed',n.procedure_performed,'anaesthesia',n.anaesthesia,'incision',n.incision,'capsulorhexis',n.capsulorhexis,'phacoTechnique',n.phaco_technique,'iolModel',n.iol_model,'iolPower',n.iol_power,'complications',n.complications,'postoperativeInstructions',n.postoperative_instructions) FROM app.surgery_operation_note n WHERE n.case_id=c.id) AS "operationNote",
           (SELECT coalesce(jsonb_agg(jsonb_build_object('version',f.version,'visitType',f.visit_type,'uncorrectedAcuity',f.uncorrected_acuity,'correctedAcuity',f.corrected_acuity,'iop',f.iop,'wound',f.wound,'cornea',f.cornea,'anteriorChamber',f.anterior_chamber,'iolPosition',f.iol_position,'medications',f.medications,'plan',f.plan,'nextReview',f.next_review) ORDER BY f.created_at),'[]') FROM app.surgery_followup f WHERE f.case_id=c.id) AS followups
@@ -96,7 +110,7 @@ export async function surgeryAction(user: AuthUser, input: unknown, context: Aud
     if (data.stage === "cancelled") {
       if (["operated", "discharged", "followup", "cancelled"].includes(surgeryCase.stage)) throw new ApiError(409, "stageConflict");
     } else if (SURGERY_STAGES[SURGERY_STAGES.indexOf(surgeryCase.stage) + 1] !== data.stage) throw new ApiError(409, "stageConflict");
-    if (["consent", "scheduled"].includes(data.stage) && !(await db.query("SELECT 1 FROM app.consent_document WHERE case_id=$1 AND eye=$2", [surgeryCase.id, surgeryCase.eye])).rowCount) throw new ApiError(409, "consentDocumentRequired");
+    if (["consent", "scheduled", "operated"].includes(data.stage) && !(await hasActiveSurgicalConsent(db, surgeryCase.id))) throw new ApiError(409, "confirmedConsentRequired");
     if (data.stage === "scheduled" && surgeryCase.procedure_catalogue_id && !(await db.query("SELECT 1 FROM app.surgery_preop_assessment WHERE case_id=$1 AND biometry_verified AND medical_clearance AND pupil_dilation", [surgeryCase.id])).rowCount) throw new ApiError(409, "preopRequired");
     if (data.stage === "operated" && surgeryCase.procedure_catalogue_id && !(await db.query("SELECT 1 FROM app.surgery_operation_note WHERE case_id=$1", [surgeryCase.id])).rowCount) throw new ApiError(409, "operationNoteRequired");
     if (data.stage === "scheduled" && (!data.scheduled || Date.parse(data.scheduled) < Date.now())) throw new ApiError(400, "futureSurgeryRequired");

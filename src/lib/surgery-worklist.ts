@@ -7,10 +7,11 @@ export type SurgeryReadiness = {
 
 type ReadinessSource = {
   eye: string;
+  procedure: string;
   stage: string;
   procedureCode: string | null;
   surgeonId?: string | null;
-  documents: { eye: string }[];
+  consents: { version: number; eye: string; procedure: string; status: "created" | "confirmed" | "withdrawn" }[];
   preop: null | {
     biometryVerified: boolean;
     medicalClearance: boolean;
@@ -19,7 +20,9 @@ type ReadinessSource = {
 };
 
 export function surgeryReadiness(surgeryCase: ReadinessSource): SurgeryReadiness {
-  const consentComplete = surgeryCase.documents.some(document => document.eye === surgeryCase.eye);
+  const latestConsent = [...surgeryCase.consents].sort((a, b) => b.version - a.version)[0];
+  const consentMatches = latestConsent?.eye === surgeryCase.eye && latestConsent.procedure === surgeryCase.procedure;
+  const consentComplete = Boolean(latestConsent && consentMatches && latestConsent.status === "confirmed");
   const cataloguePreopRequired = Boolean(surgeryCase.procedureCode);
   const preopComplete = !cataloguePreopRequired || Boolean(
     surgeryCase.preop?.biometryVerified
@@ -28,7 +31,10 @@ export function surgeryReadiness(surgeryCase: ReadinessSource): SurgeryReadiness
   );
   const blockers: string[] = [];
   if (!surgeryCase.surgeonId) blockers.push("Operating surgeon not assigned");
-  if (!consentComplete) blockers.push("Signed consent missing");
+  if (!latestConsent) blockers.push("Structured consent missing");
+  else if (!consentMatches) blockers.push("Consent no longer matches the procedure and eye");
+  else if (latestConsent.status === "created") blockers.push("Consent awaiting doctor confirmation");
+  else if (latestConsent.status === "withdrawn") blockers.push("Latest consent withdrawn");
   if (cataloguePreopRequired && !surgeryCase.preop) blockers.push("Preoperative assessment missing");
   else if (cataloguePreopRequired) {
     if (!surgeryCase.preop?.biometryVerified) blockers.push("Biometry not verified");

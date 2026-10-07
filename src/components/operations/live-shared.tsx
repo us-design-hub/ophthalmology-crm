@@ -10,6 +10,11 @@ export type Field={name:string;label:MessageKey;type?:'text'|'number'|'date'|'da
 
 const errors:Record<string,string>={
  consentDocumentRequired:'Upload the signed consent document before progressing.',
+ confirmedConsentRequired:'The latest consent must be confirmed by a doctor and match the procedure and surgical eye.',
+ consentDraftExists:'Confirm the current consent version before creating another.',
+ consentVersionStale:'This consent is no longer the current version. Refresh before acting.',
+ consentContextChanged:'The procedure or surgical eye changed. Create and confirm a new consent version.',
+ consentStateConflict:'This consent action cannot follow its current status.',
  lateralityMismatch:'The confirmed eye does not match this surgery.',
  stageConflict:'This stage cannot follow the current stage.',
  futureSurgeryRequired:'Choose a future surgery date and time.',
@@ -22,7 +27,7 @@ const errors:Record<string,string>={
  surgeonUnavailable:'Select an active doctor assigned to this theatre.',
  procedureNotFound:'Select an active procedure from the catalogue.',
  cataractProcedureRequired:'This record is not configured as a cataract procedure.',
- preopRequired:'Complete and verify the cataract preoperative assessment before scheduling.',
+ preopRequired:'Complete and verify biometry, medical clearance, and pupil dilation before scheduling.',
  operationNoteRequired:'Save the cataract operation note before recording the surgery as completed.'
 };
 

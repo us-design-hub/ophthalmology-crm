@@ -24,17 +24,29 @@ test("surgery and management use explicit production read permissions", () => {
 
 test("theatre readiness names each missing surgical prerequisite", () => {
   const incomplete = surgeryReadiness({
-    eye: "OD", stage: "preop", procedureCode: "cataract-phaco-iol", surgeonId: "surgeon",
-    documents: [], preop: { biometryVerified: true, medicalClearance: false, pupilDilation: false },
+    eye: "OD", procedure: "Cataract extraction", stage: "preop", procedureCode: "cataract-phaco-iol", surgeonId: "surgeon",
+    consents: [{ version: 1, eye: "OD", procedure: "Cataract extraction", status: "created" }], preop: { biometryVerified: true, medicalClearance: false, pupilDilation: false },
   });
   assert.equal(incomplete.status, "action_required");
-  assert.deepEqual(incomplete.blockers, ["Signed consent missing", "Medical clearance incomplete", "Pupil dilation not confirmed"]);
+  assert.deepEqual(incomplete.blockers, ["Consent awaiting doctor confirmation", "Medical clearance incomplete", "Pupil dilation not confirmed"]);
   const ready = surgeryReadiness({
-    eye: "OS", stage: "scheduled", procedureCode: "cataract-phaco-iol", surgeonId: "surgeon",
-    documents: [{ eye: "OS" }], preop: { biometryVerified: true, medicalClearance: true, pupilDilation: true },
+    eye: "OS", procedure: "Cataract extraction", stage: "scheduled", procedureCode: "cataract-phaco-iol", surgeonId: "surgeon",
+    consents: [{ version: 1, eye: "OS", procedure: "Cataract extraction", status: "confirmed" }], preop: { biometryVerified: true, medicalClearance: true, pupilDilation: true },
   });
   assert.equal(ready.status, "ready");
   assert.deepEqual(ready.blockers, []);
+});
+
+test("only the latest matching consent version can make a case ready", () => {
+  const readiness = surgeryReadiness({
+    eye: "OD", procedure: "Cataract extraction", stage: "scheduled", procedureCode: null, surgeonId: "surgeon",
+    consents: [
+      { version: 1, eye: "OD", procedure: "Cataract extraction", status: "confirmed" },
+      { version: 2, eye: "OD", procedure: "Cataract extraction", status: "withdrawn" },
+    ], preop: null,
+  });
+  assert.equal(readiness.status, "action_required");
+  assert.deepEqual(readiness.blockers, ["Latest consent withdrawn"]);
 });
 
 test("theatre dates use the hospital timezone", () => {
