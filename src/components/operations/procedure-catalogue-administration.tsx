@@ -6,8 +6,10 @@ import { procedureDefinitionSchema, type AdministrationData, type ProcedureCatal
 const DEFAULT_DEFINITION:ProcedureDefinition={
   allowedEyes:['OD','OS'],
   preoperativeChecks:[],
+  preoperativeFields:[],
   operationNoteFields:[],
   followupSchedule:[],
+  followupFields:[],
 };
 
 export function ProcedureCatalogueAdministration({data,busy,canWrite,save}:{data:AdministrationData;busy:boolean;canWrite:boolean;save:(resource:string,body:unknown)=>Promise<void>}){
@@ -81,4 +83,4 @@ export function ProcedureCatalogueAdministration({data,busy,canWrite,save}:{data
   </section>;
 }
 
-function DefinitionEditor({value}:{value:ProcedureDefinition}){return <><label>Workflow definition (JSON)<textarea name="definition" className="template-json-editor" defaultValue={JSON.stringify(value,null,2)} required spellCheck={false}/></label><p className="admin-note">Allowed eyes control case creation. Preoperative checks may be biometry_verified, medical_clearance, and pupil_dilation. Operation-note fields and follow-up schedules define the procedure workflow.</p></>}
+function DefinitionEditor({value}:{value:ProcedureDefinition}){return <><label>Workflow definition (JSON)<textarea name="definition" className="template-json-editor" defaultValue={JSON.stringify(value,null,2)} required spellCheck={false}/></label><p className="admin-note">Allowed eyes control case creation. Preoperative checks may be biometry_verified, medical_clearance, and pupil_dilation. Workflow fields use text, textarea, number, select, or date controls.</p></>}

@@ -83,10 +83,10 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Encounter-linked surgery case with explicit OD/OS
 - [x] Sequential surgery stages, scheduling, history, and cancellation
 - [x] Uploaded consent evidence with witness and laterality checks
-- [~] Basic surgery lifecycle and theatre association
+- [x] Surgery lifecycle, theatre association, and procedure-driven clinical forms
 - [x] Versioned procedure catalogue administration with draft, publish, retire, laterality, preoperative checks, operation-note fields, and follow-up schedules
-- [~] Structured cataract biometry, IOL planning, clearance, and dilation checks; configurable checklist templates remain
-- [x] Cataract-specific operation note with technique, IOL, anaesthesia, complications, and postoperative instructions
+- [x] Configurable preoperative checks and procedure-specific fields, including cataract biometry and IOL planning
+- [x] Versioned procedure-driven operation notes, including cataract technique, IOL, anaesthesia, complications, and instructions
 - [~] Cataract complications and anaesthesia are structured; device catalogue and theatre personnel remain
 - [x] Cataract postoperative instructions and structured day-one, week-one, month-one, and additional follow-up records
 - [x] Structured consent signatories, immutable version history, doctor confirmation, withdrawal, and procedure/laterality locking
@@ -175,6 +175,7 @@ Technical implementation is complete. Hospital approval of the marker catalogue 
 
 - [x] Cataract catalogue entry, versioned catalogue administration, and operation note
 - [x] Cataract preoperative checks, theatre worklist, intraoperative note, postoperative instructions, and follow-ups
+- [x] Generic append-only preoperative, operation, and scheduled follow-up records driven by the selected procedure version
 - [ ] Add further procedure templates based on hospital volume
 - [x] Expand consent into structured signatories and versioned confirmation
 

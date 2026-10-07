@@ -21,22 +21,29 @@ export const templateActionSchema = z.discriminatedUnion('action', [
 ]);
 
 export const PREOPERATIVE_CHECKS = ['biometry_verified','medical_clearance','pupil_dilation'] as const;
-const operationNoteFieldSchema = z.object({
+export const procedureFieldSchema = z.object({
   code:z.string().trim().regex(/^[a-z][a-z0-9_]{1,59}$/),
   label:text(120).min(2),
-  type:z.enum(['text','textarea','number','select']),
+  type:z.enum(['text','textarea','number','select','date']),
   required:z.boolean(),
   options:z.array(text(100).min(1)).min(1).max(30).optional(),
+  min:z.number().finite().optional(),
+  max:z.number().finite().optional(),
+  step:z.number().positive().optional(),
+  maxLength:z.number().int().min(1).max(4000).optional(),
 }).strict().superRefine((field,context)=>{
   if(field.type==='select'&&!field.options)context.addIssue({code:'custom',message:'Select fields require options',path:['options']});
   if(field.type!=='select'&&field.options)context.addIssue({code:'custom',message:'Only select fields may define options',path:['options']});
+  if(field.min!==undefined&&field.max!==undefined&&field.min>field.max)context.addIssue({code:'custom',message:'Minimum cannot exceed maximum',path:['min']});
 });
 const followupScheduleSchema = z.object({code:z.string().trim().regex(/^[a-z][a-z0-9_]{1,59}$/),label:text(120).min(2),daysAfter:z.number().int().min(0).max(3650),required:z.boolean()}).strict();
 export const procedureDefinitionSchema = z.object({
   allowedEyes:z.array(z.enum(['OD','OS'])).min(1).max(2).refine(values=>new Set(values).size===values.length),
   preoperativeChecks:z.array(z.enum(PREOPERATIVE_CHECKS)).max(PREOPERATIVE_CHECKS.length).refine(values=>new Set(values).size===values.length),
-  operationNoteFields:z.array(operationNoteFieldSchema).max(40).refine(fields=>new Set(fields.map(field=>field.code)).size===fields.length),
+  preoperativeFields:z.array(procedureFieldSchema).max(40).refine(fields=>new Set(fields.map(field=>field.code)).size===fields.length).default([]),
+  operationNoteFields:z.array(procedureFieldSchema).max(40).refine(fields=>new Set(fields.map(field=>field.code)).size===fields.length),
   followupSchedule:z.array(followupScheduleSchema).max(20).refine(items=>new Set(items.map(item=>item.code)).size===items.length),
+  followupFields:z.array(procedureFieldSchema).max(40).refine(fields=>new Set(fields.map(field=>field.code)).size===fields.length).default([]),
 }).strict();
 export const procedureActionSchema = z.discriminatedUnion('action',[
   z.object({action:z.literal('createDraft'),code:z.string().trim().regex(/^[a-z][a-z0-9_-]{2,79}$/),name:text(160).min(3),specialty:text(80).min(3),definition:procedureDefinitionSchema}).strict(),
@@ -52,5 +59,6 @@ export type HospitalSettings = z.infer<typeof settingsSchema>;
 export type ExaminationTemplateRecord = {id:string;code:string;version:number;revision:number;name:string;specialty:string;status:'draft'|'published'|'retired';isDefault:boolean;definition:ExaminationTemplateDefinition;updatedAt:string};
 export type ExaminationTemplateAssignment = {id:string;templateId:string;facilityId:string|null;specialty:string;visitType:typeof VISIT_TYPES[number];active:boolean};
 export type ProcedureDefinition = z.infer<typeof procedureDefinitionSchema>;
+export type ProcedureField = z.infer<typeof procedureFieldSchema>;
 export type ProcedureCatalogueRecord = {id:string;code:string;version:number;revision:number;name:string;specialty:string;status:'draft'|'published'|'retired';active:boolean;definition:ProcedureDefinition;createdAt:string;publishedAt:string|null;updatedAt:string};
 export type AdministrationData = {staff:StaffRecord[];facilities:FacilityRecord[];hospital:HospitalSettings;templates:ExaminationTemplateRecord[];templateAssignments:ExaminationTemplateAssignment[];procedureCatalogue:ProcedureCatalogueRecord[]};

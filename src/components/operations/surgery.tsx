@@ -8,6 +8,7 @@ import { operationError } from "./live-shared";
 import { karachiDate, type SurgeryReadiness } from "@/lib/surgery-worklist";
 import { todayKarachi } from "@/lib/patients";
 import { api } from "@/lib/api-client";
+import type { ProcedureDefinition, ProcedureField } from '@/lib/administration';
 
 const stages = ["planning", "consent", "preop", "scheduled", "operated", "discharged", "followup"];
 const stageLabel = (stage: string) => stage === "estimate" ? "planning" : stage;
@@ -45,14 +46,16 @@ type ConsentVersion = {
   withdrawalReason: string | null; document: { id: string; filename: string };
 };
 type SurgeryCase = {
-  id: string; version: number; eye: "OD" | "OS"; procedure: string; procedureCode: string | null;
+  id: string; version: number; eye: "OD" | "OS"; procedure: string; procedureCode: string | null; procedureVersion:number; procedureDefinition:ProcedureDefinition;
   stage: string; scheduled: string | null; patient: string; mrn: string; facilityId: string;
   theatre: string; surgeonId: string; surgeon: string; createdAt: string; readiness: SurgeryReadiness;
   history: { stage: string; eye: string; notes: string; actor: string; at: string }[];
   documents: { id: string; filename: string; eye: string; witness: string; at: string }[];
   consents: ConsentVersion[];
   preop: Preop | null; operationNote: OperationNote | null; followups: Followup[];
+  workflowPreop:WorkflowRecord|null;workflowOperation:WorkflowRecord|null;workflowFollowups:WorkflowRecord[];
 };
+type WorkflowRecord={recordKey?:string;version:number;answers:Record<string,string|number|boolean>;createdAt:string};
 type Surgery = {
   facilities: Facility[];
   encounters: { id: string; patient: string; mrn: string }[];
@@ -124,7 +127,7 @@ export function SurgeryWorkspace() {
         <h3>{t("surgeryConsent")}</h3>
         <ConsentHistory surgeryCase={surgeryCase} canWrite={write} doctorWrite={doctorWrite} onSaved={live.refresh}/>
         {write && ["planning", "consent", "preop", "scheduled"].includes(surgeryCase.stage) && <ConsentUpload surgeryCase={surgeryCase} onSaved={live.refresh}/>}
-        {surgeryCase.procedureCode === "cataract-phaco-iol" && <CataractPathway surgeryCase={surgeryCase} canWrite={doctorWrite} onSaved={live.refresh}/>}
+        {surgeryCase.procedureCode&&surgeryCase.procedureDefinition&&<ProcedureWorkflow surgeryCase={surgeryCase} canWrite={doctorWrite} onSaved={live.refresh}/>}
         {write && !["followup", "cancelled"].includes(surgeryCase.stage) && <ActionForm
           key={"advance-" + surgeryCase.version}
           title="surgeryAdvance"
@@ -187,6 +190,43 @@ function TheatreWorklist({ cases, theatres, scope, date, theatre, readiness, onS
         <td><button type="button" className="secondary-button" onClick={() => onOpen(surgeryCase.id)}>Open case</button></td>
       </tr>)}</tbody>
     </table></div>}
+  </section>;
+}
+
+const legacyPreopFields:ProcedureField[]=[
+  {code:'axial_length',label:'Axial length (mm)',type:'number',required:true,min:15,max:40,step:.01},{code:'keratometry_k1',label:'Keratometry K1 (D)',type:'number',required:true,min:20,max:70,step:.01},{code:'keratometry_k2',label:'Keratometry K2 (D)',type:'number',required:true,min:20,max:70,step:.01},{code:'target_refraction',label:'Target refraction (D)',type:'number',required:true,min:-20,max:20,step:.01},{code:'iol_model',label:'IOL model',type:'text',required:true,maxLength:120},{code:'iol_power',label:'IOL power (D)',type:'number',required:true,min:-10,max:60,step:.01},{code:'anaesthesia',label:'Planned anaesthesia',type:'select',required:true,options:['topical','local','general']},{code:'notes',label:'Preoperative notes',type:'textarea',required:false,maxLength:2000},
+];
+const legacyFollowupFields:ProcedureField[]=[
+  {code:'uncorrected_acuity',label:'Unaided visual acuity',type:'text',required:true,maxLength:40},{code:'corrected_acuity',label:'Corrected visual acuity',type:'text',required:false,maxLength:40},{code:'iop',label:'IOP (mmHg)',type:'number',required:true,min:0,max:80,step:.1},{code:'wound',label:'Wound',type:'text',required:true,maxLength:500},{code:'cornea',label:'Cornea',type:'text',required:true,maxLength:500},{code:'anterior_chamber',label:'Anterior chamber',type:'text',required:true,maxLength:500},{code:'iol_position',label:'IOL position',type:'text',required:true,maxLength:500},{code:'medications',label:'Medications',type:'textarea',required:true,maxLength:1000},{code:'plan',label:'Plan',type:'textarea',required:true,maxLength:1500},{code:'next_review',label:'Next review date',type:'date',required:false},
+];
+const checkLabels:Record<string,string>={biometry_verified:'Biometry verified',medical_clearance:'Medical clearance complete',pupil_dilation:'Pupil dilation confirmed'};
+
+function workflowFields(surgeryCase:SurgeryCase,kind:'preop'|'operation'|'followup'){
+  const definition=surgeryCase.procedureDefinition;
+  if(kind==='operation')return definition.operationNoteFields;
+  if(kind==='preop')return definition.preoperativeFields?.length?definition.preoperativeFields:surgeryCase.procedureCode==='cataract-phaco-iol'?legacyPreopFields:[];
+  return definition.followupFields?.length?definition.followupFields:surgeryCase.procedureCode==='cataract-phaco-iol'?legacyFollowupFields:[];
+}
+function controls(fields:ProcedureField[],record?:WorkflowRecord|null):Field[]{return fields.map(field=>({name:field.code,label:'cataractNotes',literalLabel:field.label,type:field.type,choices:field.options?.map(option=>({value:option,label:option})),value:record?.answers[field.code] as string|number|undefined,min:field.min,max:field.max,step:field.step,maxLength:field.maxLength,optional:!field.required}));}
+function answers(form:FormData,fields:ProcedureField[],checks:string[]=[]){const result:Record<string,string|number|boolean>={};for(const check of checks)result[check]=form.get(check)==='true';for(const field of fields){const value=form.get(field.code);if(value===null||value==='')continue;result[field.code]=field.type==='number'?Number(value):String(value);}return result;}
+function summaryRows(fields:ProcedureField[],record:WorkflowRecord):[string,string][]{return fields.filter(field=>record.answers[field.code]!==undefined&&record.answers[field.code]!=='').map(field=>[field.label,String(record.answers[field.code])]);}
+
+function ProcedureWorkflow({surgeryCase,canWrite,onSaved}:{surgeryCase:SurgeryCase;canWrite:boolean;onSaved:()=>void}){
+  const preopFields=workflowFields(surgeryCase,'preop'),operationFields=workflowFields(surgeryCase,'operation'),followupFields=workflowFields(surgeryCase,'followup');
+  const checks=surgeryCase.procedureDefinition.preoperativeChecks??[];
+  const followupSchedule=surgeryCase.procedureCode==='cataract-phaco-iol'&&!surgeryCase.procedureDefinition.followupSchedule.some(item=>item.code==='other')?[...surgeryCase.procedureDefinition.followupSchedule,{code:'other',label:'Additional follow-up',daysAfter:0,required:false}]:surgeryCase.procedureDefinition.followupSchedule;
+  const completed=new Map(surgeryCase.workflowFollowups.map(record=>[record.recordKey,record]));
+  return <section className="cataract-pathway">
+    <p className="admin-note"><strong>{surgeryCase.procedure}</strong> / catalogue version {surgeryCase.procedureVersion}. The recorded workflow remains bound to this version.</p>
+    <h3>Preoperative assessment</h3>
+    {surgeryCase.workflowPreop&&<RecordSummary rows={[...checks.map(check=>[checkLabels[check]??check.replaceAll('_',' '),surgeryCase.workflowPreop!.answers[check]===true?'Yes':'No'] as [string,string]),...summaryRows(preopFields,surgeryCase.workflowPreop)]}/>}
+    {canWrite&&['consent','preop'].includes(surgeryCase.stage)&&(checks.length>0||preopFields.length>0)&&<ActionForm key={`workflow-preop-${surgeryCase.workflowPreop?.version??0}`} title="cataractPreopSave" resource="surgery" onSaved={onSaved} fields={[...checks.map(check=>selectedChoice(check,'cataractNotes',yesNo,surgeryCase.workflowPreop?.answers[check] as boolean|undefined)).map((field,index)=>({...field,literalLabel:checkLabels[checks[index]]??checks[index].replaceAll('_',' ')})),...controls(preopFields,surgeryCase.workflowPreop)]} body={form=>({action:'save_preop',id:surgeryCase.id,version:surgeryCase.workflowPreop?.version??0,eye:surgeryCase.eye,answers:answers(form,preopFields,checks)})}/>}
+    <h3>Operation record</h3>
+    {surgeryCase.workflowOperation&&<RecordSummary rows={summaryRows(operationFields,surgeryCase.workflowOperation)}/>}
+    {canWrite&&surgeryCase.stage==='scheduled'&&<ActionForm key={`workflow-operation-${surgeryCase.workflowOperation?.version??0}`} title="cataractOperationSave" resource="surgery" onSaved={onSaved} fields={controls(operationFields,surgeryCase.workflowOperation)} body={form=>({action:'save_operation',id:surgeryCase.id,version:surgeryCase.workflowOperation?.version??0,eye:surgeryCase.eye,answers:answers(form,operationFields)})}/>}
+    <h3>Follow-up schedule</h3>
+    {!followupSchedule.length&&<p>No procedure-specific follow-up schedule is configured.</p>}
+    {followupSchedule.map(schedule=>{const record=completed.get(schedule.code);return <div key={schedule.code}><h4>{schedule.label}{schedule.daysAfter?` / ${schedule.daysAfter} days`:''}{schedule.required?' / required':''}</h4>{record&&<RecordSummary rows={summaryRows(followupFields,record)}/>} {canWrite&&['operated','discharged','followup'].includes(surgeryCase.stage)&&<ActionForm key={`${schedule.code}-${record?.version??0}`} title="cataractFollowupSave" resource="surgery" onSaved={onSaved} fields={controls(followupFields,record)} body={form=>({action:'save_followup',id:surgeryCase.id,recordKey:schedule.code,version:record?.version??0,eye:surgeryCase.eye,answers:answers(form,followupFields)})}/>}</div>;})}
   </section>;
 }
 

@@ -123,7 +123,7 @@ test("operations snapshots require tenant context and reject all runtime writes"
   } finally {await app.query('ROLLBACK');}
 });
 
-test('active clinical operations tables enforce RLS and immutable evidence',async()=>{const names=['surgery_case','consent_document','surgery_consent_version','surgery_consent_event','patient_history','prescription_evidence','investigation_result','investigation_evidence','procedure_catalogue','surgery_preop_assessment','surgery_operation_note','surgery_followup'];for(const name of names){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}for(const statement of ['DELETE FROM app.consent_document WHERE false',"UPDATE app.surgery_consent_version SET signatory_name='tampered' WHERE false","DELETE FROM app.surgery_consent_event WHERE false","UPDATE app.patient_history SET text='tampered' WHERE false","UPDATE app.investigation_result SET findings='tampered' WHERE false","UPDATE app.investigation_evidence SET filename='tampered' WHERE false"])await assert.rejects(app.query(statement),(e:{code?:string})=>e.code==='42501');});
+test('active clinical operations tables enforce RLS and immutable evidence',async()=>{const names=['surgery_case','consent_document','surgery_consent_version','surgery_consent_event','patient_history','prescription_evidence','investigation_result','investigation_evidence','procedure_catalogue','surgery_preop_assessment','surgery_operation_note','surgery_followup','surgery_workflow_record'];for(const name of names){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}for(const statement of ['DELETE FROM app.consent_document WHERE false',"UPDATE app.surgery_consent_version SET signatory_name='tampered' WHERE false","DELETE FROM app.surgery_consent_event WHERE false","UPDATE app.patient_history SET text='tampered' WHERE false","UPDATE app.investigation_result SET findings='tampered' WHERE false","UPDATE app.investigation_evidence SET filename='tampered' WHERE false","UPDATE app.surgery_workflow_record SET answers='{}' WHERE false","DELETE FROM app.surgery_workflow_record WHERE false"])await assert.rejects(app.query(statement),(e:{code?:string})=>e.code==='42501');});
 
 test('surgical consent evidence is versioned, linked and append-only',async()=>{
   assert.equal((await admin.query("SELECT count(*)::int AS total FROM app.consent_document WHERE consent_version_id IS NULL")).rows[0].total,0);
@@ -236,10 +236,12 @@ test("cataract pathway provisions a versioned catalogue procedure and a valid pu
   const procedure = await admin.query("SELECT id,code,name,specialty,version,revision,status,definition FROM app.procedure_catalogue WHERE tenant_id=$1 AND code='cataract-phaco-iol' AND active", [tenantId]);
   assert.equal(procedure.rowCount, 1);
   assert.equal(procedure.rows[0].specialty, "Cataract");
-  assert.equal(procedure.rows[0].version,1);
+  assert.ok(procedure.rows[0].version>=1);
   assert.equal(procedure.rows[0].status,'published');
   assert.deepEqual(procedure.rows[0].definition.allowedEyes,['OD','OS']);
   assert.deepEqual(procedure.rows[0].definition.preoperativeChecks,['biometry_verified','medical_clearance','pupil_dilation']);
+  assert.ok(procedure.rows[0].definition.preoperativeFields.length>0);
+  assert.ok(procedure.rows[0].definition.followupFields.length>0);
   await assert.rejects(admin.query("UPDATE app.procedure_catalogue SET name='Changed historical procedure' WHERE id=$1",[procedure.rows[0].id]),(error:{message?:string})=>error.message?.includes('immutable')===true);
   const template = (await admin.query("SELECT definition FROM app.examination_template WHERE tenant_id=$1 AND name='Cataract assessment' AND status='published'", [tenantId])).rows[0];
   assert.ok(template);

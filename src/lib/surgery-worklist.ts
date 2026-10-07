@@ -10,6 +10,7 @@ type ReadinessSource = {
   procedure: string;
   stage: string;
   procedureCode: string | null;
+  procedureDefinition?: {preoperativeChecks?:string[];preoperativeFields?:{required?:boolean}[]}|null;
   surgeonId?: string | null;
   consents: { version: number; eye: string; procedure: string; status: "created" | "confirmed" | "withdrawn" }[];
   preop: null | {
@@ -17,29 +18,29 @@ type ReadinessSource = {
     medicalClearance: boolean;
     pupilDilation: boolean;
   };
+  workflowPreop?:null|{answers:Record<string,unknown>};
 };
 
 export function surgeryReadiness(surgeryCase: ReadinessSource): SurgeryReadiness {
   const latestConsent = [...surgeryCase.consents].sort((a, b) => b.version - a.version)[0];
   const consentMatches = latestConsent?.eye === surgeryCase.eye && latestConsent.procedure === surgeryCase.procedure;
   const consentComplete = Boolean(latestConsent && consentMatches && latestConsent.status === "confirmed");
-  const cataloguePreopRequired = Boolean(surgeryCase.procedureCode);
-  const preopComplete = !cataloguePreopRequired || Boolean(
-    surgeryCase.preop?.biometryVerified
-    && surgeryCase.preop.medicalClearance
-    && surgeryCase.preop.pupilDilation,
-  );
+  const checks=surgeryCase.procedureDefinition?.preoperativeChecks??(surgeryCase.procedureCode?['biometry_verified','medical_clearance','pupil_dilation']:[]);
+  const requiredFields=Boolean(surgeryCase.procedureDefinition?.preoperativeFields?.some(field=>field.required));
+  const cataloguePreopRequired=checks.length>0||requiredFields;
+  const legacyAnswers:Record<string,unknown>|null=surgeryCase.preop?{biometry_verified:surgeryCase.preop.biometryVerified,medical_clearance:surgeryCase.preop.medicalClearance,pupil_dilation:surgeryCase.preop.pupilDilation}:null;
+  const preopAnswers=surgeryCase.workflowPreop?.answers??legacyAnswers;
+  const preopComplete=!cataloguePreopRequired||Boolean(preopAnswers&&checks.every(check=>preopAnswers[check]===true));
   const blockers: string[] = [];
   if (!surgeryCase.surgeonId) blockers.push("Operating surgeon not assigned");
   if (!latestConsent) blockers.push("Structured consent missing");
   else if (!consentMatches) blockers.push("Consent no longer matches the procedure and eye");
   else if (latestConsent.status === "created") blockers.push("Consent awaiting doctor confirmation");
   else if (latestConsent.status === "withdrawn") blockers.push("Latest consent withdrawn");
-  if (cataloguePreopRequired && !surgeryCase.preop) blockers.push("Preoperative assessment missing");
+  if (cataloguePreopRequired && !preopAnswers) blockers.push("Preoperative assessment missing");
   else if (cataloguePreopRequired) {
-    if (!surgeryCase.preop?.biometryVerified) blockers.push("Biometry not verified");
-    if (!surgeryCase.preop?.medicalClearance) blockers.push("Medical clearance incomplete");
-    if (!surgeryCase.preop?.pupilDilation) blockers.push("Pupil dilation not confirmed");
+    const labels:Record<string,string>={biometry_verified:'Biometry not verified',medical_clearance:'Medical clearance incomplete',pupil_dilation:'Pupil dilation not confirmed'};
+    for(const check of checks)if(preopAnswers?.[check]!==true)blockers.push(labels[check]??`${check.replaceAll('_',' ')} incomplete`);
   }
   if (surgeryCase.stage === "cancelled") return { status: "cancelled", blockers: [], consentComplete, preopComplete };
   if (["operated", "discharged", "followup"].includes(surgeryCase.stage)) return { status: "completed", blockers: [], consentComplete, preopComplete };
