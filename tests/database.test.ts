@@ -232,16 +232,41 @@ test('clinical drawing documents contain structured marker arrays', async () => 
   assert.equal(invalid.rows[0].total, 0);
 });
 
-test("cataract pathway provisions a catalogue procedure and a valid published examination template", async () => {
-  const procedure = await admin.query("SELECT code,name,specialty FROM app.procedure_catalogue WHERE tenant_id=$1 AND code='cataract-phaco-iol' AND active", [tenantId]);
+test("cataract pathway provisions a versioned catalogue procedure and a valid published examination template", async () => {
+  const procedure = await admin.query("SELECT id,code,name,specialty,version,revision,status,definition FROM app.procedure_catalogue WHERE tenant_id=$1 AND code='cataract-phaco-iol' AND active", [tenantId]);
   assert.equal(procedure.rowCount, 1);
   assert.equal(procedure.rows[0].specialty, "Cataract");
+  assert.equal(procedure.rows[0].version,1);
+  assert.equal(procedure.rows[0].status,'published');
+  assert.deepEqual(procedure.rows[0].definition.allowedEyes,['OD','OS']);
+  assert.deepEqual(procedure.rows[0].definition.preoperativeChecks,['biometry_verified','medical_clearance','pupil_dilation']);
+  await assert.rejects(admin.query("UPDATE app.procedure_catalogue SET name='Changed historical procedure' WHERE id=$1",[procedure.rows[0].id]),(error:{message?:string})=>error.message?.includes('immutable')===true);
   const template = (await admin.query("SELECT definition FROM app.examination_template WHERE tenant_id=$1 AND name='Cataract assessment' AND status='published'", [tenantId])).rows[0];
   assert.ok(template);
   const definition = examinationTemplateDefinitionSchema.parse(template.definition);
   assert.ok(definition.sections.some(section => section.id === "cataract_history"));
   assert.ok(definition.sections.some(section => section.id === "cataract_examination"));
   assert.ok(definition.sections.some(section => section.id === "cataract_decision"));
+});
+
+test('runtime procedure catalogue versions follow draft, publish and retire transitions',async()=>{
+ await app.query('BEGIN');
+ try{
+  await app.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);
+  const code='database-version-test';
+  const definition={allowedEyes:['OD'],preoperativeChecks:[],operationNoteFields:[],followupSchedule:[]};
+  const draft=(await app.query("INSERT INTO app.procedure_catalogue(tenant_id,code,version,name,specialty,status,active,definition) VALUES($1,$2,1,'Database version test','Testing','draft',false,$3) RETURNING id",[tenantId,code,definition])).rows[0];
+  await app.query("UPDATE app.procedure_catalogue SET name='Database version draft',revision=revision+1,updated_at=now() WHERE id=$1",[draft.id]);
+  await app.query("SAVEPOINT invalid_transition");
+  await assert.rejects(app.query("UPDATE app.procedure_catalogue SET status='retired',revision=revision+1 WHERE id=$1",[draft.id]),(error:{message?:string})=>error.message?.includes('immutable')===true);
+  await app.query('ROLLBACK TO SAVEPOINT invalid_transition');
+  await app.query("UPDATE app.procedure_catalogue SET status='published',active=true,published_at=now(),revision=revision+1,updated_at=now() WHERE id=$1",[draft.id]);
+  await app.query('SAVEPOINT published_mutation');
+  await assert.rejects(app.query("UPDATE app.procedure_catalogue SET name='Tampered',revision=revision+1 WHERE id=$1",[draft.id]),(error:{message?:string})=>error.message?.includes('immutable')===true);
+  await app.query('ROLLBACK TO SAVEPOINT published_mutation');
+  await app.query("UPDATE app.procedure_catalogue SET status='retired',active=false,revision=revision+1,updated_at=now() WHERE id=$1",[draft.id]);
+  assert.equal((await app.query('SELECT status,active FROM app.procedure_catalogue WHERE id=$1',[draft.id])).rows[0].status,'retired');
+ }finally{await app.query('ROLLBACK');}
 });
 
 test('Glaucoma clinics use a valid published specialty template for supported visit types', async () => {

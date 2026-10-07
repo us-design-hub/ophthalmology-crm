@@ -84,7 +84,7 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Sequential surgery stages, scheduling, history, and cancellation
 - [x] Uploaded consent evidence with witness and laterality checks
 - [~] Basic surgery lifecycle and theatre association
-- [~] Procedure catalogue foundation with the active cataract phaco/IOL procedure; administration UI remains
+- [x] Versioned procedure catalogue administration with draft, publish, retire, laterality, preoperative checks, operation-note fields, and follow-up schedules
 - [~] Structured cataract biometry, IOL planning, clearance, and dilation checks; configurable checklist templates remain
 - [x] Cataract-specific operation note with technique, IOL, anaesthesia, complications, and postoperative instructions
 - [~] Cataract complications and anaesthesia are structured; device catalogue and theatre personnel remain
@@ -173,7 +173,7 @@ Technical implementation is complete. Hospital approval of the marker catalogue 
 
 ### Phase 5 - Surgery depth
 
-- [~] Cataract catalogue entry and operation note are complete; catalogue administration remains
+- [x] Cataract catalogue entry, versioned catalogue administration, and operation note
 - [x] Cataract preoperative checks, theatre worklist, intraoperative note, postoperative instructions, and follow-ups
 - [ ] Add further procedure templates based on hospital volume
 - [x] Expand consent into structured signatories and versioned confirmation

@@ -27,6 +27,7 @@ export const administrationMessages = {
   adminTabHospital: "Hospital settings",
   adminTabFacilities: "Clinics and facilities",
   adminTabTemplates: "Examination templates",
+  adminTabProcedures: "Procedure catalogue",
 
   // --- staff table ---------------------------------------------------------
   adminStaffTitle: "Staff and user accounts",

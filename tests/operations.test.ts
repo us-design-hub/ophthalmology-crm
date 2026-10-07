@@ -3,6 +3,7 @@ import test from "node:test";
 import { ROLE_PERMISSIONS, PERMISSIONS } from "../src/lib/access";
 import { STAGES } from "../src/lib/intake";
 import { karachiDate, surgeryReadiness } from "../src/lib/surgery-worklist";
+import { procedureDefinitionSchema } from "../src/lib/administration";
 
 test("active queue stages include specialty checkpoints and end at consultation", () => {
   assert.deepEqual(STAGES, ["waiting", "workup", "testing", "imaging", "dilation", "consultation"]);
@@ -51,4 +52,12 @@ test("only the latest matching consent version can make a case ready", () => {
 
 test("theatre dates use the hospital timezone", () => {
   assert.equal(karachiDate("2026-10-06T20:30:00.000Z"), "2026-10-07");
+});
+
+test("procedure definitions only accept supported surgical workflow controls",()=>{
+  const valid=procedureDefinitionSchema.parse({allowedEyes:["OD"],preoperativeChecks:["biometry_verified"],operationNoteFields:[{code:"laser_power",label:"Laser power",type:"number",required:true}],followupSchedule:[{code:"week_1",label:"Week 1",daysAfter:7,required:true}]});
+  assert.deepEqual(valid.allowedEyes,["OD"]);
+  assert.equal(procedureDefinitionSchema.safeParse({...valid,preoperativeChecks:["invented_check"]}).success,false);
+  assert.equal(procedureDefinitionSchema.safeParse({...valid,operationNoteFields:[{code:"choice",label:"Choice",type:"select",required:true}]}).success,false);
+  assert.equal(procedureDefinitionSchema.safeParse({...valid,followupSchedule:[valid.followupSchedule[0],valid.followupSchedule[0]]}).success,false);
 });

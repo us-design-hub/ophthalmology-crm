@@ -35,7 +35,7 @@ export async function operationsData(user: AuthUser, resource: string, context: 
       const [facilities, encounters, procedures, surgeons, caseRows] = await readBatch(db, [
         { text: "SELECT id,name,type FROM app.facility WHERE active AND id=ANY($1::uuid[]) ORDER BY name", values: [user.facilityIds] },
         { text: `SELECT e.id,p.mrn,p.given_name||' '||p.family_name AS patient,e.facility_id AS "facilityId" FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id JOIN app.doctor_event d ON d.encounter_id=e.id AND d.status='signed' WHERE e.facility_id=ANY($1::uuid[]) ORDER BY e.checked_in_at DESC LIMIT 200`, values: [user.facilityIds] },
-        { text: "SELECT code,name,specialty FROM app.procedure_catalogue WHERE active ORDER BY specialty,name" },
+        { text: "SELECT code,name,specialty,version,definition FROM app.procedure_catalogue WHERE active AND status='published' ORDER BY specialty,name" },
         { text: `SELECT DISTINCT u.id,u.full_name AS name
           FROM app.user_account u
           JOIN app.user_role r ON r.tenant_id=u.tenant_id AND r.user_id=u.id AND r.role_code='doctor'
@@ -95,8 +95,9 @@ export async function surgeryAction(user: AuthUser, input: unknown, context: Aud
       if (!(await db.query(`SELECT 1 FROM app.user_account u JOIN app.user_role r ON r.tenant_id=u.tenant_id AND r.user_id=u.id JOIN app.user_facility uf ON uf.tenant_id=u.tenant_id AND uf.user_id=u.id WHERE u.id=$1 AND u.status='active' AND r.role_code='doctor' AND uf.facility_id=$2`, [data.surgeonId, data.facilityId])).rowCount) throw new ApiError(400, "surgeonUnavailable");
       if (!(await db.query("SELECT 1 FROM app.encounter e JOIN app.doctor_event v ON v.encounter_id=e.id WHERE e.id=$1 AND e.facility_id=ANY($2::uuid[]) AND v.status='signed'", [data.encounterId, user.facilityIds])).rowCount) throw new ApiError(400, "signedEventRequired");
       if (!data.procedureCode && !data.procedure) throw new ApiError(400, "validationFailed");
-      const catalogue = data.procedureCode ? (await db.query("SELECT id,name FROM app.procedure_catalogue WHERE code=$1 AND active", [data.procedureCode])).rows[0] : null;
+      const catalogue = data.procedureCode ? (await db.query("SELECT id,name,definition FROM app.procedure_catalogue WHERE code=$1 AND active AND status='published'", [data.procedureCode])).rows[0] : null;
       if (data.procedureCode && !catalogue) throw new ApiError(400, "procedureNotFound");
+      if (catalogue && !(catalogue.definition?.allowedEyes as unknown[]|undefined)?.includes(data.eye)) throw new ApiError(400,"procedureEyeNotAllowed");
       const created = (await db.query("INSERT INTO app.surgery_case(tenant_id,encounter_id,facility_id,surgeon_id,eye,procedure,procedure_catalogue_id,estimate_paisa,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,0,$8) RETURNING id", [user.tenantId, data.encounterId, data.facilityId, data.surgeonId, data.eye, catalogue?.name ?? data.procedure, catalogue?.id ?? null, user.id])).rows[0];
       await db.query("INSERT INTO app.surgery_transition(tenant_id,case_id,stage,eye,notes,actor_id) VALUES($1,$2,'estimate',$3,'Case created',$4)", [user.tenantId, created.id, data.eye, user.id]);
       await log(db, user, context, "surgery.created", created.id);
@@ -111,7 +112,12 @@ export async function surgeryAction(user: AuthUser, input: unknown, context: Aud
       if (["operated", "discharged", "followup", "cancelled"].includes(surgeryCase.stage)) throw new ApiError(409, "stageConflict");
     } else if (SURGERY_STAGES[SURGERY_STAGES.indexOf(surgeryCase.stage) + 1] !== data.stage) throw new ApiError(409, "stageConflict");
     if (["consent", "scheduled", "operated"].includes(data.stage) && !(await hasActiveSurgicalConsent(db, surgeryCase.id))) throw new ApiError(409, "confirmedConsentRequired");
-    if (data.stage === "scheduled" && surgeryCase.procedure_catalogue_id && !(await db.query("SELECT 1 FROM app.surgery_preop_assessment WHERE case_id=$1 AND biometry_verified AND medical_clearance AND pupil_dilation", [surgeryCase.id])).rowCount) throw new ApiError(409, "preopRequired");
+    if (data.stage === "scheduled" && surgeryCase.procedure_catalogue_id) {
+      const procedure=(await db.query("SELECT definition FROM app.procedure_catalogue WHERE id=$1",[surgeryCase.procedure_catalogue_id])).rows[0];
+      const checks=(procedure?.definition?.preoperativeChecks??[]) as string[];
+      const assessment=checks.length?(await db.query("SELECT biometry_verified,medical_clearance,pupil_dilation FROM app.surgery_preop_assessment WHERE case_id=$1",[surgeryCase.id])).rows[0]:null;
+      if(checks.some(check=>assessment?.[check]!==true))throw new ApiError(409,"preopRequired");
+    }
     if (data.stage === "operated" && surgeryCase.procedure_catalogue_id && !(await db.query("SELECT 1 FROM app.surgery_operation_note WHERE case_id=$1", [surgeryCase.id])).rowCount) throw new ApiError(409, "operationNoteRequired");
     if (data.stage === "scheduled" && (!data.scheduled || Date.parse(data.scheduled) < Date.now())) throw new ApiError(400, "futureSurgeryRequired");
     if (["operated", "discharged", "followup", "preop"].includes(data.stage) && !user.roles.includes("doctor")) throw new ApiError(403, "doctorRequired");

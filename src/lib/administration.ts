@@ -20,9 +20,37 @@ export const templateActionSchema = z.discriminatedUnion('action', [
   z.object({action:z.literal('assign'),templateId:z.uuid(),facilityId:z.uuid().nullable(),specialty:text(80).min(3),visitType:z.enum(VISIT_TYPES)}).strict(),
 ]);
 
+export const PREOPERATIVE_CHECKS = ['biometry_verified','medical_clearance','pupil_dilation'] as const;
+const operationNoteFieldSchema = z.object({
+  code:z.string().trim().regex(/^[a-z][a-z0-9_]{1,59}$/),
+  label:text(120).min(2),
+  type:z.enum(['text','textarea','number','select']),
+  required:z.boolean(),
+  options:z.array(text(100).min(1)).min(1).max(30).optional(),
+}).strict().superRefine((field,context)=>{
+  if(field.type==='select'&&!field.options)context.addIssue({code:'custom',message:'Select fields require options',path:['options']});
+  if(field.type!=='select'&&field.options)context.addIssue({code:'custom',message:'Only select fields may define options',path:['options']});
+});
+const followupScheduleSchema = z.object({code:z.string().trim().regex(/^[a-z][a-z0-9_]{1,59}$/),label:text(120).min(2),daysAfter:z.number().int().min(0).max(3650),required:z.boolean()}).strict();
+export const procedureDefinitionSchema = z.object({
+  allowedEyes:z.array(z.enum(['OD','OS'])).min(1).max(2).refine(values=>new Set(values).size===values.length),
+  preoperativeChecks:z.array(z.enum(PREOPERATIVE_CHECKS)).max(PREOPERATIVE_CHECKS.length).refine(values=>new Set(values).size===values.length),
+  operationNoteFields:z.array(operationNoteFieldSchema).max(40).refine(fields=>new Set(fields.map(field=>field.code)).size===fields.length),
+  followupSchedule:z.array(followupScheduleSchema).max(20).refine(items=>new Set(items.map(item=>item.code)).size===items.length),
+}).strict();
+export const procedureActionSchema = z.discriminatedUnion('action',[
+  z.object({action:z.literal('createDraft'),code:z.string().trim().regex(/^[a-z][a-z0-9_-]{2,79}$/),name:text(160).min(3),specialty:text(80).min(3),definition:procedureDefinitionSchema}).strict(),
+  z.object({action:z.literal('createVersion'),sourceId:z.uuid()}).strict(),
+  z.object({action:z.literal('saveDraft'),id:z.uuid(),revision:z.number().int().positive(),name:text(160).min(3),specialty:text(80).min(3),definition:procedureDefinitionSchema}).strict(),
+  z.object({action:z.literal('publish'),id:z.uuid(),revision:z.number().int().positive()}).strict(),
+  z.object({action:z.literal('retire'),id:z.uuid(),revision:z.number().int().positive(),reason:text(500).min(8)}).strict(),
+]);
+
 export type StaffRecord = {id:string;version:number;name:string;email:string;designation:string;licence:string|null;licenceExpiry:string|null;status:'active'|'disabled';mustChangePassword:boolean;roles:Role[];facilityIds:string[]};
 export type FacilityRecord = z.infer<typeof facilitySchema> & {id:string};
 export type HospitalSettings = z.infer<typeof settingsSchema>;
 export type ExaminationTemplateRecord = {id:string;code:string;version:number;revision:number;name:string;specialty:string;status:'draft'|'published'|'retired';isDefault:boolean;definition:ExaminationTemplateDefinition;updatedAt:string};
 export type ExaminationTemplateAssignment = {id:string;templateId:string;facilityId:string|null;specialty:string;visitType:typeof VISIT_TYPES[number];active:boolean};
-export type AdministrationData = {staff:StaffRecord[];facilities:FacilityRecord[];hospital:HospitalSettings;templates:ExaminationTemplateRecord[];templateAssignments:ExaminationTemplateAssignment[]};
+export type ProcedureDefinition = z.infer<typeof procedureDefinitionSchema>;
+export type ProcedureCatalogueRecord = {id:string;code:string;version:number;revision:number;name:string;specialty:string;status:'draft'|'published'|'retired';active:boolean;definition:ProcedureDefinition;createdAt:string;publishedAt:string|null;updatedAt:string};
+export type AdministrationData = {staff:StaffRecord[];facilities:FacilityRecord[];hospital:HospitalSettings;templates:ExaminationTemplateRecord[];templateAssignments:ExaminationTemplateAssignment[];procedureCatalogue:ProcedureCatalogueRecord[]};

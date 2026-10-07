@@ -3,7 +3,7 @@ import { hash, verify } from '@node-rs/argon2';
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
 import type { AuthUser, Permission, Session } from '@/lib/access';
-import { accessSchema, facilitySchema, passwordSchema, settingsSchema, staffSchema, templateActionSchema, type AdministrationData } from '@/lib/administration';
+import { accessSchema, facilitySchema, passwordSchema, procedureActionSchema, settingsSchema, staffSchema, templateActionSchema, type AdministrationData } from '@/lib/administration';
 import { readBatch, withTenant } from './db';
 import { audit, type AuditContext } from './audit';
 import { ApiError } from './http';
@@ -29,8 +29,9 @@ export async function administrationData(user:AuthUser,context:AuditContext):Pro
  const staff=staffRows as AdministrationData['staff'],facilities=facilityRows as AdministrationData['facilities'];
  const templates=(await db.query(`SELECT id,code,version,revision,name,specialty,status,is_default AS "isDefault",definition,updated_at AS "updatedAt" FROM app.examination_template ORDER BY code,version DESC`)).rows as AdministrationData['templates'];
  const templateAssignments=(await db.query(`SELECT id,template_id AS "templateId",facility_id AS "facilityId",specialty,visit_type AS "visitType",active FROM app.examination_template_assignment WHERE active ORDER BY specialty,visit_type`)).rows as AdministrationData['templateAssignments'];
+ const procedureCatalogue=(await db.query(`SELECT id,code,version,revision,name,specialty,status,active,definition,created_at AS "createdAt",published_at AS "publishedAt",updated_at AS "updatedAt" FROM app.procedure_catalogue ORDER BY code,version DESC`)).rows as AdministrationData['procedureCatalogue'];
  const tenant=tenantRows[0] as {name:string;mrn_prefix:string;settings:Partial<AdministrationData['hospital']>;version:number};
- await log(db,user,context,'administration.read');return {staff,facilities,templates,templateAssignments,hospital:{name:tenant.name,mrnPrefix:tenant.mrn_prefix,version:tenant.version,address:'',phone:'',email:'',clinicalIdleMinutes:15,adminIdleMinutes:30,dilationMinutes:20,...tenant.settings}};
+ await log(db,user,context,'administration.read');return {staff,facilities,templates,templateAssignments,procedureCatalogue,hospital:{name:tenant.name,mrnPrefix:tenant.mrn_prefix,version:tenant.version,address:'',phone:'',email:'',clinicalIdleMinutes:15,adminIdleMinutes:30,dilationMinutes:20,...tenant.settings}};
  });}
 export async function saveStaff(user:AuthUser,input:unknown,context:AuditContext){const data=parseInput(staffSchema,input);requireAction(user,data.id?'staff:write':'account:create');const proof=await verifyAccountPassword(user,data.currentPassword,context);
  const secret=!data.id&&data.temporaryPassword?await hash(data.temporaryPassword,hashOptions):null;if(!data.id&&!secret)throw new ApiError(400,'validationFailed');
@@ -96,4 +97,47 @@ export async function manageExaminationTemplates(user:AuthUser,input:unknown,con
   await log(db,user,context,'examination_template.assigned',row.id,{templateId:data.templateId,facilityId:data.facilityId,specialty:data.specialty,visitType:data.visitType});
   return row;
  });
+}
+
+export async function manageProcedureCatalogue(user:AuthUser,input:unknown,context:AuditContext){
+ requireAction(user,'settings:write');
+ const data=parseInput(procedureActionSchema,input);
+ try{return await withTenant(user.tenantId,user.id,async db=>{
+  await lockAdministration(db,user);
+  if(data.action==='createDraft'){
+   const row=(await db.query(`INSERT INTO app.procedure_catalogue(tenant_id,code,version,name,specialty,status,active,definition) VALUES($1,$2,1,$3,$4,'draft',false,$5) RETURNING id,version,revision`,[user.tenantId,data.code,data.name,data.specialty,JSON.stringify(data.definition)])).rows[0];
+   await log(db,user,context,'procedure_catalogue.draft_created',row.id,{code:data.code,version:1});
+   return row;
+  }
+  if(data.action==='createVersion'){
+   const source=(await db.query(`SELECT * FROM app.procedure_catalogue WHERE id=$1 AND status IN ('published','retired') FOR UPDATE`,[data.sourceId])).rows[0];
+   if(!source)throw new ApiError(404,'procedureNotFound');
+   if((await db.query("SELECT 1 FROM app.procedure_catalogue WHERE code=$1 AND status='draft'",[source.code])).rowCount)throw new ApiError(409,'procedureDraftExists');
+   const version=(await db.query('SELECT coalesce(max(version),0)+1 AS version FROM app.procedure_catalogue WHERE code=$1',[source.code])).rows[0].version;
+   const row=(await db.query(`INSERT INTO app.procedure_catalogue(tenant_id,code,version,name,specialty,status,active,definition) VALUES($1,$2,$3,$4,$5,'draft',false,$6) RETURNING id,version,revision`,[user.tenantId,source.code,version,source.name,source.specialty,source.definition])).rows[0];
+   await log(db,user,context,'procedure_catalogue.version_created',row.id,{sourceId:data.sourceId,code:source.code,version});
+   return row;
+  }
+  if(data.action==='saveDraft'){
+   const result=await db.query(`UPDATE app.procedure_catalogue SET name=$2,specialty=$3,definition=$4,revision=revision+1,updated_at=now() WHERE id=$1 AND status='draft' AND revision=$5 RETURNING id,version,revision`,[data.id,data.name,data.specialty,JSON.stringify(data.definition),data.revision]);
+   if(!result.rowCount)throw new ApiError(409,'recordChanged');
+   await log(db,user,context,'procedure_catalogue.draft_saved',data.id,{revision:result.rows[0].revision});
+   return result.rows[0];
+  }
+  if(data.action==='publish'){
+   const draft=(await db.query(`SELECT id,code,version FROM app.procedure_catalogue WHERE id=$1 AND status='draft' AND revision=$2 FOR UPDATE`,[data.id,data.revision])).rows[0];
+   if(!draft)throw new ApiError(409,'recordChanged');
+   await db.query(`UPDATE app.procedure_catalogue SET status='retired',active=false,revision=revision+1,updated_at=now() WHERE code=$1 AND status='published'`,[draft.code]);
+   const row=(await db.query(`UPDATE app.procedure_catalogue SET status='published',active=true,published_at=now(),revision=revision+1,updated_at=now() WHERE id=$1 RETURNING id,code,version,revision`,[draft.id])).rows[0];
+   await log(db,user,context,'procedure_catalogue.published',row.id,{code:row.code,version:row.version});
+   return row;
+  }
+  const result=await db.query(`UPDATE app.procedure_catalogue SET status='retired',active=false,revision=revision+1,updated_at=now() WHERE id=$1 AND status='published' AND revision=$2 RETURNING id,code,version,revision`,[data.id,data.revision]);
+  if(!result.rowCount)throw new ApiError(409,'recordChanged');
+  await log(db,user,context,'procedure_catalogue.retired',data.id,{code:result.rows[0].code,version:result.rows[0].version,reason:data.reason});
+  return result.rows[0];
+ });}catch(error){
+  if((error as {code?:string}).code==='23505')throw new ApiError(409,'procedureCodeExists');
+  throw error;
+ }
 }
