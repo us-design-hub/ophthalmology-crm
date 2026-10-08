@@ -2,9 +2,9 @@ import 'server-only';
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
 import { verify } from '@node-rs/argon2';
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID,timingSafeEqual } from 'node:crypto';
 import type { AuthUser } from '@/lib/access';
-import { eventInputSchema,rxInputSchema,reviewSchema,signSchema,addendumSchema,prescriptionWarnings,examinationTemplateDefinitionSchema,validateExaminationAnswers,type ClinicalComparison,type ClinicalDetail,type ClinicalDrawings,type DoctorEvent,type ExaminationTemplate,type Prescription,type Review } from '@/lib/clinical';
+import { eventInputSchema,rxInputSchema,rxItemSchema,reviewSchema,signSchema,addendumSchema,prescriptionWarnings,examinationTemplateDefinitionSchema,validateExaminationAnswers,type ClinicalComparison,type ClinicalDetail,type ClinicalDrawings,type DoctorEvent,type ExaminationTemplate,type Prescription,type PrescriptionPreset,type Review,type RxItem } from '@/lib/clinical';
 import { canonicalJson,contentHash } from './clinical-hash';
 import { privateHash } from './crypto';
 import { withTenant } from './db';
@@ -18,6 +18,11 @@ import { problemList, syncSignedProblems, updateProblemStatus } from './clinical
 import { investigationRows } from './investigation-service';
 export { problemList, updateProblemStatus };
 function parse<T>(schema:z.ZodType<T>,input:unknown):T {const result=schema.safeParse(input);if(!result.success)throw new ApiError(400,'clinicalInvalid');return result.data;}
+const presetActionSchema=z.discriminatedUnion('action',[
+ z.object({action:z.literal('save'),kind:z.enum(['favourite','specialty_set']),name:z.string().trim().min(1).max(120),encounterId:z.uuid(),items:z.array(rxItemSchema).min(1).max(12)}).strict(),
+ z.object({action:z.literal('delete'),id:z.uuid()}).strict(),
+ z.object({action:z.literal('use'),id:z.uuid(),encounterId:z.uuid()}).strict(),
+]);
 const flags=`(SELECT coalesce(jsonb_agg(jsonb_build_object('type',f.type,'value',f.value)),'[]') FROM app.patient_flag f WHERE f.tenant_id=p.tenant_id AND f.patient_id=p.id AND f.resolved_at IS NULL)`;
 const encounterSelect=`SELECT e.id,e.patient_id AS "patientId",p.given_name||' '||p.family_name AS name,p.mrn,p.dob,p.gender,${flags} AS flags,e.facility_id AS "facilityId",f.name AS clinic,f.specialty,e.visit_type AS "visitType",e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.closed_at AS "closedAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.encounter_id=e.id AND w.tenant_id=e.tenant_id),0) AS "workupVersion",d.status AS "eventStatus" FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id LEFT JOIN app.doctor_event d ON d.encounter_id=e.id AND d.tenant_id=e.tenant_id`;
 const signedColumns=`d.id,d.version,d.status,d.author_id AS "authorId",u.full_name AS author,d.signed_at AS "signedAt",d.content_hash AS "contentHash",CASE WHEN d.snapshot_text IS NOT NULL THEN d.snapshot_text::jsonb ELSE NULL END AS snapshot,d.synthetic`;
@@ -41,7 +46,7 @@ function drawingSectionsValid(drawings:ClinicalDrawings,template:ExaminationTemp
  return (['OD','OS'] as const).every(eye=>{const drawing=drawings[eye],populated=drawing.strokes.length>0||drawing.markers.length>0;return !populated||(sections.get(drawing.sectionId)===drawing.sectionLabel);});
 }
 async function lockedEncounter(db:PoolClient,user:AuthUser,id:string,write=false) {
- const row=(await db.query('SELECT * FROM app.encounter WHERE id=$1 AND facility_id=ANY($2::uuid[]) FOR UPDATE',[id,user.facilityIds])).rows[0];
+ const row=(await db.query('SELECT e.*,f.specialty FROM app.encounter e JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id WHERE e.id=$1 AND e.facility_id=ANY($2::uuid[]) FOR UPDATE OF e',[id,user.facilityIds])).rows[0];
  if(!row)throw new ApiError(404,'encounterNotFound');
  if(write && (row.doctor_id!==user.id))throw new ApiError(403,'clinicalOwner');
  if(write && (row.closed_at || row.stage!=='consultation'))throw new ApiError(409,'consultationRequired');return row;
@@ -59,7 +64,8 @@ async function loadDetail(db:PoolClient,user:AuthUser,id:string):Promise<Clinica
  const addenda=event?(await db.query(`SELECT a.id,CASE WHEN a.event_id IS NOT NULL THEN 'event' ELSE 'prescription' END AS kind,a.text,u.full_name AS author,a.at,a.content_hash AS "contentHash" FROM app.clinical_addendum a JOIN app.user_account u ON u.id=a.author_id AND u.tenant_id=a.tenant_id WHERE a.event_id=$1 OR a.prescription_id=$2 ORDER BY a.at,a.id`,[event.id,prescription?.id??null])).rows:[];
  return {encounter,patient:{id:encounter.patientId,name:encounter.name,mrn:encounter.mrn,dob:encounter.dob,gender:encounter.gender,flags:encounter.flags},workup:await latestWorkup(db,id),investigations:await investigationRows(db,[id]),template,event:event??null,prescription,addenda};
 }
-async function items(db:PoolClient,id:string){return(await db.query('SELECT id,quantity,drug_id AS "drugId",name,strength,therapy_group AS "therapyGroup",eye,dose,route,frequency,duration,instructions,instructions_ur AS "instructionsUr" FROM app.prescription_item WHERE prescription_id=$1 ORDER BY position',[id])).rows;}
+const medicationColumns='id,quantity,drug_id AS "drugId",name,strength,therapy_group AS "therapyGroup",eye,dose,route,frequency,duration,instructions,instructions_ur AS "instructionsUr",taper_schedule AS "taperSchedule"';
+async function items(db:PoolClient,id:string){return(await db.query(`SELECT ${medicationColumns} FROM app.prescription_item WHERE prescription_id=$1 ORDER BY position`,[id])).rows;}
 export async function clinicalList(user:AuthUser,context:AuditContext){return withTenant(user.tenantId,user.id,async db=>{const encounters=(await db.query(`${encounterSelect} WHERE e.closed_at IS NULL AND e.stage='consultation' AND e.facility_id=ANY($1::uuid[]) ORDER BY (e.doctor_id=$2) DESC,e.checked_in_at`,[user.facilityIds,user.id])).rows;await log(db,user,context,'clinical.list','encounter',undefined,{count:encounters.length});return {encounters};});}
 export async function clinicalDetail(user:AuthUser,id:unknown,context:AuditContext){const encounterId=parse(z.uuid(),id);return withTenant(user.tenantId,user.id,async db=>{const result=await loadDetail(db,user,encounterId);await log(db,user,context,'clinical.read','encounter',encounterId);return result;});}
 export async function timeline(user:AuthUser,id:unknown,context:AuditContext){const patientId=parse(z.uuid(),id);return withTenant(user.tenantId,user.id,async db=>{
@@ -111,6 +117,19 @@ export async function drawingHistory(user:AuthUser,id:unknown,current:unknown,co
  await log(db,user,context,'clinical.drawing_history','patient',patientId,{count:entries.length});return {entries};
  });}
 export async function formulary(user:AuthUser){return withTenant(user.tenantId,user.id,async db=>({drugs:(await db.query('SELECT id,name,strength,therapy_group AS "therapyGroup" FROM app.formulary WHERE active ORDER BY name,strength')).rows}));}
+function requirePrescriber(user:AuthUser){if(!user.roles.includes('doctor')||!user.permissions.includes('clinical:write'))throw new ApiError(403,'doctorRequired');}
+async function resolveMedicationItems(db:PoolClient,source:RxItem[]){const resolved=[];for(const item of source){const drug=item.drugId?(await db.query('SELECT * FROM app.formulary WHERE id=$1 AND active',[item.drugId])).rows[0]:null;if(item.drugId&&!drug)throw new ApiError(400,'drugUnavailable');resolved.push({...item,name:drug?.name??item.name,strength:drug?.strength??item.strength,therapyGroup:drug?.therapy_group??''});}return resolved;}
+export async function prescriptionPresets(user:AuthUser,encounter:unknown,context:AuditContext){requirePrescriber(user);const encounterId=parse(z.uuid(),encounter);return withTenant(user.tenantId,user.id,async db=>{
+ const row=await lockedEncounter(db,user,encounterId);const presets=(await db.query(`SELECT p.id,p.kind,p.name,p.specialty,p.owner_id AS "ownerId",u.full_name AS owner,(p.owner_id=$2) AS own FROM app.prescription_preset p JOIN app.user_account u ON u.id=p.owner_id AND u.tenant_id=p.tenant_id WHERE p.kind='favourite' OR p.specialty=$1 ORDER BY p.kind,p.name,p.created_at`,[row.specialty,user.id])).rows as Omit<PrescriptionPreset,'items'>[];
+ const byId=new Map(presets.map(value=>[value.id,{...value,items:[]} as PrescriptionPreset]));if(presets.length){const rows=(await db.query(`SELECT preset_id AS "presetId",${medicationColumns} FROM app.prescription_preset_item WHERE preset_id=ANY($1::uuid[]) ORDER BY preset_id,position`,[presets.map(value=>value.id)])).rows;for(const value of rows)byId.get(value.presetId)?.items.push(value);}
+ await log(db,user,context,'prescription.preset_list','prescription_preset',undefined,{encounterId,count:presets.length});return {specialty:row.specialty,presets:[...byId.values()]};
+ });}
+export async function prescriptionPresetAction(user:AuthUser,input:unknown,context:AuditContext){requirePrescriber(user);const data=parse(presetActionSchema,input);return withTenant(user.tenantId,user.id,async db=>{
+ if(data.action==='delete'){const deleted=(await db.query('DELETE FROM app.prescription_preset WHERE id=$1 AND owner_id=$2 RETURNING id,kind',[data.id,user.id])).rows[0];if(!deleted)throw new ApiError(404,'prescriptionPresetNotFound');await log(db,user,context,'prescription.preset_deleted','prescription_preset',data.id,{kind:deleted.kind});return {ok:true};}
+ const encounter=await lockedEncounter(db,user,data.encounterId);if(data.action==='use'){const preset=(await db.query("SELECT id,kind,specialty FROM app.prescription_preset WHERE id=$1 AND (kind='favourite' OR specialty=$2)",[data.id,encounter.specialty])).rows[0];if(!preset)throw new ApiError(404,'prescriptionPresetNotFound');await log(db,user,context,'prescription.preset_used','prescription_preset',data.id,{kind:preset.kind,encounterId:data.encounterId,specialty:encounter.specialty});return {ok:true};}
+ if(data.kind==='favourite'&&data.items.length!==1)throw new ApiError(400,'prescriptionFavouriteSingle');const resolved=await resolveMedicationItems(db,data.items);
+ try{const preset=(await db.query('INSERT INTO app.prescription_preset(tenant_id,owner_id,kind,name,specialty) VALUES($1,$2,$3,$4,$5) RETURNING id',[user.tenantId,user.id,data.kind,data.name,data.kind==='specialty_set'?encounter.specialty:''])).rows[0];for(const [position,item] of resolved.entries())await db.query(`INSERT INTO app.prescription_preset_item(id,tenant_id,preset_id,position,drug_id,name,strength,therapy_group,eye,dose,route,frequency,duration,instructions,instructions_ur,quantity,taper_schedule) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,[randomUUID(),user.tenantId,preset.id,position,item.drugId,item.name,item.strength,item.therapyGroup,item.eye,item.dose,item.route,item.frequency,item.duration,item.instructions,item.instructionsUr,item.quantity??null,JSON.stringify(item.taperSchedule)]);await log(db,user,context,'prescription.preset_saved','prescription_preset',preset.id,{kind:data.kind,itemCount:resolved.length,specialty:data.kind==='specialty_set'?encounter.specialty:null});return {id:preset.id};}catch(error){if((error as {code?:string}).code==='23505')throw new ApiError(409,'prescriptionPresetExists');throw error;}
+ });}
 export async function saveEvent(user:AuthUser,input:unknown,context:AuditContext){const data=parse(eventInputSchema,input);return withTenant(user.tenantId,user.id,async db=>{
  const encounter=await lockedEncounter(db,user,data.encounterId,true);const prior=(await db.query('SELECT * FROM app.doctor_event WHERE encounter_id=$1 FOR UPDATE',[data.encounterId])).rows[0];
  if(prior?.status==='signed')throw new ApiError(409,'signedLocked');if(prior && prior.author_id!==user.id)throw new ApiError(403,'clinicalOwner');if((prior?.version??0)!==data.version)throw new ApiError(409,'clinicalConflict');
@@ -126,10 +145,10 @@ export async function savePrescription(user:AuthUser,input:unknown,context:Audit
  if(!data.items.length)throw new ApiError(400,'prescriptionEmpty');
  await lockedEncounter(db,user,data.encounterId,true);const event=(await db.query('SELECT id,author_id FROM app.doctor_event WHERE encounter_id=$1',[data.encounterId])).rows[0];if(!event)throw new ApiError(409,'saveEventFirst');if(event.author_id!==user.id)throw new ApiError(403,'clinicalOwner');
  const prior=(await db.query('SELECT * FROM app.prescription WHERE event_id=$1 FOR UPDATE',[event.id])).rows[0];if(prior?.status==='signed')throw new ApiError(409,'signedLocked');if((prior?.version??0)!==data.version)throw new ApiError(409,'clinicalConflict');
- const resolved=[];for(const item of data.items){const drug=item.drugId?(await db.query('SELECT * FROM app.formulary WHERE id=$1 AND active',[item.drugId])).rows[0]:null;if(item.drugId&&!drug)throw new ApiError(400,'drugUnavailable');resolved.push({...item,name:drug?.name??item.name,strength:drug?.strength??item.strength,therapyGroup:drug?.therapy_group??''});}
+ const resolved=await resolveMedicationItems(db,data.items);
  let id=prior?.id as string|undefined;if(!id)id=(await db.query('INSERT INTO app.prescription(tenant_id,event_id,author_id) VALUES($1,$2,$3) RETURNING id',[user.tenantId,event.id,user.id])).rows[0].id;else await db.query('UPDATE app.prescription SET version=version+1,updated_at=now() WHERE id=$1',[id]);
  await db.query('DELETE FROM app.prescription_item WHERE prescription_id=$1',[id]);
- for(const [position,item] of resolved.entries())await db.query('INSERT INTO app.prescription_item(id,tenant_id,prescription_id,position,drug_id,name,strength,therapy_group,eye,dose,route,frequency,duration,instructions,instructions_ur,quantity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',[item.id,user.tenantId,id,position,item.drugId,item.name,item.strength,item.therapyGroup,item.eye,item.dose,item.route,item.frequency,item.duration,item.instructions,item.instructionsUr,item.quantity??null]);
+ for(const [position,item] of resolved.entries())await db.query('INSERT INTO app.prescription_item(id,tenant_id,prescription_id,position,drug_id,name,strength,therapy_group,eye,dose,route,frequency,duration,instructions,instructions_ur,quantity,taper_schedule) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',[item.id,user.tenantId,id,position,item.drugId,item.name,item.strength,item.therapyGroup,item.eye,item.dose,item.route,item.frequency,item.duration,item.instructions,item.instructionsUr,item.quantity??null,JSON.stringify(item.taperSchedule)]);
  await log(db,user,context,'prescription.draft_saved','prescription',id,{version:data.version+1});return loadDetail(db,user,data.encounterId);
  });}
 async function locate(db:PoolClient,user:AuthUser,kind:'event'|'prescription',id:string,write:boolean){

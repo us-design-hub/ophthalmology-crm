@@ -262,6 +262,12 @@ export const rxItemSchema = z.object({
   duration: text(100).min(1),
   instructions: text(500),
   instructionsUr: text(500),
+  taperSchedule: z.array(z.object({
+    dose: text(100).min(1),
+    frequency: text(100).min(1),
+    duration: text(100).min(1),
+    instructions: text(300),
+  }).strict()).max(12).default([]),
 }).strict();
 export const rxInputSchema = z.object({
   encounterId: z.uuid(),
@@ -289,6 +295,16 @@ export type EventInput = z.infer<typeof eventInputSchema>;
 export type RxItem = z.infer<typeof rxItemSchema>;
 export type RxInput = z.infer<typeof rxInputSchema>;
 export type Drug = { id: string; name: string; strength: string; therapyGroup: string };
+export type PrescriptionPreset = {
+  id: string;
+  kind: 'favourite' | 'specialty_set';
+  name: string;
+  specialty: string;
+  ownerId: string;
+  owner: string;
+  own: boolean;
+  items: RxItem[];
+};
 export type SignedFields = {
   id: string;
   version: number;

@@ -24,7 +24,7 @@ test("signed event parents and plan children reject direct runtime mutation", as
 });
 
 test("all clinical tables require tenant context and enforce forced RLS",async()=>{
-  const names=['examination_template','examination_template_assignment','formulary','doctor_event','event_plan','prescription','prescription_item','clinical_addendum'];
+  const names=['examination_template','examination_template_assignment','formulary','doctor_event','event_plan','prescription','prescription_item','prescription_preset','prescription_preset_item','clinical_addendum'];
   const tables=(await admin.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND c.relname=ANY($1)",[names])).rows;assert.equal(tables.length,names.length);
   for(const row of tables){assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query(`SELECT * FROM app.${row.relname}`)).rowCount,0);}
 });
@@ -186,6 +186,7 @@ test('signed prescriptions reject new evidence', async () => {
     await assert.rejects(admin.query(`INSERT INTO app.prescription_evidence(tenant_id,prescription_id,content,mime,filename,hash,actor_id) VALUES($1,$2,$3,'image/jpeg','late.jpg',$4,$5)`,[parent.tenant_id,prescription.id,Buffer.from([255,216,255,1]),'0'.repeat(64),parent.author_id]),(error:{code?:string})=>error.code==='42501');
   } finally { await admin.query('ROLLBACK'); }
 });
+test('database taper validation rejects incomplete, oversized and unexpected dose steps',async()=>{const valid=[{dose:'1 drop',frequency:'four times daily',duration:'7 days',instructions:''}];assert.equal((await app.query("SELECT has_function_privilege(current_user,'app.valid_taper_schedule(jsonb)','EXECUTE') AS allowed")).rows[0].allowed,true);assert.equal((await admin.query('SELECT app.valid_taper_schedule($1::jsonb) AS valid',[JSON.stringify(valid)])).rows[0].valid,true);for(const value of [[{dose:'',frequency:'daily',duration:'7 days',instructions:''}],Array.from({length:13},()=>valid[0]),[{...valid[0],unexpected:'unsafe'}]])assert.equal((await admin.query('SELECT app.valid_taper_schedule($1::jsonb) AS valid',[JSON.stringify(value)])).rows[0].valid,false);});
 
 test('published examination templates are immutable and assignments enforce tenant context', async () => {
   const published=(await admin.query("SELECT id,name FROM app.examination_template WHERE tenant_id=$1 AND status='published' LIMIT 1",[tenantId])).rows[0];

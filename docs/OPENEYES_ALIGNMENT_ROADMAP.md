@@ -73,8 +73,8 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Prescription PDF, QR verification, signed-prescription list, and addenda
 - [x] Basic formulary, duplicate-therapy, and allergy warning workflow
 - [~] Clinician-approved production formulary
-- [ ] Medication favourites and specialty prescription sets
-- [ ] Tapering-dose schedules
+- [x] Doctor medication favourites and reusable specialty prescription sets
+- [x] Structured tapering-dose schedules preserved in signed records and PDFs
 - [ ] Configurable secondary signatory/countersign policy where required
 - [-] Pharmacy dispensing and stock management
 
