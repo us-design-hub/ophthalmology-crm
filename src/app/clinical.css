@@ -121,3 +121,15 @@
 .rx-item-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
 @media(max-width:850px){.rx-preset-tools{grid-template-columns:1fr 1fr}.rx-preset-tools label{grid-column:1/-1}.rx-taper-row{grid-template-columns:28px 1fr 1fr}.rx-taper-row input:nth-of-type(4){grid-column:2/4}}
 @media(max-width:500px){.rx-preset-tools{grid-template-columns:1fr}.rx-preset-tools>*{grid-column:1}.rx-taper-row{grid-template-columns:28px 1fr}.rx-taper-row input:nth-of-type(4){grid-column:2}.rx-item-actions{align-items:flex-start;flex-direction:column}}
+.clinical-outcome{margin-top:18px;padding-top:18px;border-top:1px solid var(--border-default)}
+.clinical-outcome-fields{display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,1fr);gap:14px}
+.patient-structured-history{padding:20px;border:1px solid var(--border-default);border-radius:14px;background:var(--surface-panel)}
+.history-entry-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:14px 0}
+.history-entry{padding:14px;border:1px solid var(--border-default);border-left:4px solid var(--brand-600);border-radius:10px;background:var(--surface-panel)}
+.history-entry.resolved{border-left-color:var(--text-muted);opacity:.85}
+.history-entry>div:first-child{display:flex;justify-content:space-between;gap:12px;align-items:start}
+.history-entry span,.history-entry small{color:var(--text-muted);font-size:.82rem}
+.history-entry dl{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0}
+.history-entry dt{font-size:.72rem;color:var(--text-muted);text-transform:uppercase}.history-entry dd{margin:2px 0 0}
+.history-flag{display:flex;gap:12px;align-items:center;padding:8px 0}.history-flag p{margin:0;flex:1}
+@media(max-width:720px){.clinical-outcome-fields{grid-template-columns:1fr}.patient-structured-history{padding:14px}}

@@ -205,6 +205,16 @@ export async function patientTimelineActivities(
       JOIN app.doctor_event d ON d.id=p.latest_event_id AND d.tenant_id=p.tenant_id
       JOIN accessible_encounters e ON e.id=d.encounter_id AND e.tenant_id=d.tenant_id
       JOIN app.user_account u ON u.id=t.actor_id AND u.tenant_id=t.tenant_id
+
+      UNION ALL
+      SELECT
+        'history:'||h.id::text,'history',h.at,
+        (h.title||' - '||h.status)::text,
+        'Patient record',u.full_name,h.status,NULL::uuid,
+        jsonb_build_object('category',h.category,'laterality',h.laterality,'onsetDate',h.onset_date,'resolvedDate',h.resolved_date,'supersedesId',h.supersedes_id)
+      FROM app.patient_history h
+      JOIN app.user_account u ON u.id=h.author_id AND u.tenant_id=h.tenant_id
+      WHERE h.patient_id=$1
     )
     SELECT id,kind,at,summary,clinic,author,status,"encounterId",metadata
     FROM activity

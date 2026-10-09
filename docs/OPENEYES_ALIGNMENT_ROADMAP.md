@@ -46,10 +46,10 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [~] Longitudinal typed-event model comparable to OpenEyes episodes and events
 - [x] Versioned examination templates with specialty, clinic, and visit-type assignment
 - [x] Required, optional, ordered, role-visible, and conditionally visible examination fields
-- [ ] Structured ophthalmic history and systemic/ocular disorder sections
+- [x] Structured ophthalmic history and systemic/ocular disorder sections with attributed amendment history
 - [~] Initial structured anterior-segment, cornea, lens, fundus, optic-disc, gonioscopy, macular imaging, and motility fields are implemented; clinical refinement remains
 - [~] Cataract, glaucoma, and retina assessment templates are published; cornea, paediatric, and optometry templates remain
-- [ ] Outcome, next-step, recall, and management-plan configuration
+- [x] Configurable visit outcomes with required next-step notes and recall dates preserved in signed records
 
 ### Anatomy and clinical drawing
 

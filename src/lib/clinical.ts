@@ -227,6 +227,13 @@ export function validateExaminationAnswers(
   }
   return errors;
 }
+export const clinicalOutcomeSelectionSchema = z.object({
+  id: z.uuid(),
+  code: fieldId,
+  label: text(120).min(2),
+  notes: text(2000),
+  recallDate: z.union([z.iso.date(), z.literal('')]),
+}).strict();
 export const eventInputSchema = z.object({
   encounterId: z.uuid(),
   version: z.number().int().nonnegative(),
@@ -244,6 +251,7 @@ export const eventInputSchema = z.object({
   plans: z.array(planSchema).max(22),
   referral: text(1000),
   followUp: text(500),
+  outcome: clinicalOutcomeSelectionSchema.nullable().default(null),
   drawings: drawingsSchema,
 }).strict().refine(
   data => new Set(data.plans.map(plan => `${plan.eye}:${plan.anatomySite}`)).size === data.plans.length,
@@ -292,6 +300,15 @@ export const addendumSchema = z.object({
 }).strict();
 
 export type EventInput = z.infer<typeof eventInputSchema>;
+export type ClinicalOutcome = {
+  id: string;
+  code: string;
+  label: string;
+  active: boolean;
+  requiresRecall: boolean;
+  requiresNotes: boolean;
+  displayOrder: number;
+};
 export type RxItem = z.infer<typeof rxItemSchema>;
 export type RxInput = z.infer<typeof rxInputSchema>;
 export type Drug = { id: string; name: string; strength: string; therapyGroup: string };
@@ -347,6 +364,7 @@ export type ClinicalDetail = {
   workup: Workup | null;
   investigations: InvestigationResult[];
   template: ExaminationTemplate;
+  outcomes: ClinicalOutcome[];
   event: DoctorEvent | null;
   prescription: Prescription | null;
   addenda: Addendum[];
@@ -380,7 +398,7 @@ export type Timeline = {
 };
 export type PatientTimelineActivity = {
   id: string;
-  kind: 'appointment' | 'checkin' | 'workup' | 'investigation' | 'investigation_evidence' | 'doctor_event' | 'drawing' | 'prescription' | 'prescription_evidence' | 'addendum' | 'consent' | 'surgery' | 'operation_note' | 'surgery_followup' | 'problem';
+  kind: 'appointment' | 'checkin' | 'workup' | 'investigation' | 'investigation_evidence' | 'doctor_event' | 'drawing' | 'prescription' | 'prescription_evidence' | 'addendum' | 'consent' | 'surgery' | 'operation_note' | 'surgery_followup' | 'problem' | 'history';
   at: string;
   summary: string;
   clinic: string;

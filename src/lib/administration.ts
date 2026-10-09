@@ -20,6 +20,17 @@ export const templateActionSchema = z.discriminatedUnion('action', [
   z.object({action:z.literal('assign'),templateId:z.uuid(),facilityId:z.uuid().nullable(),specialty:text(80).min(3),visitType:z.enum(VISIT_TYPES)}).strict(),
 ]);
 
+export const outcomeActionSchema = z.object({
+  id:z.uuid().optional(),
+  version:z.number().int().nonnegative(),
+  code:z.string().trim().regex(/^[a-z][a-z0-9_]{1,59}$/),
+  label:text(120).min(2),
+  active:z.boolean(),
+  requiresRecall:z.boolean(),
+  requiresNotes:z.boolean(),
+  displayOrder:z.number().int().min(0).max(1000),
+}).strict();
+
 export const PREOPERATIVE_CHECKS = ['biometry_verified','medical_clearance','pupil_dilation'] as const;
 export const procedureFieldSchema = z.object({
   code:z.string().trim().regex(/^[a-z][a-z0-9_]{1,59}$/),
@@ -61,4 +72,5 @@ export type ExaminationTemplateAssignment = {id:string;templateId:string;facilit
 export type ProcedureDefinition = z.infer<typeof procedureDefinitionSchema>;
 export type ProcedureField = z.infer<typeof procedureFieldSchema>;
 export type ProcedureCatalogueRecord = {id:string;code:string;version:number;revision:number;name:string;specialty:string;status:'draft'|'published'|'retired';active:boolean;definition:ProcedureDefinition;createdAt:string;publishedAt:string|null;updatedAt:string};
-export type AdministrationData = {staff:StaffRecord[];facilities:FacilityRecord[];hospital:HospitalSettings;templates:ExaminationTemplateRecord[];templateAssignments:ExaminationTemplateAssignment[];procedureCatalogue:ProcedureCatalogueRecord[]};
+export type ClinicalOutcomeRecord = {id:string;code:string;label:string;active:boolean;requiresRecall:boolean;requiresNotes:boolean;displayOrder:number;version:number};
+export type AdministrationData = {staff:StaffRecord[];facilities:FacilityRecord[];hospital:HospitalSettings;templates:ExaminationTemplateRecord[];templateAssignments:ExaminationTemplateAssignment[];procedureCatalogue:ProcedureCatalogueRecord[];clinicalOutcomes:ClinicalOutcomeRecord[]};
