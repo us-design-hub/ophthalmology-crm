@@ -84,8 +84,8 @@ async function main() {
       FROM app.user_account u
       JOIN app.user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
       JOIN app.role r ON r.tenant_id=ur.tenant_id AND r.code=ur.role_code
-      WHERE u.tenant_id=$1 AND u.status='active' AND r.code=ANY($2::text[])`, [tenant.id, ["pharmacist", "cashier", "inventory_officer"]]);
-    if (Number(retired.rows[0]?.count ?? 0) > 0) throw new Error("Active accounts still have retired pharmacy, cashier, or inventory roles");
+      WHERE u.tenant_id=$1 AND u.status='active' AND r.code=ANY($2::text[])`, [tenant.id, ["cashier", "inventory_officer"]]);
+    if (Number(retired.rows[0]?.count ?? 0) > 0) throw new Error("Active accounts still have retired cashier or inventory roles");
   } finally {
     await db.end();
   }
