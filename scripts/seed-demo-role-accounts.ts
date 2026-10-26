@@ -52,6 +52,7 @@ async function main() {
         await db.query("INSERT INTO app.user_account(id,tenant_id,email,full_name,designation,password_hash) VALUES($1,$2,$3,$4,$5,$6)", [userId, tenant.id, account.email, account.name, account.designation, passwordHash]);
         created.push(account.role);
       } else {
+        await db.query("UPDATE app.user_account SET full_name=$3,designation=$4,status='active' WHERE tenant_id=$1 AND id=$2", [tenant.id, userId, account.name, account.designation]);
         preserved.push(account.role);
       }
       if (!(await db.query("SELECT 1 FROM app.role WHERE tenant_id=$1 AND code=$2", [tenant.id, account.role])).rowCount) throw new Error(`Role ${account.role} has not been migrated`);
