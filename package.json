@@ -19,6 +19,7 @@
     "db:seed:intake": "tsx scripts/seed-intake.ts",
     "db:seed:clinical": "tsx scripts/seed-clinical.ts",
     "db:seed:live": "tsx scripts/seed-live-operations.ts",
+    "db:seed:demo-roles": "tsx scripts/seed-demo-role-accounts.ts",
     "preflight:production": "tsx scripts/production-preflight.ts",
     "db:migrate:production": "tsx scripts/migrate-production.ts",
     "db:bootstrap:production": "tsx scripts/bootstrap-production.ts",
