@@ -164,7 +164,8 @@ export function isExaminationFieldVisible(
   answers: ExaminationAnswers,
   roles?: readonly string[],
 ) {
-  if (roles && field.roles && !field.roles.some(role => roles.includes(role))) return false;
+  const effectiveRoles = roles?.includes('senior_technician') ? [...roles, 'nurse'] : roles;
+  if (effectiveRoles && field.roles && !field.roles.some(role => effectiveRoles.includes(role))) return false;
   if (!field.visibleWhen) return true;
   const answer = answers[field.visibleWhen.fieldId];
   const answered = answer !== undefined && answer !== null && answer !== ''

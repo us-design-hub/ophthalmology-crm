@@ -12,6 +12,7 @@ const staff: { name: string; email: string; role: Role; designation: string }[] 
   { name: "Dr. Sara Khan", email: "sara.khan@demo.openeyes.local", role: "doctor", designation: "Consultant ophthalmologist" },
   { name: "Dr. Hamza Ali", email: "hamza.ali@demo.openeyes.local", role: "doctor", designation: "Retina specialist" },
   { name: "Nadia Raza", email: "nadia.raza@demo.openeyes.local", role: "nurse", designation: "Ophthalmic nurse" },
+  { name: "Sana Qureshi", email: "sana.qureshi@demo.openeyes.local", role: "senior_technician", designation: "Senior ophthalmic technician" },
   { name: "Usman Farooq", email: "usman.farooq@demo.openeyes.local", role: "optometrist", designation: "Optometrist" },
   { name: "Omar Siddiqui", email: "omar.siddiqui@demo.openeyes.local", role: "hospital_admin", designation: "Hospital administrator" },
   { name: "Faisal Noor", email: "faisal.noor@demo.openeyes.local", role: "security_admin", designation: "Security administrator" },
@@ -97,7 +98,7 @@ async function main() {
     }
     await db.query("INSERT INTO app.mrn_counter(tenant_id,year,sequence) VALUES($1,$2,60)", [tenantId, year]);
     await db.query("COMMIT");
-    console.log(`Seeded 1 demo hospital, 6 facilities, 9 named accounts, and 60 synthetic patients in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
+    console.log(`Seeded 1 demo hospital, 6 facilities, 10 named accounts, and 60 synthetic patients in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
     console.log("Demo account choices are available on the login screen when explicitly enabled. Passwords were not printed.");
   } catch (error) { await db.query("ROLLBACK"); throw error; }
   finally { await db.end(); }

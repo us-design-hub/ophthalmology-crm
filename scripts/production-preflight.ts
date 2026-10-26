@@ -18,14 +18,6 @@ function key(name: string): Buffer {
   return value;
 }
 
-function uuid(name: string): string {
-  const value = required(name);
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
-    throw new Error(`${name} must be a UUID`);
-  }
-  return value;
-}
-
 async function main() {
   if (required("APP_MODE") !== "production") throw new Error("APP_MODE must be production");
   const origin = new URL(required("APP_ORIGIN"));
@@ -60,11 +52,6 @@ async function main() {
     await runtimeDb.end();
   }
 
-  const webhookSecret = required("ODOO_WEBHOOK_SECRET");
-  if (webhookSecret.length < 32) throw new Error("ODOO_WEBHOOK_SECRET must contain at least 32 characters");
-  const serviceEmail = required("ODOO_SERVICE_ACCOUNT_EMAIL").toLowerCase();
-  const facilityId = uuid("ODOO_DEFAULT_FACILITY_ID");
-
   const db = new pg.Client({ connectionString: adminUrl.toString() });
   await db.connect();
   try {
@@ -92,11 +79,6 @@ async function main() {
       if (!counts.get(role)) throw new Error(`At least one active ${role} account is required`);
     }
 
-    const service = await db.query("SELECT 1 FROM app.user_account WHERE tenant_id=$1 AND lower(email)=$2 AND status='active'", [tenant.id, serviceEmail]);
-    if (!service.rowCount) throw new Error("ODOO_SERVICE_ACCOUNT_EMAIL must name an active account in this hospital");
-    const facility = await db.query("SELECT 1 FROM app.facility WHERE tenant_id=$1 AND id=$2 AND type='clinic' AND active", [tenant.id, facilityId]);
-    if (!facility.rowCount) throw new Error("ODOO_DEFAULT_FACILITY_ID must name an active clinic in this hospital");
-
     const retired = await db.query<{ count: string }>(`
       SELECT count(DISTINCT u.id)::text AS count
       FROM app.user_account u
@@ -108,7 +90,7 @@ async function main() {
     await db.end();
   }
 
-  console.log("Production preflight passed: configuration, migrations, tenant, administrators, and Odoo identity are ready.");
+  console.log("Production preflight passed: configuration, migrations, tenant, administrators, and native patient registration are ready.");
 }
 
 main().catch(error => {

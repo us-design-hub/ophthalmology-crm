@@ -45,10 +45,12 @@ test("duplicate-review signatures bind the reviewed payload", () => {
   assert.equal(matchesReview(token, signReview({ patient: "synthetic", tenant: "b" })), false);
   assert.equal(matchesReview("short", token), false);
 });
-test("Odoo owns demographics while active roles retain clinical and governance access", () => {
-  for (const role of ASSIGNABLE_ROLES) {
+test("native registration is limited to patient administration roles", () => {
+  assert.equal(ROLE_PERMISSIONS.receptionist.includes("patient:create"), true);
+  assert.equal(ROLE_PERMISSIONS.receptionist.includes("patient:edit"), true);
+  assert.equal(ROLE_PERMISSIONS.hospital_admin.includes("patient:create"), true);
+  for (const role of ASSIGNABLE_ROLES.filter(role => !["receptionist","hospital_admin"].includes(role))) {
     assert.equal(ROLE_PERMISSIONS[role].includes("patient:create"), false);
-    assert.equal(ROLE_PERMISSIONS[role].includes("patient:edit"), false);
   }
   assert.equal(ASSIGNABLE_ROLES.includes("doctor"), true);
   assert.equal(ROLE_PERMISSIONS.doctor.includes("patient:read"), true);

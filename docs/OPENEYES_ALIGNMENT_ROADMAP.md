@@ -33,6 +33,7 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Walk-in registration and arrival
 - [x] Check-in, full live queue, focused ophthalmic workup queue, dilation, consultation handoff, and direct clinical completion
 - [x] Bilateral visual acuity, IOP, refraction, and logMAR workup
+- [x] Technician entry with senior-technician review, correction return, approval, and attributed handoff
 - [x] Patient 360/history timeline backed by saved encounters
 - [~] Configurable clinic pathways and worklists
 - [ ] Patient merge workflow for duplicate records received from an external system
@@ -93,17 +94,11 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Daily and active-case theatre worklists with named surgeons, facility filters, readiness blockers, and direct case opening
 - [-] Surgery pricing, estimates, invoicing, and cashier workflow
 
-### Odoo and interoperability
+### Patient administration and interoperability
 
-- [x] Authenticated inbound Odoo patient synchronization endpoint
-- [x] Stable external identity mapping, safe matching, idempotency, and stale-update protection
-- [x] Odoo remains the demographic source of truth while this system owns clinical records
-- [~] Production Odoo configuration and staging validation
-- [ ] Appointment synchronization from Odoo
-- [ ] Patient merge, archive, and deactivation messages
-- [ ] Retry queue, dead-letter handling, and integration status dashboard
-- [ ] Configurable external-to-internal value mappings
-- [ ] Outbound clinical status/events required by the hospital
+- [x] Native patient registration with duplicate review and encrypted identity data
+- [x] Reception-controlled demographic correction with attributed change history
+- [ ] Patient merge, archive, and deactivation workflow
 - [ ] FHIR/HL7 interfaces after the actual receiving systems and use cases are confirmed
 - [-] QuickBooks clinical workflow; finance remains in the external finance system
 
@@ -155,12 +150,12 @@ Technical implementation is complete. Hospital approval of the marker catalogue 
 - [x] Bind drawings to examination sections and signed event snapshots
 - [x] Display prior-visit signed drawings for read-only comparison
 
-### Phase 3 - Odoo operational integration
+### Phase 3 - Native patient administration
 
-- [ ] Validate the existing patient endpoint against an Odoo staging instance
-- [ ] Add appointments, cancellations, patient merges, and deactivations
-- [ ] Add retry, replay protection, failure review, and synchronization status
-- [ ] Reconcile migrated patients before enabling production writes
+- [x] Register patients directly with duplicate review and stable MRN allocation
+- [x] Correct demographics with encrypted identity history and audit attribution
+- [x] Separate technician entry from senior-technician workup approval
+- [ ] Add patient merge, archive, and deactivation workflows
 
 ### Phase 4 - Specialty templates and longitudinal record
 

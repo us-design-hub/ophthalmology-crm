@@ -24,7 +24,7 @@ export async function GET(request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
  try {
   checkOrigin(request); const { resource } = await context.params;
-  const permissions = { appointments: "appointment:create", checkin: "appointment:checkin", transition: "intake:read", workup: "workup:write", investigations:"workup:write" } as const;
+  const permissions = { appointments: "appointment:create", checkin: "appointment:checkin", transition: "intake:read", workup: "workup:write", "workup-review": "workup:review", investigations:"workup:write" } as const;
   if (!Object.hasOwn(permissions, resource)) throw new ApiError(404, "invalidRequest");
   const { user } = await requestSession(request, permissions[resource as keyof typeof permissions]);
   await consumeLimit(`intake-write:${user.tenantId}:${user.id}`, 60, 60);
@@ -32,6 +32,7 @@ export async function POST(request: Request, context: Context) {
   if (resource === "appointments") return json(await intake.book(user, body, audit), 201);
   if (resource === "checkin") return json(await intake.checkIn(user, body, audit), 201);
   if (resource === "transition") return json(await intake.transition(user, body, audit));
+  if (resource === "workup-review") return json(await intake.reviewWorkup(user, body, audit));
   if(resource==='investigations')return json(await investigations.createInvestigation(user,body,audit),201);
   return json(await intake.saveWorkup(user, body, audit), 201);
 } catch (error) { return errorResponse(error); }

@@ -1,8 +1,8 @@
 # OpenEyes clinical workspace
 
-OpenEyes connects Odoo-synchronized patient demographics with ophthalmology appointments, clinical queues, bilateral workup, signed clinical documentation, digital prescriptions, surgery tracking, administration, audit, and operational reporting on PostgreSQL. The frontend supports the existing partial Urdu/RTL interface and iPad-sized layouts.
+OpenEyes provides native patient registration with ophthalmology appointments, clinical queues, bilateral workup, signed clinical documentation, digital prescriptions, surgery tracking, administration, audit, and operational reporting on PostgreSQL. The frontend supports the existing partial Urdu/RTL interface and iPad-sized layouts.
 
-See [Odoo integration](docs/ODOO_INTEGRATION.md), [production readiness](docs/PRODUCTION_READINESS.md), [current implementation](docs/USABLE_SYSTEM_IMPLEMENTATION.md), and [current verification](docs/USABLE_SYSTEM_VERIFICATION.md). Earlier milestone documents describe historical demo boundaries and are superseded by these records. Planning documents remain in the project folder, outside the client interface.
+See [production readiness](docs/PRODUCTION_READINESS.md), [current implementation](docs/USABLE_SYSTEM_IMPLEMENTATION.md), and [current verification](docs/USABLE_SYSTEM_VERIFICATION.md). Earlier milestone documents describe historical demo boundaries and are superseded by these records. Planning documents remain in the project folder, outside the client interface.
 
 ## Start on this machine
 
@@ -18,7 +18,7 @@ In another terminal:
 npm run dev
 ```
 
-The normal development address is **http://127.0.0.1:3000**. The updated preview started during verification is at **http://127.0.0.1:3001**, because an existing process occupied port 3000. Choose a named demo account, then sign in. Reception can find Odoo-synchronized patients, book, and check in patients. Nurses save workup and hand off; doctors review saved measurements. Auditors read the audit trail. Do not start a second database process if it is already running.
+The normal development address is **http://127.0.0.1:3000**. Choose a named demo account, then sign in. Reception registers patients, books appointments, and confirms arrival. Technicians save bilateral workups; senior technicians review and release them. Doctors review saved measurements and document care. Auditors read the audit trail. Do not start a second database process if it is already running.
 
 For the optimized preview, use `npm run build` then `npm start`.
 
@@ -54,7 +54,7 @@ The idempotent seed creates one fictional hospital, four facilities, nine named 
 - Password authentication, revocable sessions, forced temporary-password changes, and server-enforced role/facility permissions.
 - Hospital administrator staff profiles and facility assignments; security administrator credentials, roles, activation and access. Last-administrator and self-access protections are enforced.
 - Hospital settings, clinic schedules, closures and doctor rosters.
-- Odoo-owned demographics with authenticated, idempotent synchronization, deterministic matching, encrypted identifiers, masked summaries, and attributed history/flag amendments.
+- Native patient registration with duplicate review, encrypted identifiers, masked summaries, demographic correction history, and attributed clinical history/flag amendments.
 - Appointments, rescheduling, cancellations, no-shows, walk-ins, check-in, queue priority, departure, and clinical visit completion.
 - Bilateral VA/IOP, refraction, optional logMAR values, immutable workup revisions, and configurable dilation timing.
 - Patient 360, Doctor Events, configurable general, cataract, glaucoma, and retina examinations, coded diagnoses, anatomy plans, persistent bilateral drawing sheets, longitudinal comparison, separate event/prescription signatures, handwritten-prescription evidence, addenda, and prescription PDFs with limited QR verification.
@@ -67,7 +67,7 @@ The idempotent seed creates one fictional hospital, four facilities, nine named 
 
 The local workspace uses synthetic patients. Real operational writes persist. Signed clinical content, drawing sheets, and prescription evidence remain immutable after signing. Evidence files currently use protected PostgreSQL storage; production AWS deployment can move the same hashed objects to S3 without changing the signed evidence metadata.
 
-Odoo connector acceptance, identity-provider/SSO integration, MFA, email recovery, external messaging, device interfaces and FHIR/HL7/DICOM integrations remain separate work. Terminology codes can be recorded but there is no external terminology service. Urdu coverage is partial. Surgery tracking does not implement a full theatre-resource scheduling engine. Reports support CSV and browser printing; prescription PDFs use server-side Chromium.
+Identity-provider/SSO integration, MFA, email recovery, external messaging, device interfaces and FHIR/HL7/DICOM integrations remain separate work. Terminology codes can be recorded but there is no external terminology service. Urdu coverage is partial. Surgery tracking does not implement a full theatre-resource scheduling engine. Reports support CSV and browser printing; prescription PDFs use server-side Chromium.
 
 
 PDF generation requires a Playwright-compatible Chromium installation and a font supporting Urdu. This Windows workspace uses its existing `.playwright` browser and Nirmala UI. For deployment, install the browser and system dependencies or set `PDF_CHROMIUM_EXECUTABLE`; verify Urdu rendering on that host. PDF rendering blocks external network requests and keeps generated documents in memory.
@@ -85,9 +85,9 @@ npm run db:bootstrap:production
 npm run preflight:production
 ```
 
-Bootstrap creates one clinic, separate hospital and security administrators with forced password changes, and a non-interactive Odoo identity. It refuses to modify an existing hospital.
+Bootstrap creates one clinic and separate hospital and security administrators with forced password changes. It refuses to modify an existing hospital.
 
-The administrative database URL belongs only in the migration/preflight environment. Do not expose it to the web application. The detailed AWS, Odoo, evidence-storage, PDF, identity, and operational gates are in [production readiness](docs/PRODUCTION_READINESS.md).
+The administrative database URL belongs only in the migration/preflight environment. Do not expose it to the web application. The detailed AWS, evidence-storage, PDF, identity, and operational gates are in [production readiness](docs/PRODUCTION_READINESS.md).
 
 ## Verification
 

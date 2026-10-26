@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { hash } from "@node-rs/argon2";
 import { ASSIGNABLE_ROLES, PERMISSIONS, ROLE_PERMISSIONS } from "../src/lib/access";
 import { productionClient, requiredProductionEnv } from "./production-env";
@@ -26,8 +26,7 @@ async function main() {
   const facilityName = requiredProductionEnv("PRODUCTION_FACILITY_NAME");
   const hospitalAdmin = account("HOSPITAL_ADMIN", "hospital_admin");
   const securityAdmin = account("SECURITY_ADMIN", "security_admin");
-  const serviceEmail = requiredProductionEnv("ODOO_SERVICE_ACCOUNT_EMAIL").toLowerCase();
-  if (new Set([hospitalAdmin.email, securityAdmin.email, serviceEmail]).size !== 3) throw new Error("Initial administrator and Odoo service emails must be distinct");
+  if (hospitalAdmin.email === securityAdmin.email) throw new Error("Initial administrator emails must be different");
   if (hospitalAdmin.password === securityAdmin.password) throw new Error("Initial administrator passwords must be different");
 
   const db = productionClient("openeyes-production-bootstrap");
@@ -64,16 +63,11 @@ async function main() {
       await db.query("INSERT INTO app.user_facility(tenant_id,user_id,facility_id) VALUES($1,$2,$3)", [tenantId, id, facilityId]);
     }
 
-    const serviceId = randomUUID();
-    const unusablePassword = await hash(randomBytes(48).toString("base64"), { algorithm: 2, memoryCost: 65536, timeCost: 3, parallelism: 1 });
-    await db.query(`INSERT INTO app.user_account(id,tenant_id,email,full_name,designation,password_hash)
-      VALUES($1,$2,$3,'Odoo integration','Non-interactive integration identity',$4)`, [serviceId, tenantId, serviceEmail, unusablePassword]);
-    await db.query("INSERT INTO app.user_facility(tenant_id,user_id,facility_id) VALUES($1,$2,$3)", [tenantId, serviceId, facilityId]);
     await db.query(`INSERT INTO app.audit_log(tenant_id,actor_id,action,entity_type,entity_id,metadata)
-      VALUES($1,$2,'tenant.production_bootstrapped','tenant',$1,$3::jsonb)`, [tenantId, hospitalAdminId, JSON.stringify({ facilityId, serviceAccountId: serviceId })]);
+      VALUES($1,$2,'tenant.production_bootstrapped','tenant',$1,$3::jsonb)`, [tenantId, hospitalAdminId, JSON.stringify({ facilityId })]);
     await db.query("COMMIT");
-    console.log(`Created production hospital ${code} with one clinic, two named administrators, and a non-interactive Odoo identity.`);
-    console.log(`Set ODOO_DEFAULT_FACILITY_ID=${facilityId}, then run npm run preflight:production.`);
+    console.log(`Created production hospital ${code} with one clinic and two named administrators.`);
+    console.log(`Clinic ID: ${facilityId}. Run npm run preflight:production after removing the one-time passwords.`);
   } catch (error) {
     await db.query("ROLLBACK");
     throw error;

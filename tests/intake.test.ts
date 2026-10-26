@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { bookingDateAllowed, dateSchema, slotTimes, canTransition, nextPathwayStage, pathwayEvidenceRequired, workupSchema, isElevatedIop } from '../src/lib/intake';
+import { bookingDateAllowed, dateSchema, slotTimes, canTransition, nextPathwayStage, pathwayEvidenceRequired, workupReviewSchema, workupSchema, isElevatedIop } from '../src/lib/intake';
 import { ROLE_PERMISSIONS } from '../src/lib/access';
 import { investigationInputSchema } from '../src/lib/investigations';
 test('clinic slots include the opening slot and exclude the closing boundary', () => { const slots = slotTimes(540, 1020, 15); assert.equal(slots.length, 32); assert.equal(slots[0], '09:00'); assert.equal(slots.at(-1), '16:45'); assert.equal(slots.includes('17:00'), false); });
@@ -18,7 +18,8 @@ test('bilateral measurements retain nonnumeric acuity and validate IOP without b
  assert.equal(workupSchema.safeParse(data).success,true); assert.equal(workupSchema.safeParse({...data,OS:undefined}).success,false); assert.equal(workupSchema.safeParse({...data,OD:{...eye,iop:81}}).success,false); assert.equal(workupSchema.safeParse({...data,tenantId:crypto.randomUUID()}).success,false);
  assert.equal(isElevatedIop(21),false); assert.equal(isElevatedIop(21.1),true);
 });
-test('reception, clinical workup, and doctor review permissions stay separate', () => { assert.ok(ROLE_PERMISSIONS.receptionist.includes('queue:workup')); assert.equal(ROLE_PERMISSIONS.receptionist.includes('workup:read'),false); assert.equal(ROLE_PERMISSIONS.hospital_admin.includes('workup:write'),false); assert.ok(ROLE_PERMISSIONS.nurse.includes('workup:write')); assert.equal(ROLE_PERMISSIONS.doctor.includes('workup:write'),false); assert.ok(ROLE_PERMISSIONS.doctor.includes('workup:read')); });
+test('technician entry and senior review permissions stay separate', () => { assert.ok(ROLE_PERMISSIONS.receptionist.includes('queue:workup')); assert.equal(ROLE_PERMISSIONS.receptionist.includes('workup:read'),false); assert.equal(ROLE_PERMISSIONS.hospital_admin.includes('workup:write'),false); assert.ok(ROLE_PERMISSIONS.nurse.includes('workup:write')); assert.equal(ROLE_PERMISSIONS.nurse.includes('workup:review'),false); assert.equal(ROLE_PERMISSIONS.nurse.includes('queue:handoff'),false); assert.ok(ROLE_PERMISSIONS.senior_technician.includes('workup:review')); assert.ok(ROLE_PERMISSIONS.senior_technician.includes('queue:handoff')); assert.equal(ROLE_PERMISSIONS.doctor.includes('workup:write'),false); assert.ok(ROLE_PERMISSIONS.doctor.includes('workup:read')); });
+test('senior review requires an attributed return reason',()=>{const base={encounterId:crypto.randomUUID(),revisionId:crypto.randomUUID(),decision:'approved' as const,notes:''};assert.equal(workupReviewSchema.safeParse(base).success,true);assert.equal(workupReviewSchema.safeParse({...base,decision:'returned',notes:'short'}).success,false);assert.equal(workupReviewSchema.safeParse({...base,decision:'returned',notes:'Repeat the pressure measurement'}).success,true);});
 test('structured investigations enforce checkpoint modality and safe measurement ranges',()=>{
  const base={encounterId:crypto.randomUUID(),stage:'testing',kind:'visual_field',eye:'OD',performedAt:new Date().toISOString(),device:'Humphrey',findings:'Stable visual field',measurements:{meanDeviation:-4.2,visualFieldIndex:92}};
  assert.equal(investigationInputSchema.safeParse(base).success,true);

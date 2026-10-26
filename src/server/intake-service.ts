@@ -2,7 +2,7 @@ import "server-only";
 import type { PoolClient } from "pg";
 import { z } from "zod";
 import type { AuthUser } from "@/lib/access";
-import { bookingSchema, bookingDateAllowed, canTransition, dateSchema, pathwayEvidenceRequired, slotTimes, transitionSchema, workupSchema, type Encounter, type Workup, type EncounterDetail, type Clinic } from "@/lib/intake";
+import { bookingSchema, bookingDateAllowed, canTransition, dateSchema, pathwayEvidenceRequired, slotTimes, transitionSchema, workupReviewSchema, workupSchema, type Encounter, type Workup, type EncounterDetail, type Clinic } from "@/lib/intake";
 import { todayKarachi } from "@/lib/patients";
 import { withTenant } from "./db";
 import { audit, type AuditContext } from "./audit";
@@ -13,7 +13,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T { const result = sche
 export function intakeDate(value: unknown) { return parse(dateSchema, value ?? todayKarachi()); }
 function facilityAccess(user: AuthUser, facilityId: string) { if (!user.facilityIds.includes(facilityId)) throw new ApiError(403, "accessDenied"); }
 const flags = `(SELECT coalesce(jsonb_agg(jsonb_build_object('type',pf.type,'value',pf.value)),'[]') FROM app.patient_flag pf WHERE pf.tenant_id=p.tenant_id AND pf.patient_id=p.id AND pf.resolved_at IS NULL)`;
-const encounterSelect = `SELECT e.id,e.patient_id AS "patientId",concat_ws(' ',p.given_name,p.family_name) AS name,p.mrn,e.facility_id AS "facilityId",f.name AS clinic,f.specialty,e.visit_type AS "visitType",e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.pathway_steps AS "pathwaySteps",e.pathway_target_minutes AS "pathwayTargetMinutes",e.priority,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id),0) AS "workupVersion",${flags} AS flags FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id`;
+const encounterSelect = `SELECT e.id,e.patient_id AS "patientId",concat_ws(' ',p.given_name,p.family_name) AS name,p.mrn,e.facility_id AS "facilityId",f.name AS clinic,f.specialty,e.visit_type AS "visitType",e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.pathway_steps AS "pathwaySteps",e.pathway_target_minutes AS "pathwayTargetMinutes",e.priority,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id),0) AS "workupVersion",(SELECT r.decision FROM app.workup_revision w LEFT JOIN app.workup_review r ON r.tenant_id=w.tenant_id AND r.revision_id=w.id WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id ORDER BY w.version DESC LIMIT 1) AS "workupReviewStatus",${flags} AS flags FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id`;
 async function event(db: PoolClient, user: AuthUser, context: AuditContext, action: string, entityType: string, entityId?: string, metadata?: Record<string, unknown>) { await audit(db, { tenantId: user.tenantId, actorId: user.id, action, entityType, entityId, metadata, context }); }
 async function lockEncounter(db: PoolClient, user: AuthUser, id: string) {
  const result = await db.query('SELECT * FROM app.encounter WHERE id=$1 AND facility_id=ANY($2::uuid[]) FOR UPDATE', [id, user.facilityIds]);
@@ -25,7 +25,8 @@ export async function latestWorkup(db: PoolClient, encounterId: string): Promise
  const result = await db.query(`SELECT w.id,w.encounter_id AS "encounterId",w.version,w.author_id AS "authorId",u.full_name AS author,w.saved_at AS "savedAt",w.notes FROM app.workup_revision w JOIN app.user_account u ON u.id=w.author_id AND u.tenant_id=w.tenant_id WHERE w.encounter_id=$1 ORDER BY w.version DESC LIMIT 1`, [encounterId]);
  if (!result.rowCount) return null;
  const eyes = await db.query('SELECT eye,refraction,logmar,uncorrected,pinhole,corrected,iop::float8 AS iop,method,measured_at AS "measuredAt" FROM app.workup_eye WHERE revision_id=$1 ORDER BY eye', [result.rows[0].id]);
- return { ...result.rows[0], ...Object.fromEntries(eyes.rows.map(({ eye, ...measurement }) => [eye, measurement])) } as Workup;
+ const review = (await db.query(`SELECT r.id,r.decision,r.notes,r.reviewer_id AS "reviewerId",u.full_name AS reviewer,r.reviewed_at AS "reviewedAt" FROM app.workup_review r JOIN app.user_account u ON u.id=r.reviewer_id AND u.tenant_id=r.tenant_id WHERE r.revision_id=$1`, [result.rows[0].id])).rows[0] ?? null;
+ return { ...result.rows[0], review, ...Object.fromEntries(eyes.rows.map(({ eye, ...measurement }) => [eye, measurement])) } as Workup;
 }
 export async function clinics(user: AuthUser): Promise<{ clinics: Clinic[] }> {
  return withTenant(user.tenantId, user.id, async db => ({ clinics: (await db.query(`SELECT f.id,f.name,s.start_minute AS "startMinute",s.end_minute AS "endMinute",s.slot_minutes AS "slotMinutes",coalesce((SELECT jsonb_agg(jsonb_build_object('id',u.id,'name',u.full_name) ORDER BY u.full_name) FROM app.clinic_doctor cd JOIN app.user_account u ON u.id=cd.doctor_id AND u.tenant_id=cd.tenant_id WHERE cd.active AND cd.facility_id=f.id AND cd.tenant_id=f.tenant_id AND u.status='active' AND EXISTS(SELECT 1 FROM app.user_role ur WHERE ur.tenant_id=u.tenant_id AND ur.user_id=u.id AND ur.role_code='doctor') AND EXISTS(SELECT 1 FROM app.user_facility uf WHERE uf.tenant_id=u.tenant_id AND uf.user_id=u.id AND uf.facility_id=f.id)),'[]') AS doctors FROM app.clinic_schedule s JOIN app.facility f ON f.id=s.facility_id AND f.tenant_id=s.tenant_id WHERE f.active AND f.id=ANY($1::uuid[]) ORDER BY f.name`, [user.facilityIds])).rows }));
@@ -87,7 +88,12 @@ export async function transition(user: AuthUser, input: unknown, context: AuditC
  return withTenant(user.tenantId, user.id, async db => {
   const encounter = await lockEncounter(db, user, data.encounterId);
   if (encounter.version !== data.version || !canTransition(encounter.stage, data.to, encounter.pathway_steps)) throw new ApiError(409, "queueConflict");
-  if (data.to !== "workup" && !(await latestWorkup(db, data.encounterId))) throw new ApiError(409, "workupRequired");
+  const workup = data.to === "workup" ? null : await latestWorkup(db, data.encounterId);
+  if (data.to !== "workup" && !workup) throw new ApiError(409, "workupRequired");
+  if (encounter.stage === "workup") {
+   if (!user.permissions.includes("workup:review")) throw new ApiError(403, "seniorReviewRequired");
+   if (workup?.review?.decision !== "approved") throw new ApiError(409, "workupReviewRequired");
+  }
   if (pathwayEvidenceRequired(encounter.stage) && !(await hasInvestigation(db,data.encounterId,encounter.stage))) throw new ApiError(409,"investigationRequired");
   if (pathwayEvidenceRequired(encounter.stage) && data.reason.trim().length < 3) throw new ApiError(409, "pathwayEvidenceRequired");
   if (encounter.stage === "dilation" && new Date(encounter.dilation_ready_at).getTime() > Date.now() && data.reason.length < 8) throw new ApiError(409, "dilationReasonRequired");
@@ -115,10 +121,25 @@ export async function saveWorkup(user: AuthUser, input: unknown, context: AuditC
   for (const eye of [data.OD, data.OS]) { const measured = new Date(eye.measuredAt).getTime(); if (measured > Date.now() + 60_000 || measured < new Date(encounter.checked_in_at).getTime() - 60_000) throw new ApiError(400, "measurementTimeInvalid"); }
   const prior = await latestWorkup(db, data.encounterId);
   if ((prior?.version ?? 0) !== data.version) throw new ApiError(409, "workupConflict");
-  if (prior && prior.authorId !== user.id) throw new ApiError(403, "workupOwnership");
+  if (prior?.review?.decision === "approved") throw new ApiError(409, "workupApproved");
+  if (prior && prior.authorId !== user.id && !user.permissions.includes("workup:review")) throw new ApiError(403, "workupOwnership");
   const revision = (await db.query('INSERT INTO app.workup_revision(tenant_id,encounter_id,version,author_id,notes) VALUES($1,$2,$3,$4,$5) RETURNING id', [user.tenantId, data.encounterId, data.version + 1, user.id, data.notes])).rows[0];
   for (const eye of ["OD", "OS"] as const) { const value = data[eye]; await db.query('INSERT INTO app.workup_eye(tenant_id,revision_id,eye,uncorrected,pinhole,corrected,iop,method,measured_at,refraction,logmar) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)', [user.tenantId, revision.id, eye, value.uncorrected, value.pinhole, value.corrected, value.iop, value.method, value.measuredAt, value.refraction?JSON.stringify(value.refraction):null,value.logmar?JSON.stringify(value.logmar):null]); }
   await event(db, user, context, "workup.saved", "encounter", data.encounterId, { revisionId: revision.id, version: data.version + 1 });
+  return { workup: await latestWorkup(db, data.encounterId) };
+ });
+}
+export async function reviewWorkup(user: AuthUser, input: unknown, context: AuditContext) {
+ if (!user.permissions.includes("workup:review")) throw new ApiError(403, "accessDenied");
+ const data = parse(workupReviewSchema, input);
+ return withTenant(user.tenantId, user.id, async db => {
+  const encounter = await lockEncounter(db, user, data.encounterId);
+  if (encounter.stage !== "workup") throw new ApiError(409, "encounterLocked");
+  const current = await latestWorkup(db, data.encounterId);
+  if (!current || current.id !== data.revisionId) throw new ApiError(409, "workupConflict");
+  if (current.review) throw new ApiError(409, "workupAlreadyReviewed");
+  await db.query('INSERT INTO app.workup_review(tenant_id,encounter_id,revision_id,reviewer_id,decision,notes) VALUES($1,$2,$3,$4,$5,$6)', [user.tenantId, data.encounterId, data.revisionId, user.id, data.decision, data.notes]);
+  await event(db, user, context, `workup.${data.decision}`, "encounter", data.encounterId, { revisionId: data.revisionId, notes: data.notes });
   return { workup: await latestWorkup(db, data.encounterId) };
  });
 }

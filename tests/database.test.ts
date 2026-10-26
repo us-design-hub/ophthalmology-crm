@@ -30,7 +30,7 @@ test("all clinical tables require tenant context and enforce forced RLS",async()
 });
 
 test("intake tables enforce RLS and clinical revisions cannot be mutated by the runtime role", async () => {
-  const names = ['clinic_schedule','clinic_doctor','appointment','encounter','queue_transition','workup_revision','workup_eye'];
+  const names = ['clinic_schedule','clinic_doctor','appointment','encounter','queue_transition','workup_revision','workup_eye','workup_review'];
   const tables = (await admin.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND c.relname=ANY($1)",[names])).rows;
   assert.equal(tables.length,names.length);
   for(const table of tables) { assert.equal(table.relrowsecurity,true); assert.equal(table.relforcerowsecurity,true); assert.equal((await app.query(`SELECT * FROM app.${table.relname}`)).rowCount,0); }
@@ -142,17 +142,18 @@ test('surgical cases have an accountable surgeon and an indexed theatre list',as
 
 test('clinical problem episodes enforce tenant isolation and immutable history',async()=>{for(const name of ['clinical_problem','clinical_problem_transition']){const row=(await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid=$1::regclass",['app.'+name])).rows[0];assert.equal(row.relrowsecurity,true);assert.equal(row.relforcerowsecurity,true);assert.equal((await app.query('SELECT 1 FROM app.'+name)).rowCount,0);}await app.query('BEGIN');try{await app.query("SELECT set_config('app.tenant_id',$1,true)",[tenantId]);const problem=(await app.query('SELECT id FROM app.clinical_problem LIMIT 1')).rows[0];assert.ok(problem);assert.ok((await app.query('SELECT id FROM app.clinical_problem_transition WHERE problem_id=$1',[problem.id])).rowCount!>0);await app.query('SAVEPOINT denied');await assert.rejects(app.query("UPDATE app.clinical_problem SET label='Tampered' WHERE id=$1",[problem.id]),(e:{code?:string})=>e.code==='42501');await app.query('ROLLBACK TO SAVEPOINT denied');await app.query('SAVEPOINT history_denied');await assert.rejects(app.query('DELETE FROM app.clinical_problem_transition WHERE problem_id=$1',[problem.id]),(e:{code?:string})=>e.code==='42501');await app.query('ROLLBACK TO SAVEPOINT history_denied');}finally{await app.query('ROLLBACK');}});
 
-test('Odoo identity mappings enforce tenant isolation and retired access is absent', async () => {
-  const security = (await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='app.patient_external_identity'::regclass")).rows[0];
+test('native registration roles are active and retired integration mappings are inaccessible', async () => {
+  const security = (await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='app.retired_patient_external_identity'::regclass")).rows[0];
   assert.equal(security.relrowsecurity, true);
   assert.equal(security.relforcerowsecurity, true);
-  assert.equal((await app.query('SELECT 1 FROM app.patient_external_identity')).rowCount, 0);
-  assert.equal((await admin.query("SELECT has_column_privilege('openeyes_app','app.patient_external_identity','payload_hash','UPDATE') AS allowed")).rows[0].allowed, true);
-  assert.equal((await admin.query("SELECT has_column_privilege('openeyes_app','app.patient_external_identity','external_id','UPDATE') AS allowed")).rows[0].allowed, false);
+  assert.equal((await admin.query("SELECT has_table_privilege('openeyes_app','app.retired_patient_external_identity','SELECT') AS allowed")).rows[0].allowed, false);
   await app.query('BEGIN');
   try {
     await app.query("SELECT set_config('app.tenant_id',$1,true)", [tenantId]);
-    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('pharmacist','cashier','inventory_officer') OR permission_code IN ('patient:create','patient:edit','anatomy:use','preview:inventory','preview:billing','preview:surgery','preview:management','preview:admin','inventory:write','pharmacy:dispense','billing:write','billing:discount','billing:approve_refund')")).rows[0].total, 0);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('pharmacist','cashier','inventory_officer') OR permission_code IN ('anatomy:use','preview:inventory','preview:billing','preview:surgery','preview:management','preview:admin','inventory:write','pharmacy:dispense','billing:write','billing:discount','billing:approve_refund')")).rows[0].total, 0);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('receptionist','hospital_admin') AND permission_code IN ('patient:create','patient:edit')")).rows[0].total, 4);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code='senior_technician' AND permission_code IN ('workup:write','workup:review','queue:handoff')")).rows[0].total, 3);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code='nurse' AND permission_code IN ('workup:review','queue:handoff')")).rows[0].total, 0);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.permission WHERE code IN ('surgery:read','management:read')")).rows[0].total, 2);
     assert.equal((await admin.query("SELECT has_table_privilege('openeyes_app','app.invoice','SELECT') AS allowed")).rows[0].allowed, false);
     assert.equal((await admin.query("SELECT has_table_privilege('openeyes_app','app.stock_batch','SELECT') AS allowed")).rows[0].allowed, false);

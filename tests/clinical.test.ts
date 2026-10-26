@@ -47,6 +47,8 @@ test('examination templates apply role visibility and conditional field rules',(
  assert.ok(validateExaminationAnswers(template,{visit_outcome:'Follow-up'},['doctor']).includes('recall_interval:required'));
  assert.ok(validateExaminationAnswers(template,{visit_outcome:'Discharge',recall_interval:'3 months'},['doctor']).includes('recall_interval:hidden'));
  assert.ok(validateExaminationAnswers(template,{visit_outcome:'Follow-up',recall_interval:'3 months',handoff_note:'Not permitted'},['doctor']).includes('handoff_note:hidden'));
+ assert.ok(validateExaminationAnswers(template,{visit_outcome:'Discharge'},['senior_technician']).includes('handoff_note:required'));
+ assert.deepEqual(validateExaminationAnswers(template,{visit_outcome:'Discharge',handoff_note:'Reviewed'},['senior_technician']),[]);
  assert.equal(examinationTemplateDefinitionSchema.safeParse({sections:[{id:'bad',title:'Bad',fields:[
   {id:'dependent',label:'Dependent',type:'text',laterality:'none',required:false,visibleWhen:{fieldId:'later',operator:'answered'}},
   {id:'later',label:'Later',type:'text',laterality:'none',required:false},

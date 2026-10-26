@@ -15,9 +15,13 @@ export const refractionSchema=z.object({sphere:z.number().min(-30).max(30).nulla
 export function snellenLogmar(value:string):number|null{const match=/^(\d+)\/(\d+)$/.exec(value);return match?Math.round(Math.log10(Number(match[2])/Number(match[1]))*100)/100:null;}
 const eyeSchema = z.object({ uncorrected: z.enum(VA_VALUES), pinhole: z.enum(VA_VALUES), corrected: z.enum(VA_VALUES), iop: z.number().min(1).max(80), method: z.enum(IOP_METHODS), measuredAt: z.iso.datetime({ offset: true }), refraction:refractionSchema.nullable().optional(), logmar:z.object({uncorrected:z.number().min(-0.5).max(3).nullable(),pinhole:z.number().min(-0.5).max(3).nullable(),corrected:z.number().min(-0.5).max(3).nullable()}).strict().nullable().optional() }).strict();
 export const workupSchema = z.object({ encounterId: z.uuid(), version: z.number().int().nonnegative(), OD: eyeSchema, OS: eyeSchema, notes: z.string().trim().max(1000).default("") }).strict();
+export const workupReviewSchema = z.object({ encounterId: z.uuid(), revisionId: z.uuid(), decision: z.enum(["approved", "returned"]), notes: z.string().trim().max(1000).default("") }).strict().superRefine((value, context) => {
+ if (value.decision === "returned" && value.notes.length < 8) context.addIssue({ code: "custom", path: ["notes"], message: "A return reason of at least 8 characters is required" });
+});
 export type EyeMeasurements = z.infer<typeof eyeSchema>;
 export type WorkupInput = z.infer<typeof workupSchema>;
-export type Workup = WorkupInput & { id: string; authorId: string; author: string; savedAt: string };
+export type WorkupReview = { id: string; decision: "approved" | "returned"; notes: string; reviewerId: string; reviewer: string; reviewedAt: string };
+export type Workup = WorkupInput & { id: string; authorId: string; author: string; savedAt: string; review: WorkupReview | null };
 export function isElevatedIop(value: number) { return value > 21; }
 export function nextPathwayStage(from: Stage, pathway: readonly PathwayStep[] = ["workup"]): Stage | null {
  if (from === "waiting") return "workup";
@@ -31,5 +35,5 @@ export function bookingDateAllowed(date: string, today = todayKarachi()) { retur
 export function slotTimes(start: number, end: number, duration: number) { const slots: string[] = []; for (let minute = start; minute + duration <= end; minute += duration) slots.push(`${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`); return slots; }
 export type Clinic = { id: string; name: string; startMinute: number; endMinute: number; slotMinutes: number; doctors: { id: string; name: string }[] };
 export type Appointment = { id: string; patientId: string; name: string; mrn: string; facilityId: string; clinic: string; doctorId: string; doctor: string; date: string; time: string; version:number; status: "booked" | "checked_in" | "cancelled" | "no_show" | "rescheduled"; encounterId: string | null; flags: { type: "allergy" | "risk"; value: string }[] };
-export type Encounter = { id: string; patientId: string; name: string; mrn: string; clinic: string; facilityId: string; specialty: string; visitType: "general"|"new"|"follow_up"|"emergency"|"post_op"; doctor: string; doctorId: string; stage: Stage; pathwaySteps: PathwayStep[]; pathwayTargetMinutes: number; priority?: "routine"|"urgent"; version: number; checkedInAt: string; stageAt: string; dilationReadyAt: string | null; workupVersion: number; flags: Appointment["flags"] };
+export type Encounter = { id: string; patientId: string; name: string; mrn: string; clinic: string; facilityId: string; specialty: string; visitType: "general"|"new"|"follow_up"|"emergency"|"post_op"; doctor: string; doctorId: string; stage: Stage; pathwaySteps: PathwayStep[]; pathwayTargetMinutes: number; priority?: "routine"|"urgent"; version: number; checkedInAt: string; stageAt: string; dilationReadyAt: string | null; workupVersion: number; workupReviewStatus: "approved"|"returned"|null; flags: Appointment["flags"] };
 export type EncounterDetail = { encounter: Encounter; workup: Workup | null; investigations: InvestigationResult[]; history: { from: Stage | null; to: Stage; actor: string; at: string; reason: string }[] };
