@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { escapeLiteral } from "pg";
 import { hash, verify } from "@node-rs/argon2";
-import { setTenant, transaction, withTenant } from "./db";
+import { singleTripTransaction, transaction, withTenant } from "./db";
 import { privateHash } from "./crypto";
 import { isDemo, requiredEnv, secureCookies, showDemoCredentials } from "./config";
 import { audit, type AuditContext } from "./audit";
@@ -29,16 +29,15 @@ type RateLimit = { key: string; maximum: number; seconds: number };
 async function consumeLimits(limits: RateLimit[]) {
   if (!limits.length) return;
   const keys = limits.map(limit => privateHash(limit.key));
-  const attempts = await transaction(async db => {
-    const result = await db.query(`INSERT INTO app.rate_limit(key,attempts,window_end)
+  const seconds = limits.map(limit => { if (!Number.isInteger(limit.seconds)) throw new Error("Invalid rate limit window"); return limit.seconds; });
+  const [result] = await singleTripTransaction(`INSERT INTO app.rate_limit(key,attempts,window_end)
       SELECT input.key,1,now()+make_interval(secs=>input.seconds)
-      FROM unnest($1::text[],$2::int[]) AS input(key,seconds)
+      FROM unnest(ARRAY[${keys.map(escapeLiteral).join(",")}]::text[],ARRAY[${seconds.join(",")}]::int[]) AS input(key,seconds)
       ON CONFLICT(key) DO UPDATE SET
         attempts=CASE WHEN app.rate_limit.window_end<now() THEN 1 ELSE app.rate_limit.attempts+1 END,
         window_end=CASE WHEN app.rate_limit.window_end<now() THEN EXCLUDED.window_end ELSE app.rate_limit.window_end END
-      RETURNING key,attempts`, [keys, limits.map(limit => limit.seconds)]);
-    return new Map(result.rows.map(row => [row.key as string, Number(row.attempts)]));
-  });
+      RETURNING key,attempts`);
+  const attempts = new Map(result.rows.map(row => [row.key as string, Number(row.attempts)]));
   if (limits.some((limit, index) => (attempts.get(keys[index]) ?? limit.maximum + 1) > limit.maximum)) throw new ApiError(429, "tooManyAttempts");
 }
 export async function consumeLimit(key: string, maximum: number, seconds: number) {
@@ -98,37 +97,34 @@ export function cookieOptions() { return { httpOnly: true, secure: secureCookies
 export async function sessionFromToken(token: string | undefined, touch = true): Promise<Session | null> {
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const tokenHash = privateHash(token);
-  return transaction(async db => {
-    // Session lookup needs its RLS context established as a completed statement.
-    // A safe literal lets both statements use the simple protocol in one network
-    // round trip, while tenant context remains an explicit boundary.
-    const lookup = await db.query(`SELECT set_config('app.session_hash',${escapeLiteral(tokenHash)},true);
-      SELECT tenant_id,user_id FROM app.session
-      WHERE token_hash=${escapeLiteral(tokenHash)} AND expires_at>now()
-        AND last_seen_at + make_interval(mins=>idle_minutes)>now()`) as unknown as Array<{ rows: Array<{ tenant_id: string; user_id: string }> }>;
-    const record = lookup[1]?.rows[0];
-    if (!record) return null;
-    await setTenant(db, record.tenant_id, record.user_id);
-    const result = await db.query(`WITH touched AS (
-        UPDATE app.session s SET last_seen_at=now()
-        WHERE $2::boolean AND s.token_hash=$1
-          AND EXISTS(SELECT 1 FROM app.user_account u JOIN app.tenant t ON t.id=u.tenant_id
-            WHERE u.id=$3 AND u.status='active' AND ($4::boolean OR NOT t.is_demo))
-        RETURNING 1
-      )
-      SELECT u.id,u.tenant_id AS "tenantId",t.name AS "tenantName",t.is_demo AS "isDemo",u.full_name AS name,u.email,u.must_change_password AS "mustChangePassword",
-        ARRAY(SELECT ur.role_code FROM app.user_role ur WHERE ur.user_id=u.id ORDER BY ur.role_code) AS roles,
-        ARRAY(SELECT DISTINCT rp.permission_code FROM app.user_role ur JOIN app.role_permission rp ON rp.tenant_id=ur.tenant_id AND rp.role_code=ur.role_code WHERE ur.user_id=u.id) AS permissions,
-        ARRAY(SELECT uf.facility_id FROM app.user_facility uf JOIN app.facility f ON f.id=uf.facility_id AND f.active WHERE uf.user_id=u.id ORDER BY uf.facility_id) AS "facilityIds",
-        (SELECT count(*) FROM touched) AS "_touched"
-      FROM app.user_account u JOIN app.tenant t ON t.id=u.tenant_id
-      WHERE u.id=$3 AND u.status='active' AND ($4::boolean OR NOT t.is_demo)`,
-      [tokenHash, touch, record.user_id, isDemo()]);
-    const row = result.rows[0] as (AuthUser & { _touched: string }) | undefined;
-    if (!row) return null;
-    const { _touched, ...user } = row;
-    return { user, tokenHash };
-  });
+  const hashLiteral = escapeLiteral(tokenHash), demo = isDemo() ? "true" : "false";
+  // Each RLS context is established by a completed statement before the next
+  // one relies on it: the session hash permits the session lookup, which sets
+  // tenant and actor context for the user query. Safe literals let the whole
+  // transaction use the simple protocol in one network round trip.
+  const results = await singleTripTransaction(`SELECT set_config('app.session_hash',${hashLiteral},true);
+    SELECT set_config('app.tenant_id',tenant_id::text,true), set_config('app.actor_id',user_id::text,true) FROM app.session
+    WHERE token_hash=${hashLiteral} AND expires_at>now()
+      AND last_seen_at + make_interval(mins=>idle_minutes)>now();
+    WITH actor AS (SELECT nullif(current_setting('app.actor_id',true),'')::uuid AS id), touched AS (
+      UPDATE app.session s SET last_seen_at=now()
+      WHERE ${touch ? "true" : "false"} AND s.token_hash=${hashLiteral}
+        AND EXISTS(SELECT 1 FROM app.user_account u JOIN app.tenant t ON t.id=u.tenant_id
+          WHERE u.id=(SELECT id FROM actor) AND u.status='active' AND (${demo} OR NOT t.is_demo))
+      RETURNING 1
+    )
+    SELECT u.id,u.tenant_id AS "tenantId",t.name AS "tenantName",t.is_demo AS "isDemo",u.full_name AS name,u.email,u.must_change_password AS "mustChangePassword",
+      ARRAY(SELECT ur.role_code FROM app.user_role ur WHERE ur.user_id=u.id ORDER BY ur.role_code) AS roles,
+      ARRAY(SELECT DISTINCT rp.permission_code FROM app.user_role ur JOIN app.role_permission rp ON rp.tenant_id=ur.tenant_id AND rp.role_code=ur.role_code WHERE ur.user_id=u.id) AS permissions,
+      ARRAY(SELECT uf.facility_id FROM app.user_facility uf JOIN app.facility f ON f.id=uf.facility_id AND f.active WHERE uf.user_id=u.id ORDER BY uf.facility_id) AS "facilityIds",
+      (SELECT count(*) FROM touched) AS "_touched"
+    FROM app.user_account u JOIN app.tenant t ON t.id=u.tenant_id
+    WHERE u.id=(SELECT id FROM actor) AND u.status='active' AND (${demo} OR NOT t.is_demo)`);
+  if (results[1]?.rowCount !== 1) return null;
+  const row = results[2]?.rows[0] as (AuthUser & { _touched: string }) | undefined;
+  if (!row) return null;
+  const { _touched, ...user } = row;
+  return { user, tokenHash };
 }
 export async function pageSession(): Promise<Session | null> { return sessionFromToken((await cookies()).get(SESSION_COOKIE)?.value); }
 export async function requestSession(request: Request, permission?: Permission, touch = true, allowPasswordChange = false): Promise<Session> {

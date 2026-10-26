@@ -1,5 +1,5 @@
 import "server-only";
-import { Pool, types, type PoolClient } from "pg";
+import { Pool, escapeLiteral, types, type PoolClient, type QueryResult } from "pg";
 import { requiredEnv } from "./config";
 
 types.setTypeParser(1082, value => value);
@@ -20,16 +20,29 @@ async function verifyAppRole() {
   })();
   return globalDb.roleCheck;
 }
-export async function transaction<T>(work: (db: PoolClient) => Promise<T>): Promise<T> {
+const BEGIN = "BEGIN; SET LOCAL statement_timeout = '8s'";
+export async function transaction<T>(work: (db: PoolClient) => Promise<T>, preamble?: string): Promise<T> {
   await verifyAppRole();
   const db = await pool().connect();
   try {
-    // Both statements use the simple protocol, saving one network round trip
+    // These statements use the simple protocol, saving network round trips
     // for every transaction without changing its timeout or isolation.
-    await db.query("BEGIN; SET LOCAL statement_timeout = '8s'");
+    await db.query(preamble ? `${BEGIN}; ${preamble}` : BEGIN);
     const result = await work(db);
     await db.query("COMMIT");
     return result;
+  } catch (error) { await db.query("ROLLBACK"); throw error; }
+  finally { db.release(); }
+}
+// Runs a complete transaction in one network round trip. The simple protocol
+// accepts no parameters, so every value must already be embedded with
+// escapeLiteral. Returns the results of the caller's statements only.
+export async function singleTripTransaction(sql: string): Promise<QueryResult[]> {
+  await verifyAppRole();
+  const db = await pool().connect();
+  try {
+    const results = await db.query(`${BEGIN}; ${sql}; COMMIT`) as unknown as QueryResult[];
+    return results.slice(2, -1);
   } catch (error) { await db.query("ROLLBACK"); throw error; }
   finally { db.release(); }
 }
@@ -50,9 +63,10 @@ export async function readBatch(db: PoolClient, queries: readonly ReadQuery[]): 
   return queries.map((_query, index) => row[`q${index}`] ?? []);
 }
 
-export async function setTenant(db: PoolClient, tenantId: string, actorId?: string) {
-  await db.query("SELECT set_config('app.tenant_id',$1,true), set_config('app.actor_id',$2,true)", [tenantId, actorId ?? ""]);
+// Tenant context travels with BEGIN, so it costs no extra round trip.
+export function tenantContextSql(tenantId: string, actorId?: string) {
+  return `SELECT set_config('app.tenant_id',${escapeLiteral(tenantId)},true), set_config('app.actor_id',${escapeLiteral(actorId ?? "")},true)`;
 }
 export async function withTenant<T>(tenantId: string, actorId: string | undefined, work: (db: PoolClient) => Promise<T>): Promise<T> {
-  return transaction(async db => { await setTenant(db, tenantId, actorId); return work(db); });
+  return transaction(work, tenantContextSql(tenantId, actorId));
 }
