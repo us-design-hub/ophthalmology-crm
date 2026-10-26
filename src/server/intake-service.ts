@@ -42,6 +42,15 @@ export async function availableSlots(user: AuthUser, input: unknown) {
   return { slots: slotTimes(clinic.startMinute, clinic.endMinute, clinic.slotMinutes).filter(time => !busy.includes(time)) };
  });
 }
+// The booking dialog opens on the first clinic and doctor. Returning their slots
+// with the clinic list saves the dialog a second network round trip.
+export async function clinicsWithSlots(user: AuthUser, date: string | null) {
+ const result = await clinics(user), clinic = result.clinics[0], doctor = clinic?.doctors[0];
+ if (!date || !clinic || !doctor) return result;
+ // On failure the dialog's own slot request reports the problem.
+ try { return { ...result, initialSlots: { facilityId: clinic.id, doctorId: doctor.id, date, ...(await availableSlots(user, { facilityId: clinic.id, doctorId: doctor.id, date })) } }; }
+ catch { return result; }
+}
 export async function appointments(user: AuthUser, date: string, context: AuditContext) {
  return withTenant(user.tenantId, user.id, async db => {
   const result = await db.query(`SELECT a.id,a.patient_id AS "patientId",concat_ws(' ',p.given_name,p.family_name) AS name,p.mrn,a.facility_id AS "facilityId",f.name AS clinic,a.doctor_id AS "doctorId",u.full_name AS doctor,a.appointment_date AS date,to_char(a.slot_time,'HH24:MI') AS time,a.status,a.version,e.id AS "encounterId",${flags} AS flags FROM app.appointment a JOIN app.patient p ON p.id=a.patient_id AND p.tenant_id=a.tenant_id JOIN app.facility f ON f.id=a.facility_id AND f.tenant_id=a.tenant_id JOIN app.user_account u ON u.id=a.doctor_id AND u.tenant_id=a.tenant_id LEFT JOIN app.encounter e ON e.appointment_id=a.id AND e.tenant_id=a.tenant_id WHERE a.appointment_date=$1 AND a.facility_id=ANY($2::uuid[]) ORDER BY a.slot_time,f.name,u.full_name`, [date, user.facilityIds]);

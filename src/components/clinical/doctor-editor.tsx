@@ -1,7 +1,7 @@
 "use client";
 import { useEffect,useRef,useState } from 'react';
 import { CheckCircle2,FileCheck2,LockKeyhole,Plus,Save,Trash2,X } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { api,prefetch } from '@/lib/api-client';
 import { EMPTY_DRAWINGS,eventInputSchema,rxInputSchema,type ClinicalDetail,type Drug,type EventInput,type RxInput,type RxItem } from '@/lib/clinical';
 import type { MessageKey } from '@/lib/messages';
 import type { PlanRow } from '@/lib/anatomy';
@@ -26,7 +26,7 @@ function ClinicalOutcomeEditor({detail,event,disabled,onChange}:{detail:Clinical
  const {t}=useLocale(),selected=detail.outcomes.find(value=>value.id===event.outcome?.id);
  return <fieldset disabled={disabled} className="clinical-fields clinical-outcome"><h4>{t('clinicalOutcome')}</h4><label><span>{t('clinicalOutcomeType')}</span><select aria-label={t('clinicalOutcomeType')} value={event.outcome?.id??''} onChange={change=>{const choice=detail.outcomes.find(value=>value.id===change.target.value);onChange(choice?{id:choice.id,code:choice.code,label:choice.label,notes:'',recallDate:''}:null);}}><option value="">{t('clinicalOutcomeChoose')}</option>{detail.outcomes.map(value=><option value={value.id} key={value.id}>{value.label}</option>)}</select></label>{event.outcome&&<div className="clinical-outcome-fields"><label><span>{t('clinicalOutcomeNotes')}{selected?.requiresNotes?' *':''}</span><textarea aria-label={t('clinicalOutcomeNotes')} required={selected?.requiresNotes} maxLength={2000} value={event.outcome.notes} onChange={change=>onChange({...event.outcome!,notes:change.target.value})}/></label><label><span>{t('clinicalRecallDate')}{selected?.requiresRecall?' *':''}</span><input aria-label={t('clinicalRecallDate')} type="date" required={selected?.requiresRecall} value={event.outcome.recallDate} onChange={change=>onChange({...event.outcome!,recallDate:change.target.value})}/></label></div>}</fieldset>;
 }
-export function DoctorEditor({id,onClose}:{id:string;onClose:()=>void}){
+export function DoctorEditor({id,patientId,onClose}:{id:string;patientId?:string;onClose:()=>void}){
  const {t}=useLocale(),user=useSession(),ref=useRef<HTMLDialogElement>(null);
  const [activeId,setActiveId]=useState(id),[detail,setDetail]=useState<ClinicalDetail|null>(null),[event,setEvent]=useState<EventInput|null>(null),[rx,setRx]=useState<RxInput|null>(null),[drugs,setDrugs]=useState<Drug[]>([]),[error,setError]=useState<MessageKey|null>(null),[busy,setBusy]=useState(false),[eventDirty,setEventDirty]=useState(false),[rxDirty,setRxDirty]=useState(false),[anatomy,setAnatomy]=useState(false),[signKind,setSignKind]=useState<'event'|'prescription'|null>(null),[addendumKind,setAddendumKind]=useState<'event'|'prescription'|null>(null),[historyRevision,setHistoryRevision]=useState(0),[saved,setSaved]=useState(false);
  const dirty=eventDirty||rxDirty;
@@ -35,7 +35,9 @@ export function DoctorEditor({id,onClose}:{id:string;onClose:()=>void}){
   if(part!=='prescription'){const source=result.event;setEvent({encounterId:result.encounter.id,version:source?.version??0,templateId:source?.templateId??result.template.id,answers:source?.answers??{},complaint:source?.complaint??'',findings:source?.findings??{OD:'',OS:''},diagnoses:source?.diagnoses??[],plans:source?.plans??[],referral:source?.referral??'',followUp:source?.followUp??'',outcome:source?.outcome??null,drawings:boundDrawings(result,source?.drawings)});setEventDirty(false);}
   if(part!=='event'){setRx({encounterId:result.encounter.id,version:result.prescription?.version??0,items:result.prescription?.items.map(item=>({id:item.id,quantity:item.quantity,drugId:item.drugId,name:item.name,strength:item.strength,eye:item.eye,dose:item.dose,route:item.route,frequency:item.frequency,duration:item.duration,instructions:item.instructions,instructionsUr:item.instructionsUr,taperSchedule:item.taperSchedule??[]}))??[]});setRxDirty(false);}
  }
- useEffect(()=>{ref.current?.showModal();const controller=new AbortController();setDetail(null);setError(null);setSaved(false);api<ClinicalDetail>(`/api/clinical/detail?encounterId=${activeId}`,undefined,{signal:controller.signal}).then(result=>apply(result)).catch(error=>{if(!controller.signal.aborted)setError(intakeError(error));});api<{drugs:Drug[]}>('/api/clinical/formulary',undefined,{signal:controller.signal}).then(result=>setDrugs(result.drugs)).catch(()=>{});return()=>controller.abort();},[activeId]);
+ // History, timeline and presets mount only once the detail arrives; start them alongside it.
+ useEffect(()=>{if(patientId)prefetch('/api/clinical/timeline?patientId='+patientId,'/api/patients/'+patientId+'/history');},[]);
+ useEffect(()=>{ref.current?.showModal();const controller=new AbortController();setDetail(null);setError(null);setSaved(false);prefetch(`/api/clinical/prescription-presets?encounterId=${activeId}`);api<ClinicalDetail>(`/api/clinical/detail?encounterId=${activeId}`,undefined,{signal:controller.signal}).then(result=>apply(result)).catch(error=>{if(!controller.signal.aborted)setError(intakeError(error));});api<{drugs:Drug[]}>('/api/clinical/formulary',undefined,{signal:controller.signal}).then(result=>setDrugs(result.drugs)).catch(()=>{});return()=>controller.abort();},[activeId]);
  useEffect(()=>{if(!dirty)return;const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
  function leave(action:()=>void){if(!busy&&(!dirty||window.confirm(t('discardClinical'))))action();}
  const canWrite=!!detail&&user.permissions.includes('clinical:write')&&detail.encounter.doctorId===user.id&&detail.encounter.stage==='consultation'&&!detail.encounter.closedAt;

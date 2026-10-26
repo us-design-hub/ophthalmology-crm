@@ -12,7 +12,7 @@ export async function GET(request: Request, context: Context) {
   const { user } = await requestSession(request, resource === "workup" || resource === 'investigations' ? "workup:read" : "intake:read", false);
   await consumeLimit(`intake-read:${user.tenantId}:${user.id}`, 180, 60);
   const query = new URL(request.url).searchParams; const audit = requestContext(request);
-  if (resource === "clinics") return json(await intake.clinics(user));
+  if (resource === "clinics") return json(await intake.clinicsWithSlots(user, query.get("slotsDate")));
   if (resource === "slots") return json(await intake.availableSlots(user, { date: query.get("date"), facilityId: query.get("facilityId"), doctorId: query.get("doctorId") }));
   if (resource === "appointments") return json(await intake.appointments(user, intake.intakeDate(query.get("date")), audit));
   if (resource === "queue") return json(await intake.queue(user, audit));
