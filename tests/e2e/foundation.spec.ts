@@ -21,7 +21,7 @@ test("named reception login registers a patient and the masked record survives r
   await page.screenshot({ path: "test-results/login-desktop.png", fullPage: true });
   await page.getByTestId("demo-account-aisha.malik").click();
   await page.getByRole("button", { name: "Sign in securely", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "The right record. The first time.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The right record. Ready for care.", exact: true })).toBeVisible();
   await expect(page.getByTestId("patient-total")).toBeVisible();
   await page.screenshot({ path: "test-results/patient-registry-desktop.png", fullPage: true });
   await page.getByRole("button", { name: "Register patient", exact: true }).click();
@@ -191,6 +191,7 @@ test("an existing patient from another hospital returns 404 without exposing dat
     } finally {
       await db.query("ALTER TABLE app.procedure_catalogue ENABLE TRIGGER procedure_catalogue_immutable");
     }
+    await db.query("DELETE FROM app.clinical_outcome WHERE tenant_id=$1", [tenantId]);
     await db.query("DELETE FROM app.tenant WHERE id=$1 AND code=$2", [tenantId, `TEST-${tenantId}`]);
     await db.end();
   }
