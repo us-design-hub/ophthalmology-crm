@@ -13,7 +13,7 @@ async function main() {
   for (const facility of facilities) {
    await db.query('INSERT INTO app.clinic_schedule(tenant_id,facility_id,start_minute,end_minute,slot_minutes) VALUES($1,$2,540,1020,15) ON CONFLICT DO NOTHING', [tid, facility.id]);
    for (const doctor of doctors) await db.query('INSERT INTO app.clinic_doctor(tenant_id,facility_id,doctor_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [tid, facility.id, doctor.id]);
-   await db.query("INSERT INTO app.user_facility(tenant_id,user_id,facility_id) SELECT $1,u.id,$2 FROM app.user_account u WHERE u.tenant_id=$1 AND EXISTS(SELECT 1 FROM app.user_role r WHERE r.tenant_id=u.tenant_id AND r.user_id=u.id AND r.role_code IN ('receptionist','nurse','senior_technician','optometrist','doctor','hospital_admin')) ON CONFLICT DO NOTHING", [tid, facility.id]);
+   await db.query("INSERT INTO app.user_facility(tenant_id,user_id,facility_id) SELECT $1,u.id,$2 FROM app.user_account u WHERE u.tenant_id=$1 AND EXISTS(SELECT 1 FROM app.user_role r WHERE r.tenant_id=u.tenant_id AND r.user_id=u.id AND r.role_code IN ('receptionist','nurse','senior_technician','optometrist','doctor','lab_assistant','machine_operator','ot_coordinator','pharmacist','hospital_admin')) ON CONFLICT DO NOTHING", [tid, facility.id]);
   }
   if ((await db.query('SELECT 1 FROM app.appointment WHERE tenant_id=$1 LIMIT 1', [tid])).rowCount) { await db.query('COMMIT'); console.log('Intake configuration ready; existing appointments preserved.'); return; }
   const reception = (await db.query("SELECT id FROM app.user_account WHERE tenant_id=$1 AND email='aisha.malik@demo.openeyes.local'", [tid])).rows[0].id;

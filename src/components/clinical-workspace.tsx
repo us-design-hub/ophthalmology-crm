@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Activity, CalendarDays, ChevronRight, CircleHelp, Eye as EyeIcon, FileText, Globe2, LayoutDashboard, ListOrdered, LockKeyhole, Menu, PanelLeftClose, ScanEye, ShieldCheck, Stethoscope, Users } from "lucide-react";
+import { Activity, CalendarDays, ChevronRight, CircleHelp, Eye as EyeIcon, FileText, FlaskConical, Globe2, LayoutDashboard, ListOrdered, LockKeyhole, Menu, PanelLeftClose, ScanEye, ScanLine, ShieldCheck, Stethoscope, Users } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import type { MessageKey } from "@/lib/messages";
 import { useRouter } from "next/navigation";
@@ -22,7 +22,7 @@ import { PasswordForm } from "./account-password";
 import { ReportLinks } from "./operations/report-links";
 import { AdministrationWorkspace } from "./operations/administration";
 
-type Page = "overview" | "patients" | "audit" | "appointments" | "queue" | "workup" | "clinical" | "prescriptions" | "surgery" | "management" | "administration";
+type Page = "overview" | "patients" | "audit" | "appointments" | "queue" | "workup" | "laboratory" | "diagnostics" | "clinical" | "prescriptions" | "surgery" | "management" | "administration";
 
 export function ClinicalWorkspace() {
   const { locale, setLocale, t } = useLocale();
@@ -45,7 +45,7 @@ export function ClinicalWorkspace() {
   const navigated = useRef(false);
   const navigate = (next: Page) => { navigated.current = true; setPage(next); setMenuOpen(false); };
   useEffect(() => { if (navigated.current) pageHeading.current?.focus(); }, [page]);
-  const titleKeys: [MessageKey, MessageKey, MessageKey] = page === "surgery" ? ["opsEyebrow", "opsSurgeryTitle", "opsSurgerySubtitle"] : page === "management" ? ["opsEyebrow", "opsManagementTitle", "opsManagementSubtitle"] : page === "administration" ? ["opsEyebrow", "opsAdminTitle", "opsAdminSubtitle"] : page === "clinical" ? ["clinicalEyebrow", "clinicalTitle", "clinicalSubtitle"] : page === "prescriptions" ? ["clinicalEyebrow", "rxInboxTitle", "rxInboxSubtitle"] : page === "appointments" ? ["intakeEyebrow", "appointmentsTitle", "appointmentsSubtitle"] : page === "queue" ? ["intakeEyebrow", "queueTitle", "queueSubtitle"] : page === "workup" ? ["intakeEyebrow", "workupTitle", "workupSubtitle"] : page === "patients" ? ["patientsEyebrow", "patientsTitle", "patientsSubtitle"] : page === "audit" ? ["auditEyebrow", "auditTitle", "auditSubtitle"] : page === "overview" ? ["overviewEyebrow", "overviewTitle", "overviewSubtitle"] : ["overviewEyebrow", "overviewTitle", "overviewSubtitle"];
+  const titleKeys: [MessageKey, MessageKey, MessageKey] = page === "surgery" ? ["opsEyebrow", "opsSurgeryTitle", "opsSurgerySubtitle"] : page === "management" ? ["opsEyebrow", "opsManagementTitle", "opsManagementSubtitle"] : page === "administration" ? ["opsEyebrow", "opsAdminTitle", "opsAdminSubtitle"] : page === "laboratory" ? ["intakeEyebrow","laboratoryTitle","laboratorySubtitle"] : page === "diagnostics" ? ["intakeEyebrow","diagnosticsTitle","diagnosticsSubtitle"] : page === "clinical" ? ["clinicalEyebrow", "clinicalTitle", "clinicalSubtitle"] : page === "prescriptions" ? ["clinicalEyebrow", "rxInboxTitle", "rxInboxSubtitle"] : page === "appointments" ? ["intakeEyebrow", "appointmentsTitle", "appointmentsSubtitle"] : page === "queue" ? ["intakeEyebrow", "queueTitle", "queueSubtitle"] : page === "workup" ? ["intakeEyebrow", "workupTitle", "workupSubtitle"] : page === "patients" ? ["patientsEyebrow", "patientsTitle", "patientsSubtitle"] : page === "audit" ? ["auditEyebrow", "auditTitle", "auditSubtitle"] : page === "overview" ? ["overviewEyebrow", "overviewTitle", "overviewSubtitle"] : ["overviewEyebrow", "overviewTitle", "overviewSubtitle"];
   const pageLabel: MessageKey = page === "clinical" ? "doctorEvent" : page === "audit" ? "auditLog" : page;
   async function signOut() {
     setSigningOut(true); setSignOutError(false);
@@ -63,6 +63,8 @@ export function ClinicalWorkspace() {
       { key: "appointments", icon: CalendarDays, page: "appointments", allowed: canReadIntake },
       { key: "queue", icon: ListOrdered, page: "queue", allowed: canReadIntake },
       { key: "workup", icon: Activity, page: "workup", allowed: user.permissions.includes("workup:read") },
+      { key: "laboratory", icon: FlaskConical, page: "laboratory", allowed: user.roles.includes("lab_assistant") },
+      { key: "diagnostics", icon: ScanLine, page: "diagnostics", allowed: user.roles.includes("machine_operator") },
       { key: "doctorEvent", icon: Stethoscope, page: "clinical", allowed: canReadClinical },
       { key: "prescriptions", icon: FileText, page: "prescriptions", allowed: canReadRx },
     ] },
@@ -122,7 +124,7 @@ export function ClinicalWorkspace() {
         {signOutError && <p className="form-error" role="alert">{t("serviceUnavailable")}</p>}
         <div className={`page-heading ${page === "overview" ? "is-visually-hidden" : ""}`}><div><p className="eyebrow">{t(titleKeys[0])}</p><h1 tabIndex={-1} ref={pageHeading}>{t(titleKeys[1])}</h1><p className="page-subtitle">{t(titleKeys[2])}</p></div></div>
 
-        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "queue" || page === "workup" ? <QueueWorkspace workupOnly={page === "workup"}/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={patient => { setBookingPatient(patient); navigate("appointments"); }}/> : page === "audit" ? <AuditWorkspace /> : page === "overview" ? <OverviewWorkspace navigate={navigate}/> : null}
+        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <QueueWorkspace stageScope={["testing"]}/> : page === "diagnostics" ? <QueueWorkspace stageScope={["imaging"]}/> : page === "queue" || page === "workup" ? <QueueWorkspace workupOnly={page === "workup"}/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={patient => { setBookingPatient(patient); navigate("appointments"); }}/> : page === "audit" ? <AuditWorkspace /> : page === "overview" ? <OverviewWorkspace navigate={navigate}/> : null}
         {historyPatient && <PatientTimelineDialog patientId={historyPatient} onClose={() => setHistoryPatient(null)}/>}
         <ReportLinks/><footer className="workspace-footer"><span><EyeIcon size={15}/>{t("footer")}</span></footer>
       </main>

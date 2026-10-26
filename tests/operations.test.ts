@@ -9,9 +9,9 @@ test("active queue stages include specialty checkpoints and end at consultation"
   assert.deepEqual(STAGES, ["waiting", "workup", "testing", "imaging", "dilation", "consultation"]);
 });
 
-test("retired finance, pharmacy, inventory, preview and practice permissions are absent", () => {
+test("retired finance and inventory permissions are absent while pharmacy remains review only", () => {
   for (const permission of ["anatomy:use", "preview:inventory", "preview:billing", "preview:surgery", "preview:management", "preview:admin", "inventory:write", "pharmacy:dispense", "billing:write", "billing:discount", "billing:approve_refund"]) assert.equal(PERMISSIONS.includes(permission as never), false);
-  assert.deepEqual(ROLE_PERMISSIONS.pharmacist, []);
+  assert.deepEqual(ROLE_PERMISSIONS.pharmacist, ['patient:read','prescription:read']);
   assert.deepEqual(ROLE_PERMISSIONS.cashier, []);
   assert.deepEqual(ROLE_PERMISSIONS.inventory_officer, []);
 });

@@ -29,6 +29,8 @@ test("patient validation rejects impossible dates, invalid identifiers, and adul
   assert.equal(patientInputSchema.safeParse({ ...input, dob: "2025-02-30" }).success, false);
   assert.equal(patientInputSchema.safeParse({ ...input, identifier: "not-a-CNIC" }).success, false);
   assert.equal(patientInputSchema.safeParse({ ...input, identifierType: "guardian_cnic" }).success, false);
+  assert.equal(patientInputSchema.safeParse({ ...input, alternatePhone: "not a phone" }).success, false);
+  assert.equal(patientInputSchema.safeParse({ ...input, medicalConditions: ["diabetes", "hypertension"], guardianName: "Ahmed Khan", programme: "General" }).success, true);
   assert.equal(patientInputSchema.safeParse({ ...input, tenantId: "untrusted" }).success, false);
 });
 test("encryption is randomized while identifier search is deterministic and tenant-bound", () => {

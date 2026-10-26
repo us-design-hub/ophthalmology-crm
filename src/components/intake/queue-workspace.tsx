@@ -13,7 +13,7 @@ import { ReasonDialog } from "../reason-dialog";
 
 const WORKUP_STAGES = ["waiting", "workup", "testing", "imaging", "dilation"] as const satisfies readonly Stage[];
 
-export function QueueWorkspace({ workupOnly = false }: { workupOnly?: boolean }) {
+export function QueueWorkspace({ workupOnly = false, stageScope }: { workupOnly?: boolean; stageScope?: readonly Stage[] }) {
   const { t } = useLocale();
   const user = useSession();
   const live = useLiveData<{ encounters: Encounter[]; serverNow: string }>("/api/intake/queue");
@@ -23,7 +23,7 @@ export function QueueWorkspace({ workupOnly = false }: { workupOnly?: boolean })
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<MessageKey | null>(null);
   const [pending, setPending] = useState<{ item: Encounter; action: string } | null>(null);
-  const visibleStages: readonly Stage[] = workupOnly ? WORKUP_STAGES : STAGES;
+  const visibleStages: readonly Stage[] = stageScope ?? (workupOnly ? WORKUP_STAGES : STAGES);
   const encounters = live.data?.encounters.filter(value => (!clinic || value.facilityId === clinic) && (!specialty || value.specialty === specialty) && visibleStages.includes(value.stage)) ?? [];
   const serverNow = new Date(live.data?.serverNow ?? Date.now()).getTime();
 

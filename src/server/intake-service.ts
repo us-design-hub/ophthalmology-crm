@@ -22,10 +22,10 @@ async function lockEncounter(db: PoolClient, user: AuthUser, id: string) {
  return result.rows[0];
 }
 export async function latestWorkup(db: PoolClient, encounterId: string): Promise<Workup | null> {
- const result = await db.query(`SELECT w.id,w.encounter_id AS "encounterId",w.version,w.author_id AS "authorId",u.full_name AS author,w.saved_at AS "savedAt",w.notes FROM app.workup_revision w JOIN app.user_account u ON u.id=w.author_id AND u.tenant_id=w.tenant_id WHERE w.encounter_id=$1 ORDER BY w.version DESC LIMIT 1`, [encounterId]);
+ const result = await db.query(`SELECT w.id,w.encounter_id AS "encounterId",w.version,w.author_id AS "authorId",u.full_name AS author,w.saved_at AS "savedAt",w.chief_complaint AS "chiefComplaint",w.complaint_duration AS "complaintDuration",w.wearing_glasses AS "wearingGlasses",w.notes FROM app.workup_revision w JOIN app.user_account u ON u.id=w.author_id AND u.tenant_id=w.tenant_id WHERE w.encounter_id=$1 ORDER BY w.version DESC LIMIT 1`, [encounterId]);
  if (!result.rowCount) return null;
- const eyes = await db.query('SELECT eye,refraction,logmar,uncorrected,pinhole,corrected,iop::float8 AS iop,method,measured_at AS "measuredAt" FROM app.workup_eye WHERE revision_id=$1 ORDER BY eye', [result.rows[0].id]);
- const review = (await db.query(`SELECT r.id,r.decision,r.notes,r.reviewer_id AS "reviewerId",u.full_name AS reviewer,r.reviewed_at AS "reviewedAt" FROM app.workup_review r JOIN app.user_account u ON u.id=r.reviewer_id AND u.tenant_id=r.tenant_id WHERE r.revision_id=$1`, [result.rows[0].id])).rows[0] ?? null;
+ const eyes = await db.query('SELECT eye,technician,refraction,logmar,uncorrected,pinhole,corrected,iop::float8 AS iop,method,measured_at AS "measuredAt" FROM app.workup_eye WHERE revision_id=$1 ORDER BY eye', [result.rows[0].id]);
+ const review = (await db.query(`SELECT r.id,r.decision,r.notes,r.assessment,r.reviewer_id AS "reviewerId",u.full_name AS reviewer,r.reviewed_at AS "reviewedAt" FROM app.workup_review r JOIN app.user_account u ON u.id=r.reviewer_id AND u.tenant_id=r.tenant_id WHERE r.revision_id=$1`, [result.rows[0].id])).rows[0] ?? null;
  return { ...result.rows[0], review, ...Object.fromEntries(eyes.rows.map(({ eye, ...measurement }) => [eye, measurement])) } as Workup;
 }
 export async function clinics(user: AuthUser): Promise<{ clinics: Clinic[] }> {
@@ -123,8 +123,8 @@ export async function saveWorkup(user: AuthUser, input: unknown, context: AuditC
   if ((prior?.version ?? 0) !== data.version) throw new ApiError(409, "workupConflict");
   if (prior?.review?.decision === "approved") throw new ApiError(409, "workupApproved");
   if (prior && prior.authorId !== user.id && !user.permissions.includes("workup:review")) throw new ApiError(403, "workupOwnership");
-  const revision = (await db.query('INSERT INTO app.workup_revision(tenant_id,encounter_id,version,author_id,notes) VALUES($1,$2,$3,$4,$5) RETURNING id', [user.tenantId, data.encounterId, data.version + 1, user.id, data.notes])).rows[0];
-  for (const eye of ["OD", "OS"] as const) { const value = data[eye]; await db.query('INSERT INTO app.workup_eye(tenant_id,revision_id,eye,uncorrected,pinhole,corrected,iop,method,measured_at,refraction,logmar) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)', [user.tenantId, revision.id, eye, value.uncorrected, value.pinhole, value.corrected, value.iop, value.method, value.measuredAt, value.refraction?JSON.stringify(value.refraction):null,value.logmar?JSON.stringify(value.logmar):null]); }
+  const revision = (await db.query('INSERT INTO app.workup_revision(tenant_id,encounter_id,version,author_id,chief_complaint,complaint_duration,wearing_glasses,notes) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id', [user.tenantId, data.encounterId, data.version + 1, user.id, data.chiefComplaint,data.complaintDuration,data.wearingGlasses,data.notes])).rows[0];
+  for (const eye of ["OD", "OS"] as const) { const value = data[eye]; await db.query('INSERT INTO app.workup_eye(tenant_id,revision_id,eye,uncorrected,pinhole,corrected,iop,method,measured_at,technician,refraction,logmar) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [user.tenantId, revision.id, eye, value.uncorrected, value.pinhole, value.corrected, value.iop, value.method, value.measuredAt,JSON.stringify(value.technician), value.refraction?JSON.stringify(value.refraction):null,value.logmar?JSON.stringify(value.logmar):null]); }
   await event(db, user, context, "workup.saved", "encounter", data.encounterId, { revisionId: revision.id, version: data.version + 1 });
   return { workup: await latestWorkup(db, data.encounterId) };
  });
@@ -138,7 +138,7 @@ export async function reviewWorkup(user: AuthUser, input: unknown, context: Audi
   const current = await latestWorkup(db, data.encounterId);
   if (!current || current.id !== data.revisionId) throw new ApiError(409, "workupConflict");
   if (current.review) throw new ApiError(409, "workupAlreadyReviewed");
-  await db.query('INSERT INTO app.workup_review(tenant_id,encounter_id,revision_id,reviewer_id,decision,notes) VALUES($1,$2,$3,$4,$5,$6)', [user.tenantId, data.encounterId, data.revisionId, user.id, data.decision, data.notes]);
+  await db.query('INSERT INTO app.workup_review(tenant_id,encounter_id,revision_id,reviewer_id,decision,notes,assessment) VALUES($1,$2,$3,$4,$5,$6,$7)', [user.tenantId, data.encounterId, data.revisionId, user.id, data.decision, data.notes, JSON.stringify(data.assessment)]);
   await event(db, user, context, `workup.${data.decision}`, "encounter", data.encounterId, { revisionId: data.revisionId, notes: data.notes });
   return { workup: await latestWorkup(db, data.encounterId) };
  });

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 
 export const IDENTIFIER_TYPES = ["cnic", "passport", "guardian_cnic"] as const;
+export const MEDICAL_CONDITIONS = ["diabetes", "hypertension", "asthma", "heart_disease", "hepatitis", "previous_eye_surgery"] as const;
 export type IdentifierType = typeof IDENTIFIER_TYPES[number];
 
 export function todayKarachi(): string {
@@ -45,6 +46,11 @@ export const patientInputSchema = z.object({
   preferredLanguage: z.enum(["en", "ur"]).default("en"),
   allergy: shortText(160).default(""), risk: shortText(160).default(""),
   nextOfKinName: shortText(100).default(""), nextOfKinPhone: shortText(30).default(""),
+  guardianName: shortText(120).default(""), alternatePhone: shortText(30).default(""),
+  alternateRelation: z.enum(["", "self", "father", "husband", "wife", "son", "daughter", "guardian", "other"]).default(""),
+  referredBy: shortText(120).default(""), programme: shortText(120).default("General"),
+  medicalConditions: z.array(z.enum(MEDICAL_CONDITIONS)).max(20).default([]),
+  previousSurgery: shortText(1000).default(""), currentMedications: shortText(1000).default(""),
   duplicateReviewToken: z.string().max(160).optional(), duplicateReason: shortText(240).optional(),
 }).strict().superRefine((value, context) => {
   const identifier = normalizeIdentifier(value.identifier, value.identifierType);
@@ -53,6 +59,7 @@ export const patientInputSchema = z.object({
   }
   if (value.identifierType === "guardian_cnic" && ageFromDob(value.dob) >= 18) context.addIssue({ code: "custom", path: ["identifierType"], message: "guardianMinorOnly" });
   if (value.nextOfKinPhone && !normalizePhone(value.nextOfKinPhone)) context.addIssue({ code: "custom", path: ["nextOfKinPhone"], message: "invalidPhone" });
+  if (value.alternatePhone && !normalizePhone(value.alternatePhone)) context.addIssue({ code: "custom", path: ["alternatePhone"], message: "invalidPhone" });
 });
 export type PatientInput = z.infer<typeof patientInputSchema>;
 export type PatientSummary = {
@@ -60,7 +67,7 @@ export type PatientSummary = {
   phone: string; identifierType: IdentifierType; identifierMasked: string; city: string; createdAt: string;
   flags: { type: "allergy" | "risk"; value: string }[];
 };
-export type PatientDetail = PatientSummary & { version:number; address: string; preferredLanguage: string; nextOfKinName: string; nextOfKinPhone: string };
+export type PatientDetail = PatientSummary & { version:number; address: string; preferredLanguage: string; nextOfKinName: string; nextOfKinPhone: string; guardianName:string; alternatePhone:string; alternateRelation:string; referredBy:string; programme:string; medicalConditions:string[]; previousSurgery:string; currentMedications:string };
 export type PatientList = { patients: PatientSummary[]; total: number; page: number; pageSize: number };
 
 export function patientName(patient: Pick<PatientSummary, "givenName" | "familyName">): string { return `${patient.givenName} ${patient.familyName}`.trim(); }

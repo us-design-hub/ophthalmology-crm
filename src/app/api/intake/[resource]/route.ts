@@ -24,7 +24,7 @@ export async function GET(request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
  try {
   checkOrigin(request); const { resource } = await context.params;
-  const permissions = { appointments: "appointment:create", checkin: "appointment:checkin", transition: "intake:read", workup: "workup:write", "workup-review": "workup:review", investigations:"workup:write" } as const;
+  const permissions = { appointments: "appointment:create", checkin: "appointment:checkin", transition: "intake:read", workup: "workup:write", "workup-review": "workup:review", investigations:"investigation:write" } as const;
   if (!Object.hasOwn(permissions, resource)) throw new ApiError(404, "invalidRequest");
   const { user } = await requestSession(request, permissions[resource as keyof typeof permissions]);
   await consumeLimit(`intake-write:${user.tenantId}:${user.id}`, 60, 60);
@@ -38,4 +38,4 @@ export async function POST(request: Request, context: Context) {
 } catch (error) { return errorResponse(error); }
 }
 
-export async function DELETE(request:Request,context:Context){try{checkOrigin(request);const {resource}=await context.params;if(resource!=='investigations')throw new ApiError(404,'invalidRequest');const {user}=await requestSession(request,'workup:write');await consumeLimit(`intake-write:${user.tenantId}:${user.id}`,60,60);return json(await investigations.deleteInvestigation(user,new URL(request.url).searchParams.get('id'),requestContext(request)));}catch(error){return errorResponse(error);}}
+export async function DELETE(request:Request,context:Context){try{checkOrigin(request);const {resource}=await context.params;if(resource!=='investigations')throw new ApiError(404,'invalidRequest');const {user}=await requestSession(request,'investigation:write');await consumeLimit(`intake-write:${user.tenantId}:${user.id}`,60,60);return json(await investigations.deleteInvestigation(user,new URL(request.url).searchParams.get('id'),requestContext(request)));}catch(error){return errorResponse(error);}}
