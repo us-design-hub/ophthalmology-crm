@@ -191,6 +191,7 @@ test("an existing patient from another hospital returns 404 without exposing dat
     } finally {
       await db.query("ALTER TABLE app.procedure_catalogue ENABLE TRIGGER procedure_catalogue_immutable");
     }
+    await db.query("DELETE FROM app.clinical_outcome WHERE tenant_id=$1", [tenantId]);
     await db.query("DELETE FROM app.tenant WHERE id=$1 AND code=$2", [tenantId, `TEST-${tenantId}`]);
     await db.end();
   }
