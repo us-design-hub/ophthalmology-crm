@@ -11,7 +11,7 @@ type Management = {
   waits: { stage: string; minutes: number }[];
 };
 
-export function ManagementWorkspace({ navigate }: { navigate: (page: "surgery" | "overview") => void }) {
+export function ManagementWorkspace({ navigate, canOpen }: { navigate: (page: "surgery" | "overview") => void; canOpen: (page: "surgery") => boolean }) {
   const { t } = useLocale();
   const live = useOperations<Management>("management");
   if (!live.data) return <LiveHeading {...live}/>;
@@ -37,6 +37,6 @@ export function ManagementWorkspace({ navigate }: { navigate: (page: "surgery" |
         <Table heads={["dashStage", "dashCount"]}>{data.surgery.map(stage => <tr key={stage.stage}><td>{stage.stage}</td><td>{stage.count}</td></tr>)}</Table>
       </section>
     </div>
-    <div className="admin-actions"><button className="secondary-button" onClick={() => navigate("surgery")}>{t("opsViewSurgery")}</button></div>
+    {canOpen("surgery")&&<div className="admin-actions"><button className="secondary-button" onClick={() => navigate("surgery")}>{t("opsViewSurgery")}</button></div>}
   </div>;
 }

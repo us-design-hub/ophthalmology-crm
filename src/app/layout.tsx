@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic, IBM_Plex_Serif } from "next/font/google";
+import { IBM_Plex_Sans_Arabic, Poppins } from "next/font/google";
 import { LocaleProvider } from "@/components/locale-provider";
 import "./tokens.css";
 import "./globals.css";
@@ -9,26 +9,15 @@ import "./clinical.css";
 import "./operations.css";
 import "./overview.css";
 import "./contrast.css";
+import "./theme.css";
 
 // Self-hosted at build time by next/font: no runtime request to Google, no
-// layout shift, and the same rendering on every machine. The previous stack
-// started with "Segoe UI", which only exists on Windows and silently fell back
-// to Arial elsewhere.
-//
-// Plex Sans is loaded as a variable font (wght 100-700) because the type scale
-// uses non-standard weights (550, 650) that only interpolate on a variable
-// face. Plex Serif and Plex Sans Arabic ship static weights only, so theirs are
-// listed explicitly.
-const plexSans = IBM_Plex_Sans({
+// layout shift, and the same rendering on every machine. Poppins is the
+// Fillow interface face; it is not a variable font, so its weights are listed.
+const poppins = Poppins({
   subsets: ["latin"],
-  variable: "--font-plex-sans",
-  display: "swap",
-});
-
-const plexSerif = IBM_Plex_Serif({
-  subsets: ["latin"],
-  weight: ["400", "600"],
-  variable: "--font-plex-serif",
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-poppins",
   display: "swap",
 });
 
@@ -53,5 +42,5 @@ export const metadata: Metadata = {
 // Warning applies one level deep — this element's own attributes and text — so
 // genuine mismatches inside the app tree are still reported.
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en" className={`${plexSans.variable} ${plexSerif.variable} ${plexArabic.variable}`}><body suppressHydrationWarning><LocaleProvider>{children}</LocaleProvider></body></html>;
+  return <html lang="en" className={`${poppins.variable} ${plexArabic.variable}`}><body suppressHydrationWarning><LocaleProvider>{children}</LocaleProvider></body></html>;
 }

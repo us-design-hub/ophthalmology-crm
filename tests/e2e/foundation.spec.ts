@@ -21,7 +21,7 @@ test("named reception login registers a patient and the masked record survives r
   await page.screenshot({ path: "test-results/login-desktop.png", fullPage: true });
   await page.getByTestId("demo-account-aisha.malik").click();
   await page.getByRole("button", { name: "Sign in securely", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "The right record. The first time.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Patients", exact: true })).toBeVisible();
   await expect(page.getByTestId("patient-total")).toBeVisible();
   await page.screenshot({ path: "test-results/patient-registry-desktop.png", fullPage: true });
   await page.getByRole("button", { name: "Register patient", exact: true }).click();
@@ -99,7 +99,7 @@ test("exact identifier duplicates are blocked; shared-phone registrations requir
   expect(audit.events.some((event: { action: string; entityId: string; metadata: { duplicateReason?: string } }) => event.action === "patient.created" && event.entityId === patient.id && event.metadata.duplicateReason === reason)).toBe(true);
   expect(JSON.stringify(audit)).not.toContain(shared.identifier);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Every action has an author.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Audit trail", exact: true, level: 1 })).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
   await page.screenshot({ path: "test-results/audit-desktop.png", fullPage: true });
 });

@@ -15,7 +15,7 @@ export const en = {
   ...intakeMessages,
   appName: "OpenEyes", hospital: "Demo Eye Hospital", brandCaption: "OPHTHALMOLOGY WORKSPACE",
   care: "CLINICAL CARE", operations: "HOSPITAL OPERATIONS", platform: "PLATFORM",
-  overview: "Overview", patients: "Patients", appointments: "Appointments", queue: "Live queue",
+  overview: "Home", patients: "Patients", appointments: "Appointments", queue: "Live queue",
   workup: "Ophthalmic workup", doctorEvent: "Doctor Event", prescriptions: "Prescriptions",
   surgery: "Surgery lifecycle",
   roadmap: "Build roadmap", administration: "Administration", upcoming: "Planned for a later build milestone",

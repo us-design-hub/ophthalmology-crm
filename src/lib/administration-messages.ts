@@ -2,12 +2,12 @@
 // intake-messages / clinical-messages / operations-messages.
 export const administrationMessages = {
   // --- shell ---------------------------------------------------------------
-  adminLoading: "Loading administrationÃ¢â‚¬Â¦",
+  adminLoading: "Loading administration…",
   adminLoadFailed: "Unable to load administration.",
   adminSaved: "Changes saved.",
   adminSaveFailed: "Unable to save. Check your permissions and entries.",
   adminConnectFailed: "Unable to connect.",
-  adminSaving: "SavingÃ¢â‚¬Â¦",
+  adminSaving: "Saving…",
   adminSaveChanges: "Save changes",
   adminCancel: "Cancel",
 

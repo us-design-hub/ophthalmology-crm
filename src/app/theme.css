@@ -1,0 +1,185 @@
+/* Fillow theme layer
+   Loaded last. The component stylesheets set structure; this layer gives the
+   shared pieces the Fillow treatment: compact cards with one-line facts,
+   pill status chips and quiet table headers. */
+
+/* --- Cards: queue and encounter ------------------------------------------ */
+.queue-card,
+.clinical-encounter {
+  border: 1px solid transparent;
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+}
+.queue-card { padding: 16px; }
+.queue-card.is-overdue { border-color: transparent; box-shadow: inset 4px 0 var(--amber-400), var(--card-shadow); }
+
+/* Clinic, doctor and similar facts read as one line each: label left, value right. */
+.queue-card dl,
+.clinical-encounter dl { margin: 12px 0; display: grid; gap: 6px; padding-block: 10px; border-block: 1px solid var(--border-subtle); }
+.queue-card dl > div,
+.clinical-encounter dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.queue-card dt,
+.clinical-encounter dt { color: var(--text-muted); font-size: var(--text-sm); }
+.queue-card dd,
+.clinical-encounter dd { margin: 0; font-size: var(--text-base); font-weight: var(--weight-medium); text-align: end; }
+
+.queue-card .queue-pathway,
+.queue-card .queue-arrival,
+.queue-card .queue-workup-status { font-size: var(--text-sm); color: var(--text-muted); margin-top: 4px; }
+.queue-card .queue-clock { font-size: var(--text-sm); margin-top: 6px; }
+.queue-card-actions { margin-top: 12px; }
+
+.clinical-encounter > div:first-child { flex-wrap: wrap; }
+.clinical-encounter h2 { font-size: var(--text-xl); font-weight: var(--weight-semi); line-height: 1.35; }
+
+/* --- Status chips --------------------------------------------------------- */
+.intake-status {
+  border: 0;
+  border-radius: var(--radius-full);
+  padding: 4px 12px;
+  background: var(--violet-50);
+  color: var(--violet-700);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+/* --- Queue columns ------------------------------------------------------- */
+.queue-column { border: 0; border-radius: var(--card-radius); background: color-mix(in srgb, var(--white) 55%, transparent); }
+
+/* --- Tables --------------------------------------------------------------- */
+.patient-table th,
+.intake-table-wrap th {
+  background: var(--gray-50);
+  color: var(--text-muted);
+  font-weight: var(--weight-semi);
+}
+.patient-table tr:hover td { background: var(--violet-50); }
+/* Long values such as facility lists wrap instead of pushing the action column out of view. */
+.patient-table td { white-space: normal; }
+.patient-table td:first-child { white-space: nowrap; }
+
+/* --- Dialogs --------------------------------------------------------------- */
+.intake-dialog,
+.registration-dialog,
+.confirm-dialog {
+  border: 0;
+  border-radius: var(--card-radius);
+  box-shadow: 0 24px 80px color-mix(in srgb, #2b2640 24%, transparent);
+}
+/* Tint only: a blurred backdrop is slow to paint on modest clinic PCs. */
+.intake-dialog::backdrop,
+.registration-dialog::backdrop,
+.patient-record-dialog::backdrop,
+.confirm-dialog::backdrop { background: color-mix(in srgb, #2b2640 42%, transparent); backdrop-filter: none; }
+.patient-record-dialog { border-inline-start: 0; box-shadow: -16px 0 60px color-mix(in srgb, #2b2640 16%, transparent); }
+
+.intake-dialog .patient-record-header,
+.registration-heading { padding: 24px 28px 20px; border-bottom: 1px solid var(--border-subtle); }
+.intake-dialog .intake-dialog-body { padding: 24px 28px; }
+.intake-dialog .patient-record-header h2,
+.registration-heading h2,
+.patient-record-header h2 {
+  font-family: var(--font-sans);
+  font-size: var(--display-sm);
+  font-weight: var(--weight-semi);
+  letter-spacing: -.2px;
+  margin: 6px 0;
+}
+.confirm-dialog h2 { font-size: var(--text-2xl); font-weight: var(--weight-semi); }
+.confirm-dialog p { font-size: var(--text-md); }
+.intake-dialog .patient-record-header p:not(.eyebrow),
+.registration-heading > div > p:last-child { font-size: var(--text-md); color: var(--text-muted); }
+.intake-dialog-actions { padding-top: 20px; }
+
+/* --- Form fields ----------------------------------------------------------- */
+/* One field style for every dialog and administration form. */
+:is(.intake-dialog, .registration-dialog, .patient-record-dialog, .confirm-dialog, .admin-form)
+  :is(input:not([type=checkbox], [type=radio], [type=range], [type=color], [type=file]), select, textarea) {
+  min-height: var(--control-height);
+  padding: 9px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--control-radius);
+  background: var(--white);
+  color: var(--text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--weight-normal);
+  transition: border-color .15s, box-shadow .15s;
+}
+:is(.intake-dialog, .registration-dialog, .patient-record-dialog, .confirm-dialog, .admin-form)
+  :is(input:not([type=checkbox], [type=radio]), select, textarea):hover:not(:disabled) { border-color: var(--gray-300); }
+:is(.intake-dialog, .registration-dialog, .patient-record-dialog, .confirm-dialog, .admin-form)
+  :is(input:not([type=checkbox], [type=radio]), select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--violet-600);
+  box-shadow: 0 0 0 3px var(--violet-100);
+}
+:is(.intake-dialog, .registration-dialog, .patient-record-dialog, .confirm-dialog, .admin-form)
+  :is(input, select, textarea):disabled { background: var(--gray-50); color: var(--text-secondary); }
+:is(.intake-dialog, .registration-dialog, .confirm-dialog) textarea { min-height: 88px; }
+.intake-dialog input::placeholder,
+.intake-dialog textarea::placeholder,
+.registration-dialog input::placeholder,
+.registration-dialog textarea::placeholder { color: var(--text-faint); font-size: var(--text-md); }
+
+/* Clinical states keep priority over the base field style. */
+.intake-dialog .iop-elevated input { border-color: var(--os-500); background: var(--os-50); }
+.intake-dialog .workup-eye:disabled :is(input, select),
+.intake-dialog .workup-notes textarea:disabled { background: var(--gray-50); color: var(--text-primary); }
+
+/* Labels: smaller and quieter than the values they describe. */
+.intake-dialog label,
+.intake-form-grid label,
+.workup-eye label,
+.workup-notes,
+.admin-form label,
+.form-field > span {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+.admin-form label { gap: 6px; }
+.admin-form p { font-size: var(--text-sm); color: var(--text-muted); }
+.intake-dialog .intake-help { font-size: var(--text-md); color: var(--text-muted); margin-block: 4px 12px; }
+.booking-dialog label:has(> input[type=checkbox]) { margin-top: 14px; }
+.admin-form fieldset { border: 1px solid var(--gray-200); border-radius: var(--radius-lg); padding: 16px; }
+.admin-form legend { padding: 0 6px; font-size: var(--text-md); font-weight: var(--weight-semi); color: var(--text-primary); }
+
+/* Checkboxes sit on one line with their label. */
+:is(.intake-dialog, .registration-dialog, .admin-form) label:has(> input[type=checkbox]) {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  font-weight: var(--weight-normal);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+:is(.intake-dialog, .registration-dialog, .admin-form) input[type=checkbox],
+:is(.intake-dialog, .registration-dialog, .admin-form) input[type=radio] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--violet-600);
+}
+
+/* A disabled button still reads as a button on tinted bars. */
+.primary-button:disabled { border: 1px solid var(--gray-200); }
+
+/* --- Panel headings with a note ------------------------------------------- */
+/* Title above its note, action button kept on one line. */
+.registry-heading > div:has(> .admin-note) { display: grid; gap: 6px; }
+.registry-heading > .primary-button { flex: none; white-space: nowrap; }
+.registry-heading .admin-note { margin: 0; padding: 0; }
+/* Long checkbox lists (facilities, roles) flow into columns. */
+.admin-form fieldset:has(> .admin-check) { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+/* Eye columns stay side by side (OD before OS) and shrink on phones instead of overflowing. */
+.workup-eye { grid-template-columns: minmax(0, 1fr); }
+.workup-eye label { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.workup-eye :is(input, select) { width: 100%; min-width: 0; }
+@media (max-width: 600px) {
+  .workup-eye :is(input, select) { padding-inline: 8px; }
+  .workup-eye legend { font-size: var(--text-md); }
+}

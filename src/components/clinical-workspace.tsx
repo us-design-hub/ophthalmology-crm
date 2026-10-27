@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Activity, CalendarDays, ChevronRight, CircleHelp, Eye as EyeIcon, FileText, FlaskConical, Globe2, LayoutDashboard, ListOrdered, LockKeyhole, Menu, PanelLeftClose, ScanEye, ScanLine, ShieldCheck, Stethoscope, Users } from "lucide-react";
+import { Activity, CalendarDays, ChevronDown, Eye as EyeIcon, FileText, FlaskConical, Globe2, KeyRound, LayoutDashboard, ListOrdered, LogOut, Menu, PanelLeftClose, ScanEye, ScanLine, ShieldCheck, Stethoscope, Users } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import type { MessageKey } from "@/lib/messages";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,7 @@ import { useSession } from "@/components/session-provider";
 import { PatientsWorkspace } from "@/components/patients/patients-workspace";
 import { AuditWorkspace } from "@/components/audit-workspace";
 import { api } from "@/lib/api-client";
+import { landingPage, visiblePages, type Page } from "@/lib/navigation";
 import { AppointmentsWorkspace } from "./intake/appointments-workspace";
 import { QueueWorkspace } from "./intake/queue-workspace";
 import { OverviewWorkspace } from "./overview/overview-workspace";
@@ -22,111 +23,100 @@ import { PasswordForm } from "./account-password";
 import { ReportLinks } from "./operations/report-links";
 import { AdministrationWorkspace } from "./operations/administration";
 
-type Page = "overview" | "patients" | "audit" | "appointments" | "queue" | "workup" | "laboratory" | "diagnostics" | "clinical" | "prescriptions" | "surgery" | "management" | "administration";
+const NAV: Record<Page, { key: MessageKey; icon: typeof EyeIcon }> = {
+  overview: { key: "overview", icon: LayoutDashboard },
+  clinical: { key: "doctorEvent", icon: Stethoscope },
+  queue: { key: "queue", icon: ListOrdered },
+  workup: { key: "workup", icon: Activity },
+  laboratory: { key: "laboratory", icon: FlaskConical },
+  diagnostics: { key: "diagnostics", icon: ScanLine },
+  patients: { key: "patients", icon: Users },
+  appointments: { key: "appointments", icon: CalendarDays },
+  prescriptions: { key: "prescriptions", icon: FileText },
+  surgery: { key: "surgery", icon: ScanEye },
+  management: { key: "management", icon: LayoutDashboard },
+  administration: { key: "administration", icon: ShieldCheck },
+  audit: { key: "auditLog", icon: ShieldCheck },
+};
+const initials = (name: string) => name.replace(/^Dr\.?\s+/i, "").split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join("").toUpperCase();
 
 export function ClinicalWorkspace() {
   const { locale, setLocale, t } = useLocale();
   const user = useSession();
-  const hospitalInitials = user.tenantName.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join("").toUpperCase();
   const router = useRouter();
-  const canReadPatients = user.permissions.includes("patient:read");
-  const canReadAudit = user.permissions.includes("audit:read");
-  const canReadIntake = user.permissions.includes("intake:read");
-  const [historyPatient, setHistoryPatient] = useState<string | null>(null);
+  const pages = visiblePages(user);
+  const canOpen = (next: Page) => pages.includes(next);
   const canReadClinical = user.permissions.includes("clinical:read");
-  const canReadRx = user.permissions.includes("prescription:read");
+  const [historyPatient, setHistoryPatient] = useState<string | null>(null);
   const [bookingPatient, setBookingPatient] = useState<PatientSummary | null>(null);
-  const [page, setPage] = useState<Page>(user.permissions.includes("clinical:write") ? "clinical" : canReadPatients ? "patients" : canReadAudit ? "audit" : "overview");
+  const [page, setPage] = useState<Page>(() => landingPage(user));
   const [passwordOpen,setPasswordOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const pageHeading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
-  const navigate = (next: Page) => { navigated.current = true; setPage(next); setMenuOpen(false); };
+  // Links inside a page may point at work this role does not see; those do nothing.
+  const navigate = (next: Page) => { if (!canOpen(next)) return; navigated.current = true; setPage(next); setMenuOpen(false); };
   useEffect(() => { if (navigated.current) pageHeading.current?.focus(); }, [page]);
-  const titleKeys: [MessageKey, MessageKey, MessageKey] = page === "surgery" ? ["opsEyebrow", "opsSurgeryTitle", "opsSurgerySubtitle"] : page === "management" ? ["opsEyebrow", "opsManagementTitle", "opsManagementSubtitle"] : page === "administration" ? ["opsEyebrow", "opsAdminTitle", "opsAdminSubtitle"] : page === "laboratory" ? ["intakeEyebrow","laboratoryTitle","laboratorySubtitle"] : page === "diagnostics" ? ["intakeEyebrow","diagnosticsTitle","diagnosticsSubtitle"] : page === "clinical" ? ["clinicalEyebrow", "clinicalTitle", "clinicalSubtitle"] : page === "prescriptions" ? ["clinicalEyebrow", "rxInboxTitle", "rxInboxSubtitle"] : page === "appointments" ? ["intakeEyebrow", "appointmentsTitle", "appointmentsSubtitle"] : page === "queue" ? ["intakeEyebrow", "queueTitle", "queueSubtitle"] : page === "workup" ? ["intakeEyebrow", "workupTitle", "workupSubtitle"] : page === "patients" ? ["patientsEyebrow", "patientsTitle", "patientsSubtitle"] : page === "audit" ? ["auditEyebrow", "auditTitle", "auditSubtitle"] : page === "overview" ? ["overviewEyebrow", "overviewTitle", "overviewSubtitle"] : ["overviewEyebrow", "overviewTitle", "overviewSubtitle"];
-  const pageLabel: MessageKey = page === "clinical" ? "doctorEvent" : page === "audit" ? "auditLog" : page;
+  const roleLabel = user.roles.map(role => t(`role_${role}`)).join(" · ");
   async function signOut() {
     setSigningOut(true); setSignOutError(false);
     try { await api("/api/auth/logout", {}); router.replace("/login"); router.refresh(); }
     catch { setSignOutError(true); setSigningOut(false); }
   }
-  // Declarative nav model: each entry carries the permission that unlocks it,
-  // so a role's sidebar is derived rather than maintained per role. Items the
-  // role cannot open are collected into a disclosure instead of sitting in the
-  // list as padlocks — for most roles that was the majority of the sidebar.
-  const navGroups: { label: MessageKey; items: { key: MessageKey; icon: typeof EyeIcon; page: Page; allowed: boolean }[] }[] = [
-    { label: "care", items: [
-      { key: "overview", icon: LayoutDashboard, page: "overview", allowed: true },
-      { key: "patients", icon: Users, page: "patients", allowed: canReadPatients },
-      { key: "appointments", icon: CalendarDays, page: "appointments", allowed: canReadIntake },
-      { key: "queue", icon: ListOrdered, page: "queue", allowed: canReadIntake },
-      { key: "workup", icon: Activity, page: "workup", allowed: user.permissions.includes("workup:read") },
-      { key: "laboratory", icon: FlaskConical, page: "laboratory", allowed: user.roles.includes("lab_assistant") },
-      { key: "diagnostics", icon: ScanLine, page: "diagnostics", allowed: user.roles.includes("machine_operator") },
-      { key: "doctorEvent", icon: Stethoscope, page: "clinical", allowed: canReadClinical },
-      { key: "prescriptions", icon: FileText, page: "prescriptions", allowed: canReadRx },
-    ] },
-    { label: "operations", items: [
-      { key: "surgery", icon: ScanEye, page: "surgery", allowed: user.permissions.includes("surgery:read") },
-    ] },
-    { label: "platform", items: [
-      { key: "management", icon: LayoutDashboard, page: "management", allowed: user.permissions.includes("management:read") },
-      { key: "auditLog", icon: ShieldCheck, page: "audit", allowed: canReadAudit },
-      { key: "administration", icon: ShieldCheck, page: "administration", allowed: user.permissions.includes("admin:read") },
-    ] },
-  ];
-  const restricted = navGroups.flatMap(group => group.items.filter(item => !item.allowed));
 
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">{t("skipContent")}</a>
     {menuOpen && <button type="button" className="sidebar-scrim" aria-label={t("closeMenu")} onClick={() => setMenuOpen(false)}/>}
     <aside className={`sidebar ${menuOpen ? "is-open" : ""}`}>
       <button className="brand" type="button" onClick={() => navigate("overview")} aria-label={`${t("appName")} ${t("overview")}`}>
-        <span className="brand-mark"><EyeIcon size={29} strokeWidth={1.6}/><span/></span><span><strong>{t("appName")}</strong><small>{t("brandCaption")}</small></span>
+        <span className="brand-mark"><EyeIcon size={24} strokeWidth={1.8}/></span><span><strong>{t("appName")}</strong><small>{user.tenantName}</small></span>
       </button>
       <button type="button" className="close-mobile" aria-label={t("closeMenu")} onClick={() => setMenuOpen(false)}><PanelLeftClose size={19}/></button>
-      <div className="hospital-label"><span className="hospital-avatar">{hospitalInitials}</span><span>{user.tenantName}{user.isDemo&&<small>{t("prototype")}</small>}</span></div>
       <nav aria-label={t("workspace")}>
-        {navGroups.map(group => {
-          const items = group.items.filter(item => item.allowed);
-          if (!items.length) return null;
-          return <div className="nav-group" key={group.label}>
-            <p>{t(group.label)}</p>
-            {items.map(item => <button
-              key={item.key} type="button"
-              className={`nav-item ${item.page === page ? "active" : ""}`}
-              onClick={() => navigate(item.page)}
-              aria-current={item.page === page ? "page" : undefined}>
-              <item.icon size={18} strokeWidth={1.65}/><span>{t(item.key)}</span>
-            </button>)}
-          </div>;
-        })}
-        {restricted.length > 0 && <details className="nav-restricted">
-          <summary><LockKeyhole size={12}/><span dir="auto">{restricted.length} {t(restricted.length === 1 ? "navRestrictedOne" : "navRestrictedLabel")}</span></summary>
-          <p>{t("navRestrictedNote")}</p>
-          <ul>{restricted.map(item => <li key={item.key}><item.icon size={14} strokeWidth={1.6}/>{t(item.key)}</li>)}</ul>
-        </details>}
+        {pages.map(item => { const { key, icon: Icon } = NAV[item]; return <button
+          key={item} type="button"
+          className={`nav-item ${item === page ? "active" : ""}`}
+          onClick={() => navigate(item)}
+          aria-current={item === page ? "page" : undefined}>
+          <Icon size={19} strokeWidth={1.75}/><span>{t(key)}</span>
+        </button>; })}
       </nav>
-      <div className="sidebar-bottom">{user.isDemo&&<span className="demo-dot"/>}<span><strong>{user.isDemo?t("demoOnly"):t("notClinical")}</strong>{user.isDemo&&<small>{t("notClinical")}</small>}</span><CircleHelp size={16}/></div>
+      <div className="sidebar-bottom">
+        {user.isDemo && <span className="demo-badge"><span className="demo-dot"/>{t("prototype")}</span>}
+        <small>{t("footer")}</small>
+      </div>
     </aside>
 
     <div className="main-shell">
       <header className="topbar">
         <button type="button" className="icon-button mobile-menu" aria-label={t("menu")} aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={21}/></button>
-        <div className="breadcrumbs"><span>{t("careLabel")}</span><ChevronRight size={13}/><strong>{t(pageLabel)}</strong></div>
-        <div className="topbar-actions">{user.isDemo&&<span className="build-status"><span/>{t("prototype")}</span>}<button className="language-button" type="button" onClick={() => setLocale(locale === "en" ? "ur" : "en")} aria-label={t("language")}><Globe2 size={16}/><span>{locale === "en" ? t("urdu") : t("english")}</span></button><span className="header-divider"/><span className="profile-avatar"><Stethoscope size={18}/></span><div className="profile-caption"><strong>{user.name}</strong><small>{user.roles.map(role => t(`role_${role}`)).join(" · ")}</small></div><button type="button" className="sign-out-button" onClick={() => setPasswordOpen(!passwordOpen)}>Password</button><button type="button" className="sign-out-button" disabled={signingOut} onClick={signOut}>{t(signingOut ? "signingOut" : "signOut")}</button></div>
+        <h1 tabIndex={-1} ref={pageHeading}>{t(NAV[page].key)}</h1>
+        <div className="topbar-actions">
+          <button className="language-button" type="button" onClick={() => setLocale(locale === "en" ? "ur" : "en")} aria-label={t("language")}><Globe2 size={16}/><span>{locale === "en" ? t("urdu") : t("english")}</span></button>
+          <div className="profile-menu" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setProfileOpen(false); }} onKeyDown={event => { if (event.key === "Escape") setProfileOpen(false); }}>
+            <button type="button" className="profile-trigger" aria-haspopup="menu" aria-expanded={profileOpen} onClick={() => setProfileOpen(open => !open)}>
+              <span className="profile-avatar" aria-hidden="true">{initials(user.name)}</span>
+              <span className="profile-caption"><strong>{user.name}</strong><small>{roleLabel}</small></span>
+              <ChevronDown size={16}/>
+            </button>
+            {profileOpen && <div className="profile-dropdown" role="menu">
+              <button type="button" role="menuitem" onClick={() => { setPasswordOpen(true); setProfileOpen(false); }}><KeyRound size={16}/>Change password</button>
+              <button type="button" role="menuitem" disabled={signingOut} onClick={signOut}><LogOut size={16}/>{t(signingOut ? "signingOut" : "signOut")}</button>
+            </div>}
+          </div>
+        </div>
       </header>
       <main id="main-content" className="main-content">
         {locale === "ur" && <div className="locale-banner" role="status">{t("urduPreview")}</div>}
         {passwordOpen && <PasswordForm onClose={() => setPasswordOpen(false)}/>}
         {signOutError && <p className="form-error" role="alert">{t("serviceUnavailable")}</p>}
-        <div className={`page-heading ${page === "overview" ? "is-visually-hidden" : ""}`}><div><p className="eyebrow">{t(titleKeys[0])}</p><h1 tabIndex={-1} ref={pageHeading}>{t(titleKeys[1])}</h1><p className="page-subtitle">{t(titleKeys[2])}</p></div></div>
 
-        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <QueueWorkspace stageScope={["testing"]}/> : page === "diagnostics" ? <QueueWorkspace stageScope={["imaging"]}/> : page === "queue" || page === "workup" ? <QueueWorkspace workupOnly={page === "workup"}/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={patient => { setBookingPatient(patient); navigate("appointments"); }}/> : page === "audit" ? <AuditWorkspace /> : page === "overview" ? <OverviewWorkspace navigate={navigate}/> : null}
+        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate} canOpen={canOpen}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <QueueWorkspace stageScope={["testing"]}/> : page === "diagnostics" ? <QueueWorkspace stageScope={["imaging"]}/> : page === "queue" || page === "workup" ? <QueueWorkspace workupOnly={page === "workup"}/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={canOpen("appointments") ? patient => { setBookingPatient(patient); navigate("appointments"); } : undefined}/> : page === "audit" ? <AuditWorkspace /> : <OverviewWorkspace navigate={navigate} canOpen={canOpen}/>}
         {historyPatient && <PatientTimelineDialog patientId={historyPatient} onClose={() => setHistoryPatient(null)}/>}
-        <ReportLinks/><footer className="workspace-footer"><span><EyeIcon size={15}/>{t("footer")}</span></footer>
+        {(page === "overview" || page === "management") && <ReportLinks/>}
       </main>
     </div>
   </div>;

@@ -16,7 +16,7 @@ type Page = "appointments" | "queue" | "workup" | "clinical" | "prescriptions" |
  * from whatever arrives rather than switched on role name. A role gains a
  * section the moment it gains the underlying permission — no change here.
  */
-export function OverviewWorkspace({ navigate }: { navigate: (page: Page) => void }) {
+export function OverviewWorkspace({ navigate, canOpen }: { navigate: (page: Page) => void; canOpen: (page: Page) => boolean }) {
   const { t, locale } = useLocale();
   const user = useSession();
   const [data, setData] = useState<OverviewData | null>(null);
@@ -54,21 +54,25 @@ export function OverviewWorkspace({ navigate }: { navigate: (page: Page) => void
     data.governance && { key: "ovKpiStaff", value: data.governance.activeStaff, page: "administration", icon: Users, urgent: false },
     data.governance?.auditToday !== null && data.governance && { key: "ovKpiAuditToday", value: data.governance.auditToday, page: "audit", icon: ShieldCheck, urgent: false },
   ] as const).filter(Boolean) as { key: MessageKey; value: number | string | null; page: Page; icon: typeof Users; urgent: boolean }[];
+  // Figures are links, so only those leading to this role's own pages are shown.
+  const openable = candidates.filter(kpi => canOpen(kpi.page));
 
   // The one thing this role most likely came here to do.
-  const primary: { label: MessageKey; page: Page } | null =
-    user.permissions.includes("clinical:write") ? { label: "ovActionClinical", page: "clinical" }
-    : user.permissions.includes("workup:read") ? { label: "ovActionQueue", page: "queue" }
-    : user.permissions.includes("settings:write") || user.permissions.includes("account:manage") ? { label: "ovActionAdministration", page: "administration" }
-    : user.permissions.includes("appointment:create") ? { label: "ovActionAppointments", page: "appointments" }
-    : user.permissions.includes("audit:read") ? { label: "ovActionAudit", page: "audit" }
-    : user.permissions.includes("patient:read") ? { label: "ovActionPatients", page: "patients" }
-    : null;
+  type Action = { label: MessageKey; page: Page };
+  const actions: (Action | false)[] = [
+    user.permissions.includes("clinical:write") && { label: "ovActionClinical", page: "clinical" },
+    user.permissions.includes("workup:read") && { label: "ovActionQueue", page: "queue" },
+    (user.permissions.includes("settings:write") || user.permissions.includes("account:manage")) && { label: "ovActionAdministration", page: "administration" },
+    user.permissions.includes("appointment:create") && { label: "ovActionAppointments", page: "appointments" },
+    user.permissions.includes("audit:read") && { label: "ovActionAudit", page: "audit" },
+    user.permissions.includes("patient:read") && { label: "ovActionPatients", page: "patients" },
+  ];
+  const primary = actions.find((action): action is Action => !!action && canOpen(action.page));
 
   // Put the KPIs that lead to this role's primary workspace first, so an
   // auditor opens on governance figures without
   // hard-coding either role. Stable sort keeps the curated order within a tier.
-  const kpis = candidates
+  const kpis = openable
     .map((kpi, index) => ({ kpi, rank: (kpi.page === primary?.page ? 0 : 1) * 100 + index }))
     .sort((a, b) => a.rank - b.rank)
     .map(entry => entry.kpi)
@@ -125,7 +129,7 @@ export function OverviewWorkspace({ navigate }: { navigate: (page: Page) => void
         <dl className="ov-rows">
           {section.rows.map(row => <div key={row.label}><dt>{t(row.label)}</dt><dd>{row.value}</dd></div>)}
         </dl>
-        <button type="button" className="ov-card-action" onClick={() => navigate(section.page)}>{t("ovOpen")}<ArrowRight size={14}/></button>
+        {canOpen(section.page) && <button type="button" className="ov-card-action" onClick={() => navigate(section.page)}>{t("ovOpen")}<ArrowRight size={14}/></button>}
       </section>)}
     </div> : <section className="panel ov-state">
       <span className="ov-card-icon"><LayoutDashboard size={19}/></span>

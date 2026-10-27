@@ -11,71 +11,103 @@
                     This is the only layer a theme overrides, so adding a dark
                     theme later means re-pointing these and nothing else.
 
-   Ramps were derived from the 433 one-off colours the stylesheets previously
-   used, clustered in CIELAB. The palette resolved into five real families:
-   sage (olive neutral), stone (desaturated green-grey — the largest, 166
-   colours), brand (dark navy chrome), burgundy and amber (accents), plus the
-   od/os laterality pair which is held apart from all of them.
+   The palette follows the Fillow admin look: violet accent, lavender-grey
+   neutrals and deep indigo for inverse chrome. The legacy ramp names (sage,
+   stone, brand, burgundy, slate) remain as aliases into it so older
+   component CSS keeps working; amber marks demo/preview, and the od/os
+   laterality pair is held apart from everything else.
    ========================================================================== */
 
 :root {
-  /* ---- Primitives: sage — the workhorse neutral ------------------------- *
-   * Olive-green, hue held near 85 across the whole ramp. The original
-   * stylesheets used 167 colours in this family; the dark end is genuinely
-   * olive (#4c6340, #657f4b), and stays distinct from the navy brand ramp.
-   * Keeping the two apart is what stops panels and chrome muddying together. */
-  --slate-25: #f9fafc;   /* sunken surfaces, cool to match the page ground */
-  --slate-50: #f3f5f8;   /* page ground; deliberately outside the sage ramp */
-  --sage-25:  #fafbf7;
-  --sage-50:  #f5f7f1;
-  --sage-100: #eef1e8;
-  --sage-200: #e4e8db;
-  --sage-300: #dce4d4;
-  --sage-400: #c6d0bb;
-  --sage-500: #a9ba96;
-  --sage-600: #8b9e78;
-  --sage-700: #72845f;
-  --sage-800: #5c7153;
-  --sage-900: #45603c;
+  /* ---- Primitives: Fillow palette ---------------------------------------- *
+   * The interface follows the Fillow admin look: a violet accent on a soft
+   * lavender ground with cool lavender-grey neutrals. Fillow's own #886CC0
+   * is violet-500; buttons and accent text use violet-600 so white text on
+   * them keeps at least 4.5:1 contrast. The older ramps below (sage, stone,
+   * brand, burgundy, slate) are kept as names only and now point into this
+   * palette, so existing component CSS picks up the new look unchanged. */
+  --violet-50:  #f5f1fb;
+  --violet-100: #ece6f7;
+  --violet-200: #dccff0;
+  --violet-300: #c3b0e3;
+  --violet-400: #a68dd3;
+  --violet-500: #886cc0;
+  --violet-600: #7b5db8;
+  --violet-700: #6a4ea6;
+  --violet-800: #563f88;
+  --violet-900: #3f2f62;
 
-  /* ---- Primitives: stone — desaturated grey-green ----------------------- *
-   * The true neutral axis, and the single largest family in the original
-   * stylesheets: 166 of 460 colours. Borders, muted copy, icons, table
-   * chrome. Deliberately NOT sage — muted text reading olive rather than
-   * neutral grey was one of the palette's weaker points.                    */
-  --stone-200: #e3e8e1;
-  --stone-300: #ccd4c9;
-  --stone-400: #b2bcb0;
-  --stone-500: #9ca79a;
-  --stone-600: #879183;
-  --stone-700: #737d70;
-  --stone-800: #566a5f;
-  --stone-900: #43584c;
+  --gray-25:  #fcfbfe;
+  --gray-50:  #f7f5fc;
+  --gray-100: #f1eef8;
+  --gray-200: #e8e4f1;
+  --gray-300: #dcd7e8;
+  --gray-400: #c3bdd3;
+  --gray-500: #a29cb6;
+  --gray-600: #77718d;
+  --gray-700: #66607c;
+  --gray-800: #4f4a66;
+  --gray-900: #3b374f;
 
-  /* ---- Primitives: brand — dark chrome surfaces ------------------------- *
-   * Navy, hue 226. Sidebar, masthead, login identity panel, inverse chrome.
-   * Named --brand-* rather than by hue so a future palette change is a value
-   * edit here and nothing else.                                             */
-  --brand-400: #374fa0;
-  --brand-500: #2c4081;
-  --brand-600: #26376e;
-  --brand-700: #212f5f;
-  --brand-750: #1e2b57;
-  --brand-800: #1b2850;
-  --brand-900: #151e3d;
-  --brand-950: #0e152a;
+  --indigo-400: #4b4470;
+  --indigo-500: #3f3961;
+  --indigo-600: #352f55;
+  --indigo-700: #2c2748;
+  --indigo-750: #29243f;
+  --indigo-800: #241f3a;
+  --indigo-900: #1c1830;
+  --indigo-950: #131022;
 
-  /* ---- Primitives: burgundy — primary accent ---------------------------- */
-  --burgundy-50:  #fbf0f2;
-  --burgundy-100: #f2dde1;
-  --burgundy-200: #e8cdd2;
-  --burgundy-300: #d0a8b1;
-  --burgundy-400: #b8798a;
-  --burgundy-500: #a3536a;
-  --burgundy-600: #8f293a;
-  --burgundy-700: #762233;
-  --burgundy-800: #5e1b28;
+  --lavender-page: #f3f0f9;
 
+  /* ---- Legacy ramp names: sage — now the lavender-grey neutral ---------- */
+  --slate-25: var(--gray-25);
+  --slate-50: var(--lavender-page);
+  --sage-25:  var(--gray-25);
+  --sage-50:  var(--gray-50);
+  --sage-100: var(--gray-100);
+  --sage-200: var(--gray-200);
+  --sage-300: var(--gray-300);
+  --sage-400: var(--gray-400);
+  --sage-500: var(--gray-500);
+  --sage-600: var(--gray-600);
+  --sage-700: var(--gray-700);
+  --sage-800: var(--gray-800);
+  --sage-900: var(--gray-900);
+
+  /* ---- Legacy ramp names: stone — the neutral axis ---------------------- */
+  --stone-200: var(--gray-200);
+  --stone-300: var(--gray-300);
+  --stone-400: var(--gray-400);
+  --stone-500: var(--gray-500);
+  --stone-600: var(--gray-600);
+  --stone-700: var(--gray-700);
+  --stone-800: var(--gray-800);
+  --stone-900: var(--gray-900);
+
+  /* ---- Legacy ramp names: brand — dark chrome, now deep indigo ---------- */
+  --brand-400: var(--indigo-400);
+  --brand-500: var(--indigo-500);
+  --brand-600: var(--indigo-600);
+  --brand-700: var(--indigo-700);
+  --brand-750: var(--indigo-750);
+  --brand-800: var(--indigo-800);
+  --brand-900: var(--indigo-900);
+  --brand-950: var(--indigo-950);
+
+  /* ---- Legacy ramp names: burgundy — the accent, now violet ------------- */
+  --burgundy-50:  var(--violet-50);
+  --burgundy-100: var(--violet-100);
+  --burgundy-200: var(--violet-200);
+  --burgundy-300: var(--violet-300);
+  --burgundy-400: var(--violet-400);
+  --burgundy-500: var(--violet-500);
+  --burgundy-600: var(--violet-600);
+  --burgundy-700: var(--violet-700);
+  --burgundy-800: var(--violet-800);
+}
+
+:root {
   /* ---- Primitives: amber — secondary accent, "demo/preview" signal ------ */
   --amber-50:  #faf6ea;
   --amber-100: #f4efe2;
@@ -103,17 +135,17 @@
   --os-700: #7d2f3d;
 
   /* ---- Primitives: status ---------------------------------------------- */
-  --danger-50:  #fbefef;
-  --danger-200: #ebcfd1;
-  --danger-600: #9a3945;
-  --warning-50:  #f9f4e4;
-  --warning-200: #e9dec1;
-  --warning-600: #8f7951;
-  --success-50:  #edf2e3;
-  --success-200: #dfe7d0;
-  --success-600: #5b7556;
-  --info-50:  #edf0f4;
-  --info-600: #637180;
+  --danger-50:  #fff0f3;
+  --danger-200: #fccfd9;
+  --danger-600: #c4213f;
+  --warning-50:  #fff8e6;
+  --warning-200: #fde6a8;
+  --warning-600: #8a6400;
+  --success-50:  #e9f8ee;
+  --success-200: #c6ecd3;
+  --success-600: #1b7f43;
+  --info-50:  var(--violet-50);
+  --info-600: var(--gray-700);
 
   --white: #ffffff;
   --black: #000000;
@@ -133,16 +165,16 @@
   --surface-scrim:    color-mix(in srgb, var(--brand-950) 42%, transparent);
 
   /* ---- Text ------------------------------------------------------------- */
-  --text-primary:   #1b2438;
+  --text-primary:   #2b2640;
   --text-secondary: var(--stone-800);
   --text-muted:     var(--stone-700);
   --text-subtle:    var(--stone-600);
   --text-faint:     var(--stone-500);
   --text-on-accent: var(--white);
-  --text-on-inverse:      #e6eaf3;
-  --text-on-inverse-muted: var(--sage-400);
-  --text-accent:    var(--burgundy-600);
-  --text-link:      var(--brand-800);
+  --text-on-inverse:      #ece9f6;
+  --text-on-inverse-muted: var(--violet-100);
+  --text-accent:    var(--violet-600);
+  --text-link:      var(--violet-700);
 
   /* ---- Borders ---------------------------------------------------------- */
   --border-subtle:  var(--stone-200);
@@ -162,11 +194,11 @@
   --control-bg-hover:  var(--sage-100);
   --control-border:    var(--border-subtle);
   --control-fg:        var(--text-secondary);
-  --control-disabled-bg: #e9e5df;
-  --control-disabled-fg: #99958c;
+  --control-disabled-bg: var(--gray-100);
+  --control-disabled-fg: var(--gray-600);
 
-  --focus-ring: #ca9c51;
-  --focus-ring-strong: #b77b24;   /* on SVG strokes, where the ring needs more weight */
+  --focus-ring: var(--violet-400);
+  --focus-ring-strong: var(--violet-600);   /* on SVG strokes, where the ring needs more weight */
   --focus-ring-width: 3px;
   --focus-ring-offset: 3px;
 
@@ -204,16 +236,19 @@
 
   /* ---- Weight ----------------------------------------------------------- */
   --weight-normal: 400;
-  --weight-medium: 550;
+  /* Poppins ships static weights, so these name weights it actually has. */
+  --weight-medium: 500;
   --weight-semi:   600;
-  --weight-bold:   650;
+  --weight-bold:   600;
 
   /* ---- Font families ---------------------------------------------------- */
-  /* Loaded and self-hosted by next/font in app/layout.tsx. The --font-plex-*
+  /* Loaded and self-hosted by next/font in app/layout.tsx. The --font-*
      variables carry next/font's generated family plus its metric-matched
-     fallback, so the stacks below only need a final system safety net. */
-  --font-sans:   var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  --font-serif:  var(--font-plex-serif), Georgia, "Times New Roman", serif;
+     fallback, so the stacks below only need a final system safety net.
+     Headings use the same Poppins face as body copy; --font-serif remains as
+     a name for older rules and points at it. */
+  --font-sans:   var(--font-poppins), system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-serif:  var(--font-sans);
   --font-arabic: var(--font-plex-arabic), "Noto Naskh Arabic", "Segoe UI", Tahoma, sans-serif;
 
   /* ======================================================================
@@ -250,16 +285,15 @@
      a calm vertical rhythm. Defined once here so every panel in the system
      picks up the same treatment rather than each screen restating it.
      ====================================================================== */
-  --card-radius:  10px;
-  --card-padding: 30px;
-  --card-gap:     30px;
+  --card-radius:  20px;
+  --card-padding: 24px;
+  --card-gap:     24px;
   --card-border:  transparent;
-  --card-shadow:  0 5px 5px color-mix(in srgb, var(--brand-900) 6%, transparent);
-  --card-shadow-raised: 0 8px 18px color-mix(in srgb, var(--brand-900) 9%, transparent);
+  --card-shadow:  0 0 40px color-mix(in srgb, #523f69 7%, transparent);
+  --card-shadow-raised: 0 10px 40px color-mix(in srgb, #523f69 14%, transparent);
 
-  /* Controls share the card radius so inputs and panels read as one system. */
   --control-radius: 10px;
-  --control-height: 46px;
+  --control-height: 42px;
 
   /* ======================================================================
      ELEVATION
@@ -280,12 +314,11 @@
 
   /* ======================================================================
      LAYOUT
-     Sidebar widths grew with the type scale: nav labels went 11px -> 14px.
      ====================================================================== */
-  --sidebar-width: 248px;
-  --sidebar-width-md: 224px;
-  --sidebar-width-sm: 208px;
-  --topbar-height: 67px;
+  --sidebar-width: 256px;
+  --sidebar-width-md: 232px;
+  --sidebar-width-sm: 216px;
+  --topbar-height: 84px;
   --content-max: 1550px;
 }
 

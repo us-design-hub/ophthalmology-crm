@@ -2,22 +2,12 @@
    Loaded after the component styles so legacy pale sage text inherits the
    stronger system palette without flattening status and clinical colours. */
 :root {
-  --text-primary: #111827;
-  --text-secondary: #29382f;
-  --text-muted: #435048;
-  --text-subtle: #536159;
-  --text-faint: #647168;
-  --text-link: #26376e;
-}
-
-/* The global text tokens are dark for light surfaces. Keep inverse chrome on
-   its dedicated high-contrast palette. */
-.sidebar .brand small,
-.sidebar .hospital-label small,
-.sidebar .nav-group > p,
-.sidebar .sidebar-bottom small,
-.sidebar .sidebar-bottom > svg {
-  color: var(--text-on-inverse-muted);
+  --text-primary: #2b2640;
+  --text-secondary: var(--gray-900);
+  --text-muted: var(--gray-800);
+  --text-subtle: #5a5571;
+  --text-faint: var(--gray-700);
+  --text-link: var(--violet-700);
 }
 
 /* Patient and shared data tables previously used the decorative sage ramp for
