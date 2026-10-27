@@ -183,3 +183,40 @@
   .workup-eye :is(input, select) { padding-inline: 8px; }
   .workup-eye legend { font-size: var(--text-md); }
 }
+
+/* --- Collapsible sidebar (desktop and tablet) ------------------------------- */
+/* Phones keep the slide-in menu, so the toggle and the icon rail stop at 760px. */
+.sidebar-toggle { flex-shrink: 0; }
+@media (min-width: 761px) {
+  .sidebar,
+  .main-shell { transition: width var(--duration-base) var(--ease), margin var(--duration-base) var(--ease); }
+  .sidebar-collapsed .sidebar { width: var(--sidebar-width-collapsed); }
+  .sidebar-collapsed .main-shell { margin-inline-start: var(--sidebar-width-collapsed); }
+  .sidebar-collapsed .brand { justify-content: center; padding: 0; }
+  .sidebar-collapsed .sidebar nav { padding-inline: 14px; }
+  .sidebar-collapsed .nav-item { justify-content: center; padding: 12px 0; }
+  /* Labels stay in the accessibility tree; only their box is hidden. */
+  .sidebar-collapsed .brand > span:last-child,
+  .sidebar-collapsed .nav-item > span {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .sidebar-collapsed .sidebar-bottom { margin-inline: 14px; justify-items: center; }
+  .sidebar-collapsed .sidebar-bottom small { display: none; }
+  .sidebar-collapsed .demo-badge { font-size: 0; gap: 0; padding: 6px; }
+}
+@media (max-width: 760px) {
+  .sidebar-toggle { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .main-shell { transition: none; }
+}
+
+/* --- Registration: send a walk-in straight to the queue --------------------- */
+.registration-form fieldset.visit-queue { padding: 16px 18px 4px; border-radius: var(--radius-lg); background: var(--violet-50); }
+.registration-form .visit-queue legend { float: left; width: 100%; border: 0; padding: 0; margin-bottom: 10px; }
+.registration-form .visit-queue legend + * { clear: both; }
+.visit-queue .queue-toggle { margin-bottom: 14px; font-weight: var(--weight-medium); }
+.medical-history-options { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 16px 0; }
+/* The sidebar sits on the right in Urdu, so the toggle icon mirrors with it. */
+html[dir=rtl] .sidebar-toggle svg { transform: scaleX(-1); }

@@ -27,6 +27,7 @@ test("named reception login registers a patient and the masked record survives r
   await page.getByRole("button", { name: "Register patient", exact: true }).click();
   const input = patientInput();
   const dialog = page.getByRole("dialog", { name: "Register a new patient", exact: true });
+  await dialog.getByLabel("Add to today's queue now", { exact: true }).uncheck();
   for (const key of ["givenName", "familyName", "dob", "phone", "identifier", "city", "allergy"] as const) await dialog.locator(`[name="${key}"]`).fill(input[key]);
   await dialog.locator('[name="gender"]').selectOption("female");
   await dialog.getByRole("button", { name: "Check & review", exact: true }).click();
@@ -47,6 +48,32 @@ test("named reception login registers a patient and the masked record survives r
   await expect(page.getByTestId("patient-total")).toHaveText("1");
   await expect(page.getByRole("button", { name: fullName, exact: false }).first()).toBeVisible();
   expect(page.url()).not.toContain(input.identifier);
+});
+
+test("reception registers a walk-in, assigns a doctor and the patient joins today's queue", async ({ page, baseURL }) => {
+  test.setTimeout(120_000);
+  await signIn(page.request, baseURL!);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Register patient", exact: true }).click();
+  const input = patientInput();
+  const dialog = page.getByRole("dialog", { name: "Register a new patient", exact: true });
+  for (const key of ["givenName", "familyName", "dob", "phone", "identifier"] as const) await dialog.locator(`[name="${key}"]`).fill(input[key]);
+  await dialog.locator('[name="gender"]').selectOption("female");
+  await expect(dialog.getByLabel("Add to today's queue now", { exact: true })).toBeChecked();
+  // A doctor is never chosen silently: the clinic must be picked before review.
+  await dialog.getByRole("button", { name: "Check & review", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Choose a clinic and doctor");
+  await dialog.locator('[name="queueClinic"]').selectOption({ label: "Optometry" });
+  const doctor = await dialog.locator('[name="queueDoctor"] option:checked').innerText();
+  await dialog.getByRole("button", { name: "Check & review", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Review before creating", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog")).toContainText(`Optometry · ${doctor}`);
+  await page.getByRole("button", { name: "Register and add to queue", exact: true }).click();
+  const banner = page.locator(".registration-success");
+  await expect(banner).toContainText(`Registered and added to the queue for ${doctor}`);
+  const mrn = (await banner.locator("strong").innerText()).split(" · ").at(-1)!;
+  const queue = await (await page.request.get("/api/intake/queue")).json();
+  expect(queue.encounters.find((item: { mrn: string }) => item.mrn === mrn)).toMatchObject({ clinic: "Optometry", doctor, stage: "waiting" });
 });
 
 test("unauthenticated, forged role, auditor, and doctor requests enforce server permissions", async ({ page, baseURL }) => {

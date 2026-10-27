@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Activity, CalendarDays, ChevronDown, Eye as EyeIcon, FileText, FlaskConical, Globe2, KeyRound, LayoutDashboard, ListOrdered, LogOut, Menu, PanelLeftClose, ScanEye, ScanLine, ShieldCheck, Stethoscope, Users } from "lucide-react";
+import { Activity, CalendarDays, ChevronDown, Eye as EyeIcon, FileText, FlaskConical, Globe2, KeyRound, LayoutDashboard, ListOrdered, LogOut, Menu, PanelLeftClose, PanelLeftOpen, ScanEye, ScanLine, ShieldCheck, Stethoscope, Users } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import type { MessageKey } from "@/lib/messages";
 import { useRouter } from "next/navigation";
@@ -40,6 +40,8 @@ const NAV: Record<Page, { key: MessageKey; icon: typeof EyeIcon }> = {
 };
 const initials = (name: string) => name.replace(/^Dr\.?\s+/i, "").split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join("").toUpperCase();
 
+const SIDEBAR_KEY = "openeyes.sidebar";
+
 export function ClinicalWorkspace() {
   const { locale, setLocale, t } = useLocale();
   const user = useSession();
@@ -55,6 +57,10 @@ export function ClinicalWorkspace() {
   const [signOutError, setSignOutError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  // Desktop-only icon rail; remembered per browser. Storage can be unavailable (private windows).
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => { try { setCollapsed(localStorage.getItem(SIDEBAR_KEY) === "collapsed"); } catch { /* keep expanded */ } }, []);
+  const toggleSidebar = () => setCollapsed(current => { try { localStorage.setItem(SIDEBAR_KEY, current ? "expanded" : "collapsed"); } catch { /* not remembered */ } return !current; });
   const pageHeading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
   // Links inside a page may point at work this role does not see; those do nothing.
@@ -67,7 +73,7 @@ export function ClinicalWorkspace() {
     catch { setSignOutError(true); setSigningOut(false); }
   }
 
-  return <div className="app-shell">
+  return <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
     <a href="#main-content" className="skip-link">{t("skipContent")}</a>
     {menuOpen && <button type="button" className="sidebar-scrim" aria-label={t("closeMenu")} onClick={() => setMenuOpen(false)}/>}
     <aside className={`sidebar ${menuOpen ? "is-open" : ""}`}>
@@ -80,7 +86,8 @@ export function ClinicalWorkspace() {
           key={item} type="button"
           className={`nav-item ${item === page ? "active" : ""}`}
           onClick={() => navigate(item)}
-          aria-current={item === page ? "page" : undefined}>
+          aria-current={item === page ? "page" : undefined}
+          title={collapsed ? t(key) : undefined}>
           <Icon size={19} strokeWidth={1.75}/><span>{t(key)}</span>
         </button>; })}
       </nav>
@@ -93,6 +100,7 @@ export function ClinicalWorkspace() {
     <div className="main-shell">
       <header className="topbar">
         <button type="button" className="icon-button mobile-menu" aria-label={t("menu")} aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><Menu size={21}/></button>
+        <button type="button" className="icon-button sidebar-toggle" aria-label={t(collapsed ? "expandMenu" : "collapseMenu")} aria-expanded={!collapsed} onClick={toggleSidebar}>{collapsed ? <PanelLeftOpen size={20}/> : <PanelLeftClose size={20}/>}</button>
         <h1 tabIndex={-1} ref={pageHeading}>{t(NAV[page].key)}</h1>
         <div className="topbar-actions">
           <button className="language-button" type="button" onClick={() => setLocale(locale === "en" ? "ur" : "en")} aria-label={t("language")}><Globe2 size={16}/><span>{locale === "en" ? t("urdu") : t("english")}</span></button>

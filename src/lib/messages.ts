@@ -77,7 +77,7 @@ export const en = {
   sclera_detail: "Outer supporting coat of the eye.", extraocular_muscles_detail: "Muscles surrounding the globe.",
   adnexa_detail: "Eyelids and associated surrounding structures.",
   wholeHint: "Internal structures remain selectable using the labelled controls.",
-  skipContent: "Skip to workspace", menu: "Open navigation", closeMenu: "Close navigation", footer: "Powered by Logic box",
+  skipContent: "Skip to workspace", menu: "Open navigation", closeMenu: "Close navigation", collapseMenu: "Collapse navigation", expandMenu: "Expand navigation", footer: "Powered by Logic box",
   loginEyebrow: "SPECIALIST CARE. CONNECTED.", loginHeadline: "A clearer picture of every patient's care.",
   loginStory: "One ophthalmology workspace for the people who register, examine, and care for your patients.",
   loginAssurance1: "Eye-specific clinical workflows", loginAssurance2: "Named accounts and role permissions", loginAssurance3: "Traceable patient registration",
@@ -154,6 +154,10 @@ export const ur: Partial<Record<MessageKey, string>> = {
   planTitle: "علاج کا منصوبہ", addToPlan: "منتخب حصے منصوبے میں شامل کریں", noPatient: "مریض کا ریکارڈ منسلک نہیں",
   notClinical: "Powered by Logic box", cornea: "قرنیہ", iris: "عنبیہ", lens: "عدسہ", retina: "شبکیہ",
   optic_nerve: "بصری عصب", sclera: "صلبیہ", selected: "منتخب", noneSelected: "کوئی حصہ منتخب نہیں",
+  collapseMenu: "مینو چھوٹا کریں", expandMenu: "مینو بڑا کریں",
+  chooseClinic: "کلینک منتخب کریں", todaysVisit: "آج کی آمد", addToQueue: "مریض کو ابھی آج کی قطار میں شامل کریں", addToQueueHelp: "مریض کی آمد فوراً درج ہو جائے گی اور وہ ڈاکٹر کی قطار میں نظر آئے گا۔",
+  queueDoctorRequired: "کلینک اور ڈاکٹر منتخب کریں، یا قطار میں شامل کرنے کا نشان ہٹا دیں۔", queueSummary: "آج کی قطار", queueNotAdded: "شامل نہیں",
+  registerAndQueue: "رجسٹر کریں اور قطار میں شامل کریں", patientQueued: "رجسٹر ہو کر قطار میں شامل:", queueFailed: "مریض رجسٹر ہو گیا ہے لیکن قطار میں شامل نہیں ہوا۔",
 };
 
 export function translate(locale: Locale, key: MessageKey): string {

@@ -318,6 +318,7 @@
   --sidebar-width: 256px;
   --sidebar-width-md: 232px;
   --sidebar-width-sm: 216px;
+  --sidebar-width-collapsed: 88px;
   --topbar-height: 84px;
   --content-max: 1550px;
 }

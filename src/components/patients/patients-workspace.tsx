@@ -8,7 +8,7 @@ import { ageFromDob, patientName, type PatientDetail, type PatientList, type Pat
 import type { MessageKey } from "@/lib/messages";
 import { PatientHistory } from "./patient-history";
 import { PatientEdit } from "./patient-edit";
-import { PatientRegistration, errorKey } from "./patient-registration";
+import { PatientRegistration, errorKey, type VisitResult } from "./patient-registration";
 
 export function formatDate(value: string, includeTime = false): string {
   const date = new Date(value.length === 10 ? `${value}T12:00:00Z` : value);
@@ -26,9 +26,12 @@ export function PatientsWorkspace({ onBook, onHistory }: { onBook?: (patient: Pa
     api<PatientList>("/api/patients/search", { query: submitted, page }, { signal: controller.signal }).then(setData).catch(error => { if (!controller.signal.aborted) setError(errorKey(error)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [submitted, page, refresh]);
-  function onCreated(patient: PatientSummary) { setRegistering(false); setCreated(patient); setSubmitted(""); setQuery(""); setPage(1); setRefresh(current => current + 1); setSelectedId(patient.id); }
+  const [visit, setVisit] = useState<VisitResult>(null);
+  // A queued walk-in is finished at reception, so the record stays closed for the next patient.
+  function onCreated(patient: PatientSummary, result: VisitResult) { setRegistering(false); setCreated(patient); setVisit(result); setSubmitted(""); setQuery(""); setPage(1); setRefresh(current => current + 1); if (!result || "error" in result) setSelectedId(patient.id); }
   return <div className="patients-workspace">
-    {created && <div className="registration-success" role="status"><CheckCircle2 size={18}/><span>{t("patientRegistered")} <strong>{patientName(created)} · {created.mrn}</strong></span><button type="button" className="icon-button" aria-label={t("clearSelection")} onClick={() => setCreated(null)}><X size={16}/></button></div>}
+    {created && <div className="registration-success" role="status"><CheckCircle2 size={18}/><span>{visit && "doctor" in visit ? <>{t("patientQueued")} {visit.doctor}:</> : t("patientRegistered")} <strong>{patientName(created)} · {created.mrn}</strong></span><button type="button" className="icon-button" aria-label={t("clearSelection")} onClick={() => { setCreated(null); setVisit(null); }}><X size={16}/></button></div>}
+    {created && visit && "error" in visit && <div className="form-error" role="alert">{t("queueFailed")} {t(visit.error)}</div>}
     <section className="panel patient-registry"><div className="registry-heading"><div><span className="section-icon"><Users size={20}/></span><h2>{t("registeredPatients")}</h2>{data && <span className="count-badge" data-testid="patient-total">{data.total}</span>}</div>{canCreate ? <button type="button" className="primary-button" onClick={() => setRegistering(true)}><Plus size={16}/>{t("registerPatient")}</button> : <span className="read-only-label"><LockKeyhole size={13}/>{t("accessControlled")}</span>}</div>
       <form className="patient-search" onSubmit={event => { event.preventDefault(); setPage(1); setSubmitted(query.trim()); setRefresh(current => current + 1); }}><div><Search size={18}/><input aria-label={t("searchPatients")} value={query} maxLength={100} onChange={event => setQuery(event.target.value)} placeholder={t("patientSearchPlaceholder")}/>{query && <button type="button" aria-label={t("clearSearch")} onClick={() => { setQuery(""); setSubmitted(""); setPage(1); }}><X size={15}/></button>}</div><button className="secondary-button" type="submit">{t("search")}</button></form>
       {!canCreate && <p className="registry-info">{t("readOnlyPatients")}</p>}
