@@ -40,8 +40,11 @@ export const patientInputSchema = z.object({
   givenName: z.string().trim().min(1).max(80), familyName: shortText(80).default(""),
   gender: z.enum(["female", "male", "other", "unknown"]),
   dob: z.string().refine(validDob, "invalidDate"), dobEstimated: z.boolean().default(false),
-  phone: z.string().transform(value => normalizePhone(value)).refine(value => value !== null, "invalidPhone"),
-  identifierType: z.enum(IDENTIFIER_TYPES), identifier: z.string().trim().min(1).max(30),
+  // The MR number is the main identifier; national ID can be added later, and an
+  // emergency arrival may not have a phone number at the desk.
+  emergency: z.boolean().default(false),
+  phone: z.string().trim().max(40).default(""),
+  identifierType: z.enum(IDENTIFIER_TYPES).default("cnic"), identifier: z.string().trim().max(30).default(""),
   city: shortText(80).default(""), address: shortText(240).default(""),
   preferredLanguage: z.enum(["en", "ur"]).default("en"),
   allergy: shortText(160).default(""), risk: shortText(160).default(""),
@@ -53,21 +56,28 @@ export const patientInputSchema = z.object({
   previousSurgery: shortText(1000).default(""), currentMedications: shortText(1000).default(""),
   duplicateReviewToken: z.string().max(160).optional(), duplicateReason: shortText(240).optional(),
 }).strict().superRefine((value, context) => {
-  const identifier = normalizeIdentifier(value.identifier, value.identifierType);
-  if (value.identifierType === "passport" ? !/^[A-Z0-9]{6,20}$/.test(identifier) : !/^\d{13}$/.test(identifier)) {
-    context.addIssue({ code: "custom", path: ["identifier"], message: "invalidIdentifier" });
+  if (!value.phone && !value.emergency) context.addIssue({ code: "custom", path: ["phone"], message: "registrationRequiredMessage" });
+  if (value.phone && !normalizePhone(value.phone)) context.addIssue({ code: "custom", path: ["phone"], message: "invalidPhone" });
+  if (value.identifier) {
+    const identifier = normalizeIdentifier(value.identifier, value.identifierType);
+    if (value.identifierType === "passport" ? !/^[A-Z0-9]{6,20}$/.test(identifier) : !/^\d{13}$/.test(identifier)) {
+      context.addIssue({ code: "custom", path: ["identifier"], message: "invalidIdentifier" });
+    }
+    if (value.identifierType === "guardian_cnic" && ageFromDob(value.dob) >= 18) context.addIssue({ code: "custom", path: ["identifierType"], message: "guardianMinorOnly" });
   }
-  if (value.identifierType === "guardian_cnic" && ageFromDob(value.dob) >= 18) context.addIssue({ code: "custom", path: ["identifierType"], message: "guardianMinorOnly" });
   if (value.nextOfKinPhone && !normalizePhone(value.nextOfKinPhone)) context.addIssue({ code: "custom", path: ["nextOfKinPhone"], message: "invalidPhone" });
   if (value.alternatePhone && !normalizePhone(value.alternatePhone)) context.addIssue({ code: "custom", path: ["alternatePhone"], message: "invalidPhone" });
 });
 export type PatientInput = z.infer<typeof patientInputSchema>;
 export type PatientSummary = {
   id: string; mrn: string; givenName: string; familyName: string; gender: string; dob: string; dobEstimated: boolean;
-  phone: string; identifierType: IdentifierType; identifierMasked: string; city: string; createdAt: string;
+  phone: string | null; identifierType: IdentifierType | null; identifierMasked: string; city: string; createdAt: string;
   flags: { type: "allergy" | "risk"; value: string }[];
 };
 export type PatientDetail = PatientSummary & { version:number; address: string; preferredLanguage: string; nextOfKinName: string; nextOfKinPhone: string; guardianName:string; alternatePhone:string; alternateRelation:string; referredBy:string; programme:string; medicalConditions:string[]; previousSurgery:string; currentMedications:string };
 export type PatientList = { patients: PatientSummary[]; total: number; page: number; pageSize: number };
+
+/** MR numbers read DEH-26-000157: hospital prefix, two-digit year, six-digit sequence. */
+export function formatMrn(prefix: string, year: number, sequence: number): string { return `${prefix}-${String(year).slice(-2)}-${String(sequence).padStart(6, "0")}`; }
 
 export function patientName(patient: Pick<PatientSummary, "givenName" | "familyName">): string { return `${patient.givenName} ${patient.familyName}`.trim(); }

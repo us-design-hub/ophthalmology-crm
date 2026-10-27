@@ -14,7 +14,7 @@ export async function patientTimelineActivities(
       SELECT a.*, f.name AS clinic, u.full_name AS doctor
       FROM app.appointment a
       JOIN app.facility f ON f.id=a.facility_id AND f.tenant_id=a.tenant_id
-      JOIN app.user_account u ON u.id=a.doctor_id AND u.tenant_id=a.tenant_id
+      LEFT JOIN app.user_account u ON u.id=a.doctor_id AND u.tenant_id=a.tenant_id
       WHERE a.patient_id=$1 AND a.facility_id=ANY($2::uuid[])
     ),
     accessible_encounters AS (

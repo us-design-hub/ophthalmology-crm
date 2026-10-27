@@ -21,13 +21,13 @@ function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
     promise.then(resolve, reject);
   });
 }
-export async function api<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T> {
-  const entry = body === undefined ? prefetched.get(path) : undefined;
+export async function api<T>(path: string, body?: unknown, options?: { signal?: AbortSignal; method?: "DELETE" }): Promise<T> {
+  const entry = body === undefined && !options?.method ? prefetched.get(path) : undefined;
   if (entry) { prefetched.delete(path); if (entry.expires > Date.now()) return abortable(entry.promise as Promise<T>, options?.signal); }
   return request<T>(path, body, options);
 }
-async function request<T>(path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T> {
-  const response = await fetch(path, { method: body === undefined ? "GET" : "POST", cache: "no-store", ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), signal: options?.signal });
+async function request<T>(path: string, body?: unknown, options?: { signal?: AbortSignal; method?: "DELETE" }): Promise<T> {
+  const response = await fetch(path, { method: options?.method ?? (body === undefined ? "GET" : "POST"), cache: "no-store", ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), signal: options?.signal });
   const data = await response.json();
   if (!response.ok) {
     if (response.status === 401 && !path.endsWith("/login")) window.location.assign("/login?expired=1");

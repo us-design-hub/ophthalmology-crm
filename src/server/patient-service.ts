@@ -5,19 +5,19 @@ import { withTenant } from "./db";
 import { audit, type AuditContext } from "./audit";
 import { ApiError } from "./http";
 import { encryptIdentifier, identifierIndex, matchesReview, signReview } from "./crypto";
-import { ageFromDob, IDENTIFIER_TYPES, normalizeIdentifier, normalizePhone, patientInputSchema, todayKarachi, type PatientDetail, type PatientInput, type PatientList, type PatientSummary } from "../lib/patients";
+import { ageFromDob, formatMrn, IDENTIFIER_TYPES, normalizeIdentifier, normalizePhone, patientInputSchema, todayKarachi, type PatientDetail, type PatientInput, type PatientList, type PatientSummary } from "../lib/patients";
 import type { AuthUser } from "../lib/access";
 
 const summaryColumns = `p.id,p.version,p.mrn,p.given_name AS "givenName",p.family_name AS "familyName",p.gender,p.dob,
   p.dob_estimated AS "dobEstimated",p.phone_e164 AS phone,p.identifier_type AS "identifierType",
-  concat('•••• ',p.identifier_last4) AS "identifierMasked",p.city,p.created_at AS "createdAt",
+  CASE WHEN p.identifier_last4 IS NULL THEN '' ELSE concat('•••• ',p.identifier_last4) END AS "identifierMasked",p.city,p.created_at AS "createdAt",
   coalesce((SELECT json_agg(json_build_object('type',f.type,'value',f.value) ORDER BY f.created_at,f.id) FROM app.patient_flag f WHERE f.patient_id=p.id AND f.tenant_id=p.tenant_id AND f.resolved_at IS NULL),'[]'::json) AS flags`;
 
 export function parsePatientInput(value: unknown): PatientInput {
   const input = patientInputSchema.safeParse(value);
   if (!input.success) throw new ApiError(400, "validationFailed", { fields: Object.fromEntries(input.error.issues.map(issue => [issue.path.join("."), issue.message])) });
   return { ...input.data, givenName: input.data.givenName.replace(/\s+/g, " "), familyName: input.data.familyName.replace(/\s+/g, " "),
-    identifier: normalizeIdentifier(input.data.identifier, input.data.identifierType), nextOfKinPhone: input.data.nextOfKinPhone ? normalizePhone(input.data.nextOfKinPhone)! : "", alternatePhone: input.data.alternatePhone ? normalizePhone(input.data.alternatePhone)! : "" };
+    phone: input.data.phone ? normalizePhone(input.data.phone)! : "", identifier: normalizeIdentifier(input.data.identifier, input.data.identifierType), nextOfKinPhone: input.data.nextOfKinPhone ? normalizePhone(input.data.nextOfKinPhone)! : "", alternatePhone: input.data.alternatePhone ? normalizePhone(input.data.alternatePhone)! : "" };
 }
 const listSchema = z.object({ query: z.string().trim().max(100).default(""), page: z.number().int().min(1).max(10000).default(1) }).strict();
 export async function listPatients(user: AuthUser, value: unknown, context: AuditContext): Promise<PatientList> {
@@ -49,10 +49,11 @@ export async function getPatient(user: AuthUser, id: string, context: AuditConte
 }
 
 async function findDuplicates(db: PoolClient, user: AuthUser, input: PatientInput) {
-  const index = identifierIndex(user.tenantId, input.identifierType, input.identifier);
+  // Without an ID or phone, name and date of birth still catch a returning patient.
+  const index = input.identifier ? identifierIndex(user.tenantId, input.identifierType, input.identifier) : null;
   const result = await db.query(`SELECT ${summaryColumns},
     (p.identifier_blind_index=$1 AND p.identifier_type<>'guardian_cnic' AND $2<>'guardian_cnic') AS "exactIdentifier"
-    FROM app.patient p WHERE (p.identifier_blind_index=$1 AND p.identifier_type<>'guardian_cnic' AND $2<>'guardian_cnic') OR p.phone_e164=$3
+    FROM app.patient p WHERE (p.identifier_blind_index=$1 AND p.identifier_type<>'guardian_cnic' AND $2<>'guardian_cnic') OR p.phone_e164=nullif($3,'')
     OR (lower(p.given_name)=lower($4) AND lower(p.family_name)=lower($5) AND p.dob=$6)
     ORDER BY p.id`, [index, input.identifierType, input.phone, input.givenName, input.familyName, input.dob]);
   return result.rows as (PatientSummary & { exactIdentifier: boolean })[];
@@ -70,6 +71,46 @@ export async function reviewPatient(user: AuthUser, input: PatientInput, context
     return { candidates, exactMatch: candidates.some(row => row.exactIdentifier), reviewToken: token };
   });
 }
+const HOLD_MINUTES = 30;
+/**
+ * The MR number this receptionist is holding, taking one if needed. Order of
+ * preference: their own hold, the lowest released or expired hold, then a new
+ * number. Callers hold the per-hospital registration lock.
+ */
+async function holdNumber(db: PoolClient, user: AuthUser) {
+  const year = Number(todayKarachi().slice(0, 4));
+  const renew = (sequence: number) => db.query(`UPDATE app.mrn_hold SET holder_id=$4,expires_at=now()+make_interval(mins=>${HOLD_MINUTES}) WHERE tenant_id=$1 AND year=$2 AND sequence=$3`, [user.tenantId, year, sequence, user.id]);
+  // A hold left over from last year is reissued from that year's own sequence, never carried across.
+  const own = await db.query("SELECT sequence FROM app.mrn_hold WHERE tenant_id=$1 AND year=$2 AND holder_id=$3 AND expires_at>now() ORDER BY sequence LIMIT 1", [user.tenantId, year, user.id]);
+  let sequence: number;
+  if (own.rowCount) sequence = Number(own.rows[0].sequence);
+  else {
+    const released = await db.query("SELECT sequence FROM app.mrn_hold WHERE tenant_id=$1 AND year=$2 AND expires_at<=now() ORDER BY sequence LIMIT 1", [user.tenantId, year]);
+    if (released.rowCount) sequence = Number(released.rows[0].sequence);
+    else {
+      const counter = await db.query("INSERT INTO app.mrn_counter(tenant_id,year,sequence) VALUES($1,$2,1) ON CONFLICT(tenant_id,year) DO UPDATE SET sequence=app.mrn_counter.sequence+1 RETURNING sequence", [user.tenantId, year]);
+      sequence = Number(counter.rows[0].sequence);
+      await db.query("INSERT INTO app.mrn_hold(tenant_id,year,sequence,holder_id,expires_at) VALUES($1,$2,$3,$4,now())", [user.tenantId, year, sequence, user.id]);
+    }
+  }
+  await renew(sequence);
+  const tenant = await db.query("SELECT mrn_prefix FROM app.tenant WHERE id=$1", [user.tenantId]);
+  return { mrn: formatMrn(tenant.rows[0].mrn_prefix, year, sequence), year, sequence };
+}
+/** Shown when reception opens Register patient, and renewed while the form stays open. */
+export async function holdMrn(user: AuthUser): Promise<{ mrn: string }> {
+  return withTenant(user.tenantId, user.id, async db => {
+    await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`patient-registration:${user.tenantId}`]);
+    return { mrn: (await holdNumber(db, user)).mrn };
+  });
+}
+/** A cancelled form hands its number straight back for the next registration. */
+export async function releaseMrn(user: AuthUser): Promise<{ ok: true }> {
+  return withTenant(user.tenantId, user.id, async db => {
+    await db.query("UPDATE app.mrn_hold SET expires_at=now() WHERE tenant_id=$1 AND holder_id=$2", [user.tenantId, user.id]);
+    return { ok: true as const };
+  });
+}
 export async function createPatient(user: AuthUser, input: PatientInput, context: AuditContext): Promise<PatientSummary> {
   if (!user.facilityIds.length) throw new ApiError(403, "facilityRequired");
   return withTenant(user.tenantId, user.id, async db => {
@@ -83,14 +124,13 @@ export async function createPatient(user: AuthUser, input: PatientInput, context
       throw new ApiError(409, "reviewRequired");
     }
     if (candidates.length && (!input.duplicateReason || input.duplicateReason.length < 8)) throw new ApiError(400, "duplicateReasonRequired");
-    const year = Number(todayKarachi().slice(0, 4));
-    const counter = await db.query("INSERT INTO app.mrn_counter(tenant_id,year,sequence) VALUES($1,$2,1) ON CONFLICT(tenant_id,year) DO UPDATE SET sequence=app.mrn_counter.sequence+1 RETURNING sequence", [user.tenantId, year]);
-    const tenant = await db.query("SELECT mrn_prefix FROM app.tenant WHERE id=$1", [user.tenantId]);
-    const mrn = `${tenant.rows[0].mrn_prefix}-${String(year).slice(-2)}-${String(counter.rows[0].sequence).padStart(6, "0")}`;
+    // The number shown on the form is the one saved; it leaves the hold table with the record.
+    const { mrn, year, sequence } = await holdNumber(db, user);
+    await db.query("DELETE FROM app.mrn_hold WHERE tenant_id=$1 AND year=$2 AND sequence=$3", [user.tenantId, year, sequence]);
     const result = await db.query(`INSERT INTO app.patient(tenant_id,mrn,given_name,family_name,dob,dob_estimated,gender,phone_e164,identifier_type,identifier_encrypted,identifier_blind_index,identifier_last4,city,address,preferred_language,next_of_kin_name,next_of_kin_phone,guardian_name,alternate_phone,alternate_relation,referred_by,programme,medical_conditions,previous_surgery,current_medications,created_by,created_facility_id)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27) RETURNING id`, [
-      user.tenantId, mrn, input.givenName, input.familyName, input.dob, input.dobEstimated, input.gender, input.phone, input.identifierType,
-      encryptIdentifier(user.tenantId, input.identifierType, input.identifier), identifierIndex(user.tenantId, input.identifierType, input.identifier), input.identifier.slice(-4),
+      user.tenantId, mrn, input.givenName, input.familyName, input.dob, input.dobEstimated, input.gender, input.phone || null, ...(input.identifier ? [input.identifierType,
+      encryptIdentifier(user.tenantId, input.identifierType, input.identifier), identifierIndex(user.tenantId, input.identifierType, input.identifier), input.identifier.slice(-4)] : [null, null, null, null]),
       input.city, input.address, input.preferredLanguage, input.nextOfKinName, input.nextOfKinPhone, input.guardianName, input.alternatePhone, input.alternateRelation, input.referredBy, input.programme, input.medicalConditions, input.previousSurgery, input.currentMedications, user.id, user.facilityIds[0],
     ]);
     const id = result.rows[0].id as string;
@@ -107,7 +147,7 @@ export async function editPatient(user:AuthUser,id:string,value:unknown,context:
  const phone=normalizePhone(d.phone),kin=d.nextOfKinPhone?normalizePhone(d.nextOfKinPhone):'',alternate=d.alternatePhone?normalizePhone(d.alternatePhone):'';
  if(!phone||kin===null||alternate===null||d.dob>todayKarachi()||Number(todayKarachi().slice(0,4))-Number(d.dob.slice(0,4))>120)throw new ApiError(400,'validationFailed');
  return withTenant(user.tenantId,user.id,async db=>{await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`patient-registration:${user.tenantId}`]);const old=(await db.query('SELECT * FROM app.patient WHERE id=$1 FOR UPDATE',[id])).rows[0];if(!old)throw new ApiError(404,'patientNotFound');if(old.version!==d.version)throw new ApiError(409,'recordChanged');
- const identifierType=d.identifier?d.identifierType:old.identifier_type;if(!identifierType||(identifierType==='guardian_cnic'&&ageFromDob(d.dob)>=18))throw new ApiError(400,'guardianMinorOnly');
+ const identifierType=d.identifier?d.identifierType:old.identifier_type;if((d.identifier&&!identifierType)||(identifierType==='guardian_cnic'&&ageFromDob(d.dob)>=18))throw new ApiError(400,'guardianMinorOnly');
  if(d.identifier){const normalized=normalizeIdentifier(d.identifier,identifierType);if(identifierType==='passport'?!/^[A-Z0-9]{6,20}$/.test(normalized):!/^\d{13}$/.test(normalized))throw new ApiError(400,'invalidIdentifier');const index=identifierIndex(user.tenantId,identifierType,normalized);if(identifierType!=='guardian_cnic'&&(await db.query("SELECT 1 FROM app.patient WHERE id<>$1 AND identifier_blind_index=$2 AND identifier_type<>'guardian_cnic'",[id,index])).rowCount)throw new ApiError(409,'duplicateIdentifier');await db.query('UPDATE app.patient SET identifier_type=$2,identifier_encrypted=$3,identifier_blind_index=$4,identifier_last4=$5 WHERE id=$1',[id,identifierType,encryptIdentifier(user.tenantId,identifierType,normalized),index,normalized.slice(-4)]);}
 
  const duplicates=(await db.query("SELECT id,mrn FROM app.patient WHERE id<>$1 AND (phone_e164=$2 OR (lower(given_name)=lower($3) AND lower(family_name)=lower($4) AND dob=$5))",[id,phone,d.givenName,d.familyName,d.dob])).rows;

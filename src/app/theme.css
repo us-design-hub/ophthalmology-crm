@@ -220,3 +220,33 @@
 .medical-history-options { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 16px 0; }
 /* The sidebar sits on the right in Urdu, so the toggle icon mirrors with it. */
 html[dir=rtl] .sidebar-toggle svg { transform: scaleX(-1); }
+
+/* --- Registration: MR number, arrival type and emergency triage ------------ */
+.registration-heading-side { display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0; }
+.mrn-badge { display: grid; gap: 2px; padding: 8px 14px; border-radius: var(--radius-lg); background: var(--violet-50); text-align: end; }
+.mrn-badge small { font-size: var(--text-xs); font-weight: var(--weight-semi); letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.mrn-badge strong { font-size: var(--text-xl); font-weight: var(--weight-semi); color: var(--violet-700); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.arrival-switch { display: inline-flex; gap: 4px; margin-top: 18px; padding: 4px; border-radius: var(--radius-full); background: var(--gray-50); border: 1px solid var(--gray-200); }
+.arrival-switch button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 16px; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--text-secondary); font-size: var(--text-md); font-weight: var(--weight-medium); }
+.arrival-switch button.is-active { background: var(--white); color: var(--violet-700); box-shadow: var(--card-shadow); }
+.arrival-switch button.is-active.is-emergency { background: var(--danger-600); color: var(--white); }
+.registration-dialog.is-emergency .registration-heading { border-top: 4px solid var(--danger-600); border-radius: var(--card-radius) var(--card-radius) 0 0; }
+.reason-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.registration-dialog .reason-options label { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 10px 14px; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); background: var(--white); font-weight: var(--weight-medium); color: var(--text-primary); cursor: pointer; }
+.registration-dialog .reason-options label.is-selected { border-color: var(--danger-600); background: color-mix(in srgb, var(--danger-600) 7%, var(--white)); }
+.registration-dialog .reason-options input { accent-color: var(--danger-600); width: 16px; height: 16px; margin: 0; }
+.emergency-advice { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; padding: 12px 14px; border-radius: var(--radius-lg); background: color-mix(in srgb, var(--danger-600) 9%, var(--white)); color: var(--danger-600); font-weight: var(--weight-semi); font-size: var(--text-md); line-height: 1.5; }
+.emergency-advice svg { flex-shrink: 0; margin-top: 2px; }
+@media (max-width: 600px) {
+  .registration-heading { flex-wrap: wrap; }
+  .registration-heading-side { width: 100%; justify-content: space-between; order: -1; }
+}
+
+/* --- Emergencies and unassigned visits on the queue and doctor list --------- */
+.emergency-tag { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; justify-self: start; margin-top: 8px; padding: 4px 10px; border-radius: var(--radius-full); background: var(--danger-600); color: var(--white); font-size: var(--text-sm); font-weight: var(--weight-semi); }
+.queue-card.is-emergency,
+.clinical-encounter.is-emergency { box-shadow: inset 4px 0 var(--danger-600), var(--card-shadow); }
+.queue-card.is-emergency.is-overdue { box-shadow: inset 4px 0 var(--danger-600), 0 0 0 2px color-mix(in srgb, var(--danger-600) 35%, transparent); }
+.doctor-unassigned { color: var(--warning-600); font-weight: var(--weight-semi); }
+.assign-doctor select { max-width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--gray-200); border-radius: var(--radius-md); background: var(--white); color: var(--text-primary); font-size: var(--text-sm); font-weight: var(--weight-medium); text-align: start; }
+.assign-doctor select:has(option[value=""]:checked) { border-color: var(--warning-600); color: var(--warning-600); }

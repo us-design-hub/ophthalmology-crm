@@ -60,10 +60,12 @@ test("reception registers a walk-in, assigns a doctor and the patient joins toda
   for (const key of ["givenName", "familyName", "dob", "phone", "identifier"] as const) await dialog.locator(`[name="${key}"]`).fill(input[key]);
   await dialog.locator('[name="gender"]').selectOption("female");
   await expect(dialog.getByLabel("Add to today's queue now", { exact: true })).toBeChecked();
-  // A doctor is never chosen silently: the clinic must be picked before review.
+  // The clinic is never chosen silently; the doctor may be left for later.
   await dialog.getByRole("button", { name: "Check & review", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toContainText("Choose a clinic and doctor");
+  await expect(dialog.getByRole("alert")).toContainText("Choose the clinic for today's visit");
   await dialog.locator('[name="queueClinic"]').selectOption({ label: "Optometry" });
+  await expect(dialog.locator('[name="queueDoctor"] option:checked')).toHaveText("Not assigned yet");
+  await dialog.locator('[name="queueDoctor"]').selectOption({ index: 1 });
   const doctor = await dialog.locator('[name="queueDoctor"] option:checked').innerText();
   await dialog.getByRole("button", { name: "Check & review", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Review before creating", exact: true })).toBeVisible();

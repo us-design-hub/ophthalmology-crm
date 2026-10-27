@@ -154,9 +154,14 @@ export const ur: Partial<Record<MessageKey, string>> = {
   planTitle: "علاج کا منصوبہ", addToPlan: "منتخب حصے منصوبے میں شامل کریں", noPatient: "مریض کا ریکارڈ منسلک نہیں",
   notClinical: "Powered by Logic box", cornea: "قرنیہ", iris: "عنبیہ", lens: "عدسہ", retina: "شبکیہ",
   optic_nerve: "بصری عصب", sclera: "صلبیہ", selected: "منتخب", noneSelected: "کوئی حصہ منتخب نہیں",
+  mrnLabel: "ایم آر نمبر", arrivalType: "آمد کی قسم", regularArrival: "عام آمد", emergencyArrival: "ایمرجنسی", emergencyReasonLabel: "ایمرجنسی کی وجہ",
+  emergency_chemical_injury: "کیمیکل سے چوٹ", emergency_trauma: "آنکھ پر چوٹ", emergency_sudden_vision_loss: "اچانک نظر کا جانا", emergency_pain_red_eye: "شدید درد یا سرخ آنکھ",
+  chemicalInjuryAdvice: "ابھی آنکھ کو صاف پانی یا سیلائن سے دھونا شروع کریں۔ رجسٹریشن مکمل ہونے کا انتظار نہ کریں۔", approximateAge: "اندازاً عمر", identifierPending: "شناخت باقی",
+  doctorNotAssigned: "ابھی ڈاکٹر مقرر نہیں", registerEmergency: "ایمرجنسی رجسٹر کریں", emergencyReasonRequired: "ایمرجنسی کی وجہ منتخب کریں۔", doctorRequired: "معائنے سے پہلے ڈاکٹر مقرر کریں۔",
+  assignDoctor: "ڈاکٹر مقرر کریں", takePatient: "یہ مریض لیں", emergencyTag: "ایمرجنسی",
   collapseMenu: "مینو چھوٹا کریں", expandMenu: "مینو بڑا کریں",
   chooseClinic: "کلینک منتخب کریں", todaysVisit: "آج کی آمد", addToQueue: "مریض کو ابھی آج کی قطار میں شامل کریں", addToQueueHelp: "مریض کی آمد فوراً درج ہو جائے گی اور وہ ڈاکٹر کی قطار میں نظر آئے گا۔",
-  queueDoctorRequired: "کلینک اور ڈاکٹر منتخب کریں، یا قطار میں شامل کرنے کا نشان ہٹا دیں۔", queueSummary: "آج کی قطار", queueNotAdded: "شامل نہیں",
+  queueClinicRequired: "آج کی آمد کے لیے کلینک منتخب کریں، یا قطار میں شامل کرنے کا نشان ہٹا دیں۔", queueSummary: "آج کی قطار", queueNotAdded: "شامل نہیں",
   registerAndQueue: "رجسٹر کریں اور قطار میں شامل کریں", patientQueued: "رجسٹر ہو کر قطار میں شامل:", queueFailed: "مریض رجسٹر ہو گیا ہے لیکن قطار میں شامل نہیں ہوا۔",
 };
 
