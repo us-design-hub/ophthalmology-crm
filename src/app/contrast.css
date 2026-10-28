@@ -2,10 +2,10 @@
    Loaded after the component styles so legacy pale sage text inherits the
    stronger system palette without flattening status and clinical colours. */
 :root {
-  --text-primary: #2b2640;
+  --text-primary: #2a2323;
   --text-secondary: var(--gray-900);
   --text-muted: var(--gray-800);
-  --text-subtle: #5a5571;
+  --text-subtle: #5c5655;
   --text-faint: var(--gray-700);
   --text-link: var(--violet-700);
 }

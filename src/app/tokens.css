@@ -11,54 +11,67 @@
                     This is the only layer a theme overrides, so adding a dark
                     theme later means re-pointing these and nothing else.
 
-   The palette follows the Fillow admin look: violet accent, lavender-grey
-   neutrals and deep indigo for inverse chrome. The legacy ramp names (sage,
+   The palette uses the hospital red (#A80000) as its accent, warm grey
+   neutrals and a deep warm charcoal for inverse chrome. The legacy ramp names (sage,
    stone, brand, burgundy, slate) remain as aliases into it so older
    component CSS keeps working; amber marks demo/preview, and the od/os
    laterality pair is held apart from everything else.
    ========================================================================== */
 
 :root {
-  /* ---- Primitives: Fillow palette ---------------------------------------- *
-   * The interface follows the Fillow admin look: a violet accent on a soft
-   * lavender ground with cool lavender-grey neutrals. Fillow's own #886CC0
-   * is violet-500; buttons and accent text use violet-600 so white text on
-   * them keeps at least 4.5:1 contrast. The older ramps below (sage, stone,
-   * brand, burgundy, slate) are kept as names only and now point into this
-   * palette, so existing component CSS picks up the new look unchanged. */
-  --violet-50:  #f5f1fb;
-  --violet-100: #ece6f7;
-  --violet-200: #dccff0;
-  --violet-300: #c3b0e3;
-  --violet-400: #a68dd3;
-  --violet-500: #886cc0;
-  --violet-600: #7b5db8;
-  --violet-700: #6a4ea6;
-  --violet-800: #563f88;
-  --violet-900: #3f2f62;
+  /* ---- Primitives: hospital red ------------------------------------------ *
+   * The accent is the hospital red #A80000 (red-600): buttons, the active
+   * menu item and accent text. White on it is about 8:1, well above the
+   * 4.5:1 minimum. Neutrals are warm greys so they sit quietly beside it.
+   * The older ramp names (violet, sage, stone, brand, burgundy, slate) are
+   * kept as aliases into this palette, so component CSS is unchanged. */
+  --red-50:  #fdf3f3;
+  --red-100: #fae3e3;
+  --red-200: #f3c4c4;
+  --red-300: #e89a9a;
+  --red-400: #d86262;
+  --red-500: #c22222;
+  --red-600: #a80000;
+  --red-700: #8c0000;
+  --red-800: #700000;
+  --red-900: #520000;
 
-  --gray-25:  #fcfbfe;
-  --gray-50:  #f7f5fc;
-  --gray-100: #f1eef8;
-  --gray-200: #e8e4f1;
-  --gray-300: #dcd7e8;
-  --gray-400: #c3bdd3;
-  --gray-500: #a29cb6;
-  --gray-600: #77718d;
-  --gray-700: #66607c;
-  --gray-800: #4f4a66;
-  --gray-900: #3b374f;
+  /* Legacy name from the earlier violet theme; points at the red ramp. */
+  --violet-50:  var(--red-50);
+  --violet-100: var(--red-100);
+  --violet-200: var(--red-200);
+  --violet-300: var(--red-300);
+  --violet-400: var(--red-400);
+  --violet-500: var(--red-500);
+  --violet-600: var(--red-600);
+  --violet-700: var(--red-700);
+  --violet-800: var(--red-800);
+  --violet-900: var(--red-900);
 
-  --indigo-400: #4b4470;
-  --indigo-500: #3f3961;
-  --indigo-600: #352f55;
-  --indigo-700: #2c2748;
-  --indigo-750: #29243f;
-  --indigo-800: #241f3a;
-  --indigo-900: #1c1830;
-  --indigo-950: #131022;
+  --gray-25:  #fcfbfb;
+  --gray-50:  #f8f6f6;
+  --gray-100: #f2efee;
+  --gray-200: #e9e4e3;
+  --gray-300: #ddd6d5;
+  --gray-400: #c4bcbb;
+  --gray-500: #a39b9a;
+  --gray-600: #76706f;
+  --gray-700: #645e5d;
+  --gray-800: #4e4948;
+  --gray-900: #3a3535;
 
-  --lavender-page: #f3f0f9;
+  /* Deep warm charcoal for inverse surfaces (the old indigo names). */
+  --indigo-400: #4a4141;
+  --indigo-500: #3d3535;
+  --indigo-600: #332c2c;
+  --indigo-700: #2b2424;
+  --indigo-750: #272020;
+  --indigo-800: #221c1c;
+  --indigo-900: #1b1616;
+  --indigo-950: #120e0e;
+
+  /* Page background (kept under its old name). */
+  --lavender-page: #f7f4f4;
 
   /* ---- Legacy ramp names: sage — now the lavender-grey neutral ---------- */
   --slate-25: var(--gray-25);
@@ -165,7 +178,7 @@
   --surface-scrim:    color-mix(in srgb, var(--brand-950) 42%, transparent);
 
   /* ---- Text ------------------------------------------------------------- */
-  --text-primary:   #2b2640;
+  --text-primary:   #2a2323;
   --text-secondary: var(--stone-800);
   --text-muted:     var(--stone-700);
   --text-subtle:    var(--stone-600);
@@ -289,8 +302,8 @@
   --card-padding: 24px;
   --card-gap:     24px;
   --card-border:  transparent;
-  --card-shadow:  0 0 40px color-mix(in srgb, #523f69 7%, transparent);
-  --card-shadow-raised: 0 10px 40px color-mix(in srgb, #523f69 14%, transparent);
+  --card-shadow:  0 0 40px color-mix(in srgb, #5a2a2a 7%, transparent);
+  --card-shadow-raised: 0 10px 40px color-mix(in srgb, #5a2a2a 14%, transparent);
 
   --control-radius: 10px;
   --control-height: 42px;

@@ -65,14 +65,14 @@
 .confirm-dialog {
   border: 0;
   border-radius: var(--card-radius);
-  box-shadow: 0 24px 80px color-mix(in srgb, #2b2640 24%, transparent);
+  box-shadow: 0 24px 80px color-mix(in srgb, #2a2323 24%, transparent);
 }
 /* Tint only: a blurred backdrop is slow to paint on modest clinic PCs. */
 .intake-dialog::backdrop,
 .registration-dialog::backdrop,
 .patient-record-dialog::backdrop,
-.confirm-dialog::backdrop { background: color-mix(in srgb, #2b2640 42%, transparent); backdrop-filter: none; }
-.patient-record-dialog { border-inline-start: 0; box-shadow: -16px 0 60px color-mix(in srgb, #2b2640 16%, transparent); }
+.confirm-dialog::backdrop { background: color-mix(in srgb, #2a2323 42%, transparent); backdrop-filter: none; }
+.patient-record-dialog { border-inline-start: 0; box-shadow: -16px 0 60px color-mix(in srgb, #2a2323 16%, transparent); }
 
 .intake-dialog .patient-record-header,
 .registration-heading { padding: 24px 28px 20px; border-bottom: 1px solid var(--border-subtle); }
