@@ -23,7 +23,7 @@ const group = (item: Encounter): Exclude<Group, "all" | "emergency"> => item.sta
 const statusKey = (item: Encounter): MessageKey => item.stage === "waiting" ? "queueWaiting" : item.stage === "consultation" ? "queueReadyForDoctor" : "queueWithTechnician";
 
 /** "45 m", "3 h 05 m", "4 d": readable at a glance, unlike a raw minute count. */
-function waited(minutes: number) {
+export function waited(minutes: number) {
   if (minutes < 60) return `${minutes} m`;
   if (minutes < 1440) return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} m`;
   return `${Math.floor(minutes / 1440)} d`;

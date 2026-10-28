@@ -335,3 +335,56 @@ html[dir=rtl] .sidebar-toggle svg { transform: scaleX(-1); }
 .rq-patient .intake-risk-flags { min-width: 0; max-width: 100%; }
 .rq-patient .flag-tag { min-width: 0; }
 .rq-waited svg { flex-shrink: 0; }
+
+/* --- Stage board (technicians, nurses, optometrists) ----------------------- */
+.queue-board-page { display: grid; gap: 18px; }
+.queue-board-page .queue-toolbar select { min-height: 40px; padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: var(--control-radius); background: var(--white); font-size: var(--text-md); }
+.queue-board-page .queue-board { grid-template-columns: var(--queue-columns); gap: 14px; overflow-x: auto; padding-bottom: 4px; }
+.queue-board-page .queue-column { border: 0; border-radius: var(--card-radius); background: color-mix(in srgb, var(--white) 55%, transparent); }
+.queue-board-page .queue-column > header { padding: 14px 16px; border-bottom: 1px solid var(--border-subtle); }
+.queue-board-page .queue-column h2 { font-size: var(--text-md); font-weight: var(--weight-semi); }
+.queue-board-page .queue-column > header > strong { min-width: 26px; padding: 1px 8px; border-radius: var(--radius-full); background: var(--white); font-size: var(--text-sm); text-align: center; }
+.queue-board-page .queue-column > div { padding: 10px; gap: 10px; }
+.queue-board-page .queue-column.is-empty { background: color-mix(in srgb, var(--white) 30%, transparent); }
+.queue-board-page .queue-column.is-empty > header { border-bottom: 0; flex-wrap: wrap; }
+.queue-board-page .queue-column.is-empty h2 { color: var(--text-muted); font-weight: var(--weight-medium); }
+.queue-board-page .queue-column.is-empty > header > strong { background: transparent; color: var(--text-faint); }
+.queue-board-page .queue-empty { padding: 6px 6px 12px; text-align: start; color: var(--text-faint); font-size: var(--text-sm); }
+
+.queue-board-page .queue-card { display: grid; gap: 10px; padding: 14px; border: 0; border-radius: 16px; background: var(--white); box-shadow: var(--card-shadow); }
+.queue-board-page .queue-card.is-overdue { box-shadow: var(--card-shadow); }
+.queue-board-page .queue-card.is-emergency { box-shadow: inset 4px 0 var(--danger-600), var(--card-shadow); }
+.qc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.qc-head h3 { font-size: var(--text-lg); font-weight: var(--weight-semi); line-height: 1.35; }
+.qc-head small { font-size: var(--text-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.qc-head .rq-more summary { width: 30px; height: 30px; margin: -4px -6px 0 0; }
+.qc-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.qc-tags .emergency-tag { margin: 0; }
+.queue-board-page .queue-card .intake-risk-flags { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.queue-board-page .queue-card .flag-tag { max-width: 100%; min-width: 0; display: inline-block; padding: 2px 8px; border-radius: var(--radius-full); font-size: var(--text-xs); line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.queue-board-page .queue-card .flag-tag strong { font-size: inherit; }
+.queue-board-page .queue-card .flag-tag svg { display: none; }
+.qc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; color: var(--text-secondary); font-size: var(--text-sm); }
+.qc-progress { display: flex; gap: 4px; }
+.qc-progress span { flex: 1; height: 5px; border-radius: var(--radius-full); background: var(--gray-100); }
+.qc-progress span.is-done { background: var(--violet-500); }
+.qc-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; font-size: var(--text-sm); }
+.qc-time { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qc-time svg { flex-shrink: 0; }
+.qc-time small { font-size: var(--text-xs); font-weight: var(--weight-semi); }
+.qc-time.is-overdue { color: var(--warning-600); font-weight: var(--weight-semi); }
+.qc-workup { padding: 2px 8px; border-radius: var(--radius-full); background: var(--gray-100); color: var(--text-secondary); font-size: var(--text-xs); font-weight: var(--weight-medium); }
+.qc-workup.qc-approved { background: color-mix(in srgb, var(--success-600) 12%, var(--white)); color: var(--success-600); }
+.qc-workup.qc-returned { background: color-mix(in srgb, var(--danger-600) 10%, var(--white)); color: var(--danger-600); }
+.qc-workup.qc-pending { background: var(--violet-50); color: var(--violet-700); }
+.queue-board-page .queue-card-actions { margin-top: 2px; }
+.queue-board-page .queue-card-actions button { padding: 8px 12px; font-size: var(--text-sm); }
+@media (max-width: 760px) {
+  .queue-board-page .queue-board { grid-template-columns: 1fr; overflow: visible; }
+  .queue-board-page .queue-column.is-empty > div { display: none; }
+}
+.queue-board-page .queue-column.is-empty > header { flex-wrap: nowrap; align-items: flex-start; padding-inline: 12px; }
+.queue-board-page .queue-column.is-empty > header > span { flex-shrink: 0; margin-top: 7px; }
+.queue-board-page .queue-column.is-empty h2 { line-height: 1.4; }
+.queue-board-page .queue-card > *,
+.queue-board-page .queue-card .intake-risk-flags { min-width: 0; max-width: 100%; }
