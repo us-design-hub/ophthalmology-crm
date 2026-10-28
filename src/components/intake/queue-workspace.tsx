@@ -12,6 +12,7 @@ import { WorkupDialog } from "./workup-dialog";
 import { ReasonDialog } from "../reason-dialog";
 import { AssignDoctor, useClinicDoctors } from "./assign-doctor";
 import { ReceptionQueue, waited } from "./reception-queue";
+import { LabChips } from "../lab/lab-chips";
 
 // Emergencies are seen first and are overdue after ten minutes, whatever the clinic target.
 const EMERGENCY_TARGET_MINUTES = 10;
@@ -87,6 +88,7 @@ function QueueBoard({ stageScope }: { stageScope?: readonly Stage[] }) {
         {emergency ? <p className="qc-tags"><strong className="emergency-tag"><Siren size={13}/>{t("emergencyTag")}</strong>{item.emergencyReason && <small className="rq-reason">{t(`emergency_${item.emergencyReason}` as MessageKey)}</small>}</p> : item.priority === "urgent" && <p className="qc-tags"><span className="rq-urgent">{t("urgentLabel")}</span></p>}
         {item.flags.length > 0 && <RiskFlags flags={item.flags}/>}
         <p className="qc-meta">{item.clinic} · {canAssign && (stage !== "consultation" || !item.doctorId) ? <AssignDoctor item={item} doctors={clinicDoctors.get(item.facilityId) ?? []} onDone={live.refresh} onError={setError}/> : item.doctor ?? <span className="doctor-unassigned">{t("doctorNotAssigned")}</span>}</p>
+        <LabChips encounterId={item.id} labs={item.labs} onChanged={live.refresh} onError={setError} allowOrder={false}/>
         <div className="qc-progress" role="img" aria-label={`${t("pathwayProgress")} ${progress}/${total}`}>{Array.from({ length: total }, (_, index) => <span key={index} className={index < progress ? "is-done" : ""}/>)}</div>
         <div className="qc-status"><span className={`qc-time ${overdue ? "is-overdue" : ""}`}><Clock3 size={13}/><span dir="ltr">{waited(elapsed)}</span>{overdue && <small>{t("overdue")}</small>}</span>{stage !== "waiting" && <span className={`qc-workup qc-${item.workupReviewStatus ?? (item.workupVersion ? "pending" : "none")}`}>{t(workupStatus)}</span>}</div>
         {stage === "dilation" && item.dilationReadyAt && <p className="dilation-countdown">{new Date(item.dilationReadyAt) > new Date(live.data!.serverNow) ? `${Math.ceil((new Date(item.dilationReadyAt).getTime() - new Date(live.data!.serverNow).getTime()) / 60000)} ${t("dilationRemaining")}` : t("dilationElapsed")}</p>}

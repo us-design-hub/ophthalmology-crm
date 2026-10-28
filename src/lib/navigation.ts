@@ -28,7 +28,7 @@ const PAGE_PERMISSION: Record<Page, Permission | null> = {
   overview: null,
   clinical: "clinical:read",
   queue: "intake:read",
-  laboratory: "intake:read",
+  laboratory: "lab:write",
   diagnostics: "intake:read",
   patients: "patient:read",
   appointments: "intake:read",

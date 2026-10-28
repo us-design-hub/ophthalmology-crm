@@ -12,6 +12,7 @@ import { api } from "@/lib/api-client";
 import { landingPage, visiblePages, type Page } from "@/lib/navigation";
 import { AppointmentsWorkspace } from "./intake/appointments-workspace";
 import { QueueWorkspace } from "./intake/queue-workspace";
+import { LabWorklist } from "./lab/lab-worklist";
 import { OverviewWorkspace } from "./overview/overview-workspace";
 import { ClinicalWorkspace as DoctorWorkspace, PatientTimelineDialog } from "./clinical/clinical-workspace";
 import { PrescriptionInbox } from "./clinical/prescription-inbox";
@@ -121,7 +122,7 @@ export function ClinicalWorkspace() {
         {passwordOpen && <PasswordForm onClose={() => setPasswordOpen(false)}/>}
         {signOutError && <p className="form-error" role="alert">{t("serviceUnavailable")}</p>}
 
-        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate} canOpen={canOpen}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <QueueWorkspace stageScope={["testing"]}/> : page === "diagnostics" ? <QueueWorkspace stageScope={["imaging"]}/> : page === "queue" ? <QueueWorkspace/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={canOpen("appointments") ? patient => { setBookingPatient(patient); navigate("appointments"); } : undefined}/> : page === "audit" ? <AuditWorkspace /> : <OverviewWorkspace navigate={navigate} canOpen={canOpen}/>}
+        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate} canOpen={canOpen}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <LabWorklist/> : page === "diagnostics" ? <QueueWorkspace stageScope={["testing", "imaging"]}/> : page === "queue" ? <QueueWorkspace/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={canOpen("appointments") ? patient => { setBookingPatient(patient); navigate("appointments"); } : undefined}/> : page === "audit" ? <AuditWorkspace /> : <OverviewWorkspace navigate={navigate} canOpen={canOpen}/>}
         {historyPatient && <PatientTimelineDialog patientId={historyPatient} onClose={() => setHistoryPatient(null)}/>}
         {(page === "overview" || page === "management") && <ReportLinks/>}
       </main>
