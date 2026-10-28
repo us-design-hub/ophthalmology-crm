@@ -388,3 +388,31 @@ html[dir=rtl] .sidebar-toggle svg { transform: scaleX(-1); }
 .queue-board-page .queue-column.is-empty h2 { line-height: 1.4; }
 .queue-board-page .queue-card > *,
 .queue-board-page .queue-card .intake-risk-flags { min-width: 0; max-width: 100%; }
+
+/* Board scrolling: columns snap into place and a faded edge shows more off-screen. */
+.queue-board-frame { position: relative; min-width: 0; }
+.queue-board-page .queue-board { scroll-snap-type: x proximity; scroll-padding-inline: 2px; }
+.queue-board-page .queue-column { scroll-snap-align: start; }
+.queue-board-frame::before,
+.queue-board-frame::after { content: ""; position: absolute; inset-block: 0; z-index: 2; width: 48px; pointer-events: none; opacity: 0; transition: opacity var(--duration-base) var(--ease); }
+.queue-board-frame::before { inset-inline-start: 0; background: linear-gradient(to right, var(--lavender-page), transparent); }
+.queue-board-frame::after { inset-inline-end: 0; background: linear-gradient(to left, var(--lavender-page), transparent); }
+html[dir=rtl] .queue-board-frame::before { background: linear-gradient(to left, var(--lavender-page), transparent); }
+html[dir=rtl] .queue-board-frame::after { background: linear-gradient(to right, var(--lavender-page), transparent); }
+.queue-board-frame[data-more-start]::before,
+.queue-board-frame[data-more-end]::after { opacity: 1; }
+
+/* "Ready for consultation" stays a narrow strip with its count until opened. */
+.queue-column-toggle { display: inline-flex; align-items: center; gap: 4px; margin-inline-start: 6px; padding: 3px 9px; border: 1px solid var(--gray-200); border-radius: var(--radius-full); background: var(--white); color: var(--violet-700); font-size: var(--text-xs); font-weight: var(--weight-semi); }
+.queue-column-toggle:hover { background: var(--violet-50); }
+.queue-board-page .queue-column.is-collapsed { background: color-mix(in srgb, var(--white) 55%, transparent); }
+.queue-board-page .queue-column.is-collapsed > header { flex-wrap: wrap; row-gap: 8px; }
+.queue-board-page .queue-column.is-collapsed h2 { color: var(--text-primary); font-weight: var(--weight-semi); }
+.queue-board-page .queue-column.is-collapsed > header > strong { background: var(--violet-100); color: var(--violet-700); }
+.queue-board-page .queue-column.is-collapsed .queue-column-toggle { margin-inline-start: 13px; }
+@media (max-width: 760px) {
+  .queue-board-frame::before, .queue-board-frame::after { display: none; }
+}
+.queue-board-page .queue-column.is-collapsed > header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: 7px; }
+.queue-board-page .queue-column.is-collapsed > header > span { margin-top: 7px; }
+.queue-board-page .queue-column.is-collapsed .queue-column-toggle { grid-column: 2 / -1; justify-self: start; margin-inline-start: 0; }

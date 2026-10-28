@@ -8,7 +8,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   expect(response.status()).toBe(200);
 });
 
-test("production navigation removes standalone anatomy practice and separates queue worklists", async ({ page }) => {
+test("one live queue board: pathway stages, and the ready-for-doctor column opens on request", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Anatomy practice", exact: true })).toHaveCount(0);
 
@@ -16,20 +16,25 @@ test("production navigation removes standalone anatomy practice and separates qu
   await expect(page.locator(".stage-waiting")).toBeVisible();
   await expect(page.locator(".stage-workup")).toBeVisible();
   await expect(page.locator(".stage-dilation")).toBeVisible();
-  await expect(page.locator(".stage-consultation")).toBeVisible();
-
-  await page.getByRole("button", { name: "Ophthalmic workup", exact: true }).click();
-  await expect(page.locator(".stage-waiting")).toBeVisible();
-  await expect(page.locator(".stage-workup")).toBeVisible();
-  await expect(page.locator(".stage-dilation")).toBeVisible();
-  await expect(page.locator(".stage-consultation")).toHaveCount(0);
+  // The old Ophthalmic workup page was the same board without this column; it is now one page.
+  await expect(page.getByRole("button", { name: "Ophthalmic workup", exact: true })).toHaveCount(0);
+  const ready = page.locator(".stage-consultation");
+  await expect(ready).toHaveClass(/is-collapsed/);
+  await expect(ready.locator(".queue-card")).toHaveCount(0);
+  await ready.getByRole("button", { name: "Show", exact: true }).click();
+  await expect(ready.locator(".queue-card").first()).toBeVisible();
+  // The choice is remembered for the next visit.
+  await page.reload();
+  await page.getByRole("button", { name: "Live queue", exact: true }).click();
+  await expect(page.locator(".stage-consultation .queue-card").first()).toBeVisible();
+  await page.locator(".stage-consultation").getByRole("button", { name: "Hide", exact: true }).click();
 });
 
 test("each role's sidebar lists only that role's pages", async ({ browser, baseURL }) => {
   const expected: Record<string, string[]> = {
     "sara.khan": ["Home", "Doctor Event", "Patients", "Prescriptions", "Surgery lifecycle"],
     "aisha.malik": ["Home", "Live queue", "Patients", "Appointments"],
-    "sana.qureshi": ["Home", "Live queue", "Ophthalmic workup", "Patients"],
+    "sana.qureshi": ["Home", "Live queue", "Patients"],
     "omar.siddiqui": ["Home", "Patients", "Appointments", "Management", "Administration"],
     "faisal.noor": ["Home", "Administration", "Audit trail"],
   };

@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { ArrowRight, Clock3, MoreHorizontal, Siren } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, ChevronsLeftRight, Clock3, MoreHorizontal, Siren } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { STAGES, type Encounter, type PathwayStep, type Stage } from "@/lib/intake";
 import type { MessageKey } from "@/lib/messages";
@@ -15,14 +15,15 @@ import { ReceptionQueue, waited } from "./reception-queue";
 
 // Emergencies are seen first and are overdue after ten minutes, whatever the clinic target.
 const EMERGENCY_TARGET_MINUTES = 10;
-const WORKUP_STAGES = ["waiting", "workup", "testing", "imaging", "dilation"] as const satisfies readonly Stage[];
+// Technicians mostly need a count for patients already handed to the doctor; the column opens on request.
+const READY_KEY = "openeyes.queue.ready";
 
-export function QueueWorkspace(props: { workupOnly?: boolean; stageScope?: readonly Stage[] }) {
+export function QueueWorkspace(props: { stageScope?: readonly Stage[] }) {
   // Reception sees a simple list; staff who record workups keep the stage board.
   const user = useSession();
-  return !props.workupOnly && !props.stageScope && !user.permissions.includes("workup:read") ? <ReceptionQueue/> : <QueueBoard {...props}/>;
+  return !props.stageScope && !user.permissions.includes("workup:read") ? <ReceptionQueue/> : <QueueBoard {...props}/>;
 }
-function QueueBoard({ workupOnly = false, stageScope }: { workupOnly?: boolean; stageScope?: readonly Stage[] }) {
+function QueueBoard({ stageScope }: { stageScope?: readonly Stage[] }) {
   const { t } = useLocale();
   const user = useSession();
   const live = useLiveData<{ encounters: Encounter[]; serverNow: string }>("/api/intake/queue");
@@ -34,8 +35,17 @@ function QueueBoard({ workupOnly = false, stageScope }: { workupOnly?: boolean; 
   const [pending, setPending] = useState<{ item: Encounter; action: string } | null>(null);
   const canAssign = user.permissions.includes("appointment:create") || user.permissions.includes("queue:manage");
   const clinicDoctors = useClinicDoctors(canAssign);
-  const visibleStages: readonly Stage[] = stageScope ?? (workupOnly ? WORKUP_STAGES : STAGES);
-  const encounters = live.data?.encounters.filter(value => (!clinic || value.facilityId === clinic) && (!specialty || value.specialty === specialty) && visibleStages.includes(value.stage)) ?? [];
+  const inFilter = live.data?.encounters.filter(value => (!clinic || value.facilityId === clinic) && (!specialty || value.specialty === specialty)) ?? [];
+  // Only the stages these clinics actually use: a Retina pathway adds imaging and dilation, General goes straight to the doctor.
+  const used = new Set<Stage>(["waiting", "workup", "consultation", ...inFilter.flatMap(value => [...value.pathwaySteps, value.stage])]);
+  const visibleStages: readonly Stage[] = stageScope ?? STAGES.filter(stage => used.has(stage));
+  const encounters = inFilter.filter(value => visibleStages.includes(value.stage));
+  const [readyOpen, setReadyOpen] = useState(false);
+  useEffect(() => { try { setReadyOpen(localStorage.getItem(READY_KEY) === "open"); } catch { /* stays collapsed */ } }, []);
+  const toggleReady = () => setReadyOpen(current => { try { localStorage.setItem(READY_KEY, current ? "closed" : "open"); } catch { /* not remembered */ } return !current; });
+  // A faded edge tells staff there are more columns off-screen when every stage is busy.
+  const board = useRef<HTMLDivElement>(null); const [more, setMore] = useState({ start: false, end: false });
+  useEffect(() => { const element = board.current; if (!element) return; const measure = () => { const scrolled = Math.abs(element.scrollLeft), hidden = element.scrollWidth - element.clientWidth; setMore(current => { const next = { start: scrolled > 4, end: hidden - scrolled > 4 }; return next.start === current.start && next.end === current.end ? current : next; }); }; measure(); element.addEventListener("scroll", measure, { passive: true }); const observer = new ResizeObserver(measure); observer.observe(element); return () => { element.removeEventListener("scroll", measure); observer.disconnect(); }; });
   const serverNow = new Date(live.data?.serverNow ?? Date.now()).getTime();
 
   async function start(item: Encounter) {
@@ -58,13 +68,14 @@ function QueueBoard({ workupOnly = false, stageScope }: { workupOnly?: boolean; 
 
   const stageCount = (stage: Stage) => encounters.filter(value => value.stage === stage).length;
   // Empty stages shrink to a narrow column so the busy ones get the room.
-  const columns = visibleStages.map(stage => stageCount(stage) ? "minmax(220px, 1fr)" : "minmax(118px, .4fr)").join(" ");
+  const collapsed = (stage: Stage) => !stageCount(stage) || (stage === "consultation" && !readyOpen && !stageScope);
+  const columns = visibleStages.map(stage => collapsed(stage) ? "minmax(118px, .4fr)" : "minmax(200px, 1fr)").join(" ");
   const canManage = user.permissions.includes("queue:manage");
 
   return <div className="intake-workspace queue-board-page">
     <div className="queue-toolbar"><div><label><span className="sr-only">{t("clinicLabel")}</span><select value={clinic} onChange={event => setClinic(event.target.value)}><option value="">{t("allClinics")}</option>{Array.from(new Map(live.data?.encounters.map(value => [value.facilityId, value.clinic])).entries()).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label><label><span className="sr-only">{t("specialtyLabel")}</span><select value={specialty} onChange={event => setSpecialty(event.target.value)}><option value="">{t("allSpecialties")}</option>{Array.from(new Set(live.data?.encounters.map(value => value.specialty))).sort().map(value => <option key={value}>{value}</option>)}</select></label></div><LiveStatus {...live}/></div>
     <ErrorNotice error={error}/>
-    <div className={`queue-board ${workupOnly ? "workup-board" : ""}`} style={{ "--queue-columns": columns } as React.CSSProperties}>{visibleStages.map(stage => <section className={`queue-column stage-${stage} ${stageCount(stage) ? "" : "is-empty"}`} key={stage}><header><span/><h2>{t(`stage_${stage}`)}</h2><strong>{stageCount(stage)}</strong></header><div>{encounters.filter(value => value.stage === stage).map(item => {
+    <div className="queue-board-frame" data-more-start={more.start || undefined} data-more-end={more.end || undefined}><div ref={board} className="queue-board" style={{ "--queue-columns": columns } as React.CSSProperties}>{visibleStages.map(stage => <section className={`queue-column stage-${stage} ${collapsed(stage) ? "is-empty" : ""} ${stage === "consultation" && stageCount(stage) && !readyOpen && !stageScope ? "is-collapsed" : ""}`} key={stage}><header><span/><h2>{t(`stage_${stage}`)}</h2><strong>{stageCount(stage)}</strong>{stage === "consultation" && !stageScope && stageCount(stage) > 0 && <button type="button" className="queue-column-toggle" aria-expanded={readyOpen} onClick={toggleReady}><ChevronsLeftRight size={14}/>{t(readyOpen ? "hideColumn" : "showColumn")}</button>}</header><div>{(collapsed(stage) ? [] : encounters.filter(value => value.stage === stage)).map(item => {
       const elapsed = Math.max(0, Math.floor((serverNow - new Date(item.stageAt).getTime()) / 60000));
       const emergency = item.visitType === "emergency";
       const overdue = elapsed >= (emergency ? EMERGENCY_TARGET_MINUTES : item.pathwayTargetMinutes);
@@ -81,7 +92,7 @@ function QueueBoard({ workupOnly = false, stageScope }: { workupOnly?: boolean; 
         {stage === "dilation" && item.dilationReadyAt && <p className="dilation-countdown">{new Date(item.dilationReadyAt) > new Date(live.data!.serverNow) ? `${Math.ceil((new Date(item.dilationReadyAt).getTime() - new Date(live.data!.serverNow).getTime()) / 60000)} ${t("dilationRemaining")}` : t("dilationElapsed")}</p>}
         <div className="queue-card-actions">{stage === "waiting" && user.permissions.includes("queue:workup") && <button type="button" className="primary-button" disabled={!!busy || !!live.error} onClick={() => start(item)}>{t("startWorkup")}<ArrowRight size={13}/></button>}{user.permissions.includes("workup:read") && (stage !== "waiting" || item.workupVersion > 0) && <button type="button" className={stage === "workup" && user.permissions.includes("workup:write") ? "primary-button" : "secondary-button"} onClick={() => setSelected(item.id)}>{t(user.permissions.includes("workup:write") && stage === "workup" ? "openWorkup" : stage === "testing" || stage === "imaging" || stage === "dilation" ? "openCheckpoint" : "viewWorkup")}</button>}</div>
       </article>;
-    })}{!stageCount(stage) && <p className="queue-empty">{t("emptyQueueShort")}</p>}</div></section>)}</div>
+    })}{!stageCount(stage) && <p className="queue-empty">{t("emptyQueueShort")}</p>}</div></section>)}</div></div>
     {pending && <ReasonDialog title="queueChangeReason" busy={busy === pending.item.id} onClose={() => setPending(null)} onConfirm={reason => void manage(pending.item, pending.action, reason)}/>}
     {selected && <WorkupDialog id={selected} onClose={() => { setSelected(null); live.refresh(); }} onSaved={live.refresh}/>}
   </div>;

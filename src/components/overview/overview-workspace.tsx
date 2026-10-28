@@ -7,7 +7,7 @@ import type { MessageKey } from "@/lib/messages";
 import { useLocale } from "../locale-provider";
 import { useSession } from "../session-provider";
 
-type Page = "appointments" | "queue" | "workup" | "clinical" | "prescriptions" | "administration" | "audit" | "patients";
+type Page = "appointments" | "queue" | "clinical" | "prescriptions" | "administration" | "audit" | "patients";
 
 /**
  * One landing page for every active role.

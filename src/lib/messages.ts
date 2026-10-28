@@ -158,7 +158,7 @@ export const ur: Partial<Record<MessageKey, string>> = {
   emergency_chemical_injury: "کیمیکل سے چوٹ", emergency_trauma: "آنکھ پر چوٹ", emergency_sudden_vision_loss: "اچانک نظر کا جانا", emergency_pain_red_eye: "شدید درد یا سرخ آنکھ",
   chemicalInjuryAdvice: "ابھی آنکھ کو صاف پانی یا سیلائن سے دھونا شروع کریں۔ رجسٹریشن مکمل ہونے کا انتظار نہ کریں۔", approximateAge: "اندازاً عمر", identifierPending: "شناخت باقی",
   doctorNotAssigned: "ابھی ڈاکٹر مقرر نہیں", registerEmergency: "ایمرجنسی رجسٹر کریں", emergencyReasonRequired: "ایمرجنسی کی وجہ منتخب کریں۔", doctorRequired: "معائنے سے پہلے ڈاکٹر مقرر کریں۔",
-  queueAll: "سب", queueWaiting: "انتظار میں", queueWithTechnician: "ٹیکنیشن کے پاس", queueReadyForDoctor: "ڈاکٹر کے لیے تیار", queueEmergencies: "ایمرجنسی", queueStatus: "حالت", queueWaited: "آمد سے اب تک", urgentLabel: "فوری", markUrgent: "فوری قرار دیں", setRoutine: "معمول پر کریں", leftBeforeSeen: "معائنے سے پہلے چلے گئے", queueEmptyAll: "اس وقت قطار میں کوئی مریض نہیں۔",
+  showColumn: "دکھائیں", hideColumn: "چھپائیں", queueAll: "سب", queueWaiting: "انتظار میں", queueWithTechnician: "ٹیکنیشن کے پاس", queueReadyForDoctor: "ڈاکٹر کے لیے تیار", queueEmergencies: "ایمرجنسی", queueStatus: "حالت", queueWaited: "آمد سے اب تک", urgentLabel: "فوری", markUrgent: "فوری قرار دیں", setRoutine: "معمول پر کریں", leftBeforeSeen: "معائنے سے پہلے چلے گئے", queueEmptyAll: "اس وقت قطار میں کوئی مریض نہیں۔",
   assignDoctor: "ڈاکٹر مقرر کریں", takePatient: "یہ مریض لیں", emergencyTag: "ایمرجنسی",
   collapseMenu: "مینو چھوٹا کریں", expandMenu: "مینو بڑا کریں",
   chooseClinic: "کلینک منتخب کریں", todaysVisit: "آج کی آمد", addToQueue: "مریض کو ابھی آج کی قطار میں شامل کریں", addToQueueHelp: "مریض کی آمد فوراً درج ہو جائے گی اور وہ ڈاکٹر کی قطار میں نظر آئے گا۔",

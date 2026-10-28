@@ -1,15 +1,15 @@
 import type { AuthUser, Permission, Role } from "./access";
 
-export const PAGES = ["overview", "clinical", "queue", "workup", "laboratory", "diagnostics", "patients", "appointments", "prescriptions", "surgery", "management", "administration", "audit"] as const;
+export const PAGES = ["overview", "clinical", "queue", "laboratory", "diagnostics", "patients", "appointments", "prescriptions", "surgery", "management", "administration", "audit"] as const;
 export type Page = typeof PAGES[number];
 
 // Each role's sidebar lists only that role's own work. Server permissions
 // still decide what every request may do; this decides what a role is shown.
 const ROLE_PAGES: Record<Role, readonly Page[]> = {
   receptionist: ["overview", "patients", "appointments", "queue"],
-  nurse: ["overview", "queue", "workup", "patients"],
-  senior_technician: ["overview", "queue", "workup", "patients"],
-  optometrist: ["overview", "queue", "workup", "patients"],
+  nurse: ["overview", "queue", "patients"],
+  senior_technician: ["overview", "queue", "patients"],
+  optometrist: ["overview", "queue", "patients"],
   doctor: ["overview", "clinical", "prescriptions", "surgery", "patients"],
   lab_assistant: ["overview", "laboratory"],
   machine_operator: ["overview", "diagnostics"],
@@ -28,7 +28,6 @@ const PAGE_PERMISSION: Record<Page, Permission | null> = {
   overview: null,
   clinical: "clinical:read",
   queue: "intake:read",
-  workup: "workup:read",
   laboratory: "intake:read",
   diagnostics: "intake:read",
   patients: "patient:read",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Activity, CalendarDays, ChevronDown, Eye as EyeIcon, FileText, FlaskConical, Globe2, KeyRound, LayoutDashboard, ListOrdered, LogOut, Menu, PanelLeftClose, PanelLeftOpen, ScanEye, ScanLine, ShieldCheck, Stethoscope, Users } from "lucide-react";
+import { CalendarDays, ChevronDown, Eye as EyeIcon, FileText, FlaskConical, Globe2, KeyRound, LayoutDashboard, ListOrdered, LogOut, Menu, PanelLeftClose, PanelLeftOpen, ScanEye, ScanLine, ShieldCheck, Stethoscope, Users } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import type { MessageKey } from "@/lib/messages";
 import { useRouter } from "next/navigation";
@@ -27,7 +27,6 @@ const NAV: Record<Page, { key: MessageKey; icon: typeof EyeIcon }> = {
   overview: { key: "overview", icon: LayoutDashboard },
   clinical: { key: "doctorEvent", icon: Stethoscope },
   queue: { key: "queue", icon: ListOrdered },
-  workup: { key: "workup", icon: Activity },
   laboratory: { key: "laboratory", icon: FlaskConical },
   diagnostics: { key: "diagnostics", icon: ScanLine },
   patients: { key: "patients", icon: Users },
@@ -122,7 +121,7 @@ export function ClinicalWorkspace() {
         {passwordOpen && <PasswordForm onClose={() => setPasswordOpen(false)}/>}
         {signOutError && <p className="form-error" role="alert">{t("serviceUnavailable")}</p>}
 
-        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate} canOpen={canOpen}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <QueueWorkspace stageScope={["testing"]}/> : page === "diagnostics" ? <QueueWorkspace stageScope={["imaging"]}/> : page === "queue" || page === "workup" ? <QueueWorkspace workupOnly={page === "workup"}/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={canOpen("appointments") ? patient => { setBookingPatient(patient); navigate("appointments"); } : undefined}/> : page === "audit" ? <AuditWorkspace /> : <OverviewWorkspace navigate={navigate} canOpen={canOpen}/>}
+        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate} canOpen={canOpen}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <QueueWorkspace stageScope={["testing"]}/> : page === "diagnostics" ? <QueueWorkspace stageScope={["imaging"]}/> : page === "queue" ? <QueueWorkspace/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={canOpen("appointments") ? patient => { setBookingPatient(patient); navigate("appointments"); } : undefined}/> : page === "audit" ? <AuditWorkspace /> : <OverviewWorkspace navigate={navigate} canOpen={canOpen}/>}
         {historyPatient && <PatientTimelineDialog patientId={historyPatient} onClose={() => setHistoryPatient(null)}/>}
         {(page === "overview" || page === "management") && <ReportLinks/>}
       </main>
