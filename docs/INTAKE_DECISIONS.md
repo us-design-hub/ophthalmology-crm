@@ -6,7 +6,7 @@ This milestone implements the booked-patient path in scenario A. Source requirem
 
 Reception books an existing or newly registered patient, checks in today's appointment, and starts workup. Check-in atomically marks the appointment, creates its encounter, and appends the initial waiting transition. The encounter is the queue entry; no separate disconnected queue record exists.
 
-Nurses and optometrists can start workup, save bilateral measurements, and hand off. Doctors can read saved workup in their assigned clinics. Reception and hospital administrators cannot read or write measurements. Auditors cannot open the intake datasets. Clinical detail requests and all mutations check assigned facilities; existing sessions re-read current grants.
+Technicians and nurses can start workup and save bilateral measurements. Senior technicians review, return corrections, approve, and hand off. Doctors can read saved workup in their assigned clinics. Reception and hospital administrators cannot read or write measurements. Auditors cannot open the intake datasets. Clinical detail requests and all mutations check assigned facilities; existing sessions re-read current grants.
 
 The hospital master patient index remains hospital-wide. The queue, schedule, workup, and dashboard are restricted to the current user's assigned clinics. Demo clinical/reception staff are assigned all three demo clinics; pharmacy and nonclinical accounts are not added to those rosters.
 

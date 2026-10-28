@@ -2,7 +2,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { todayKarachi } from '../../src/lib/patients';
-const emails = { operator:'imran.shah', reception:'aisha.malik', nurse:'nadia.raza', senior:'sana.qureshi', doctor:'sara.khan', optometrist:'usman.farooq', auditor:'maryam.saeed' };
+const emails = { operator:'imran.shah', reception:'aisha.malik', nurse:'nadia.raza', senior:'sana.qureshi', doctor:'sara.khan', auditor:'maryam.saeed' };
 async function login(request: APIRequestContext, origin: string, role: keyof typeof emails = 'reception') { const response = await request.post('/api/auth/login',{headers:{Origin:origin},data:{email:`${emails[role]}@demo.openeyes.local`,password:process.env.DEMO_ACCOUNT_PASSWORD}}); expect(response.status()).toBe(200); }
 async function post(request: APIRequestContext, origin: string, resource: string, data: unknown) { return request.post(`/api/intake/${resource}`,{headers:{Origin:origin},data}); }
 async function patient(request: APIRequestContext, origin: string) {
@@ -56,7 +56,6 @@ test('workup versions, authorship, role permissions, required checkpoints and au
  expect((await post(page.request,baseURL!,'transition',{encounterId:id,version:2,to:'imaging'})).status()).toBe(403);
  const input=measurements(id); expect((await post(page.request,baseURL!,'workup',{...input,OD:{...input.OD,measuredAt:'2099-01-01T00:00:00Z'}})).status()).toBe(400);
  const results=await Promise.all([post(page.request,baseURL!,'workup',input),post(page.request,baseURL!,'workup',input)]); expect(results.map(value=>value.status()).sort()).toEqual([201,409]);
- await login(page.request,baseURL!,'optometrist'); expect((await post(page.request,baseURL!,'workup',measurements(id,1))).status()).toBe(403);
  await login(page.request,baseURL!,'senior');let current=(await(await page.request.get(`/api/intake/workup?encounterId=${id}`)).json()).workup;expect((await post(page.request,baseURL!,'workup-review',{encounterId:id,revisionId:current.id,decision:'returned',notes:'Repeat pressure measurement'})).status()).toBe(200);
  await login(page.request,baseURL!,'nurse'); expect((await post(page.request,baseURL!,'workup',measurements(id,1))).status()).toBe(201);expect((await post(page.request,baseURL!,'transition',{encounterId:id,version:2,to:'imaging'})).status()).toBe(403);
  await login(page.request,baseURL!,'senior');current=(await(await page.request.get(`/api/intake/workup?encounterId=${id}`)).json()).workup;expect((await post(page.request,baseURL!,'workup-review',{encounterId:id,revisionId:current.id,decision:'approved',notes:'Repeat measurement reviewed'})).status()).toBe(200);expect((await post(page.request,baseURL!,'transition',{encounterId:id,version:2,to:'imaging'})).status()).toBe(200);

@@ -13,7 +13,6 @@ const staff: { name: string; email: string; role: Role; designation: string }[] 
   { name: "Dr. Hamza Ali", email: "hamza.ali@demo.openeyes.local", role: "doctor", designation: "Retina specialist" },
   { name: "Nadia Raza", email: "nadia.raza@demo.openeyes.local", role: "nurse", designation: "Ophthalmic nurse" },
   { name: "Sana Qureshi", email: "sana.qureshi@demo.openeyes.local", role: "senior_technician", designation: "Senior ophthalmic technician" },
-  { name: "Usman Farooq", email: "usman.farooq@demo.openeyes.local", role: "optometrist", designation: "Optometrist" },
   { name: "Hira Saleem", email: "hira.saleem@demo.openeyes.local", role: "lab_assistant", designation: "Ophthalmic laboratory assistant" },
   { name: "Imran Shah", email: "imran.shah@demo.openeyes.local", role: "machine_operator", designation: "Diagnostic machine operator" },
   { name: "Rabia Aslam", email: "rabia.aslam@demo.openeyes.local", role: "ot_coordinator", designation: "Operating theatre coordinator" },

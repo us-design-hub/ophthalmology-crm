@@ -47,7 +47,7 @@ Initialization generates unique secrets in ignored files: `.env.local` for the a
 
 Database files persist under `.data/postgres`, listening on `127.0.0.1:55432`. The app connects as a non-owner database role without superuser or RLS-bypass privileges. A separately managed PostgreSQL server can provide the same schema and runtime role through `DATABASE_URL`.
 
-The idempotent seed creates one fictional hospital, four facilities, nine named accounts, and sixty synthetic patients. Re-running it preserves registrations. The additive intake seed adds three clinic rosters, 24 appointments, eight arrivals, and two saved workups. The clinical seed adds 246 explicitly synthetic historical visits and eight example formulary entries, without changing the active queue. No presentation-database reset is included.
+The idempotent seed creates one fictional hospital, six facilities, thirteen named accounts, and sixty synthetic patients. Re-running it preserves registrations. The additive intake seed adds three clinic rosters, 24 appointments, eight arrivals, and two saved workups. The clinical seed adds 246 explicitly synthetic historical visits and eight example formulary entries, without changing the active queue. No presentation-database reset is included.
 
 ## Working now
 

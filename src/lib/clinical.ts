@@ -55,6 +55,8 @@ export const EMPTY_DRAWINGS: ClinicalDrawings = {
 };
 
 const fieldId = z.string().regex(/^[a-z][a-z0-9_]{1,63}$/);
+// Optometrist remains a legacy visibility token so published template versions
+// and signed snapshots continue to validate after the account role is retired.
 export const CLINICAL_TEMPLATE_ROLES = ['nurse', 'optometrist', 'doctor'] as const;
 const visibilityRuleSchema = z.object({
   fieldId,

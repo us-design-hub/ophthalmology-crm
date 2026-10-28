@@ -21,7 +21,7 @@ A nominated ophthalmologist and clinical operations representative should review
 - Confirm the order and wording of each section.
 - Confirm which fields are required.
 - Confirm OD and OS laterality for each examination field.
-- Confirm doctor, nurse/technician, and optometrist visibility using the role preview.
+- Confirm doctor, nurse/technician, and senior-technician visibility using the role preview.
 - Test every conditional field:
   - Workup interpretation
   - Requested investigations

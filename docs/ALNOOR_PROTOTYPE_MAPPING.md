@@ -13,7 +13,7 @@ The Alnoor prototype is a browser-only workflow reference. This application keep
 - Surgery worklist, readiness, consent, theatre workflow, operation note and postoperative follow-up.
 - Signed prescription review for pharmacy, including original handwritten evidence, hashes, addenda and printable output. Pharmacy cannot prescribe, alter, dispense, price or manage stock.
 - Patient 360, visit comparison, longitudinal problem list, timeline, printable summaries and operational reports.
-- Named receptionist, technician, senior technician, optometrist, doctor, laboratory assistant, machine operator, OT coordinator, pharmacy review, hospital administrator, security administrator and auditor roles.
+- Named receptionist, technician, senior technician, doctor, laboratory assistant, machine operator, OT coordinator, pharmacy review, hospital administrator, security administrator and auditor roles.
 
 ## Deliberately excluded
 

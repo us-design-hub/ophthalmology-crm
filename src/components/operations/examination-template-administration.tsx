@@ -9,7 +9,7 @@ import {
 } from '@/lib/clinical';
 import { ExaminationTemplateFields } from '../clinical/examination-template-fields';
 
-type PreviewRole = 'doctor'|'nurse'|'senior_technician'|'optometrist';
+type PreviewRole = 'doctor'|'nurse'|'senior_technician';
 
 export function ExaminationTemplateAdministration({
   data,
@@ -75,7 +75,7 @@ export function ExaminationTemplateAdministration({
         <label>Specialty<input name="specialty" defaultValue={selected.specialty} required minLength={3} maxLength={80}/></label>
       </div>
       <label>Template definition (JSON)<textarea name="definition" className="template-json-editor" defaultValue={JSON.stringify(selected.definition,null,2)} required spellCheck={false}/></label>
-      <p className="admin-note">Fields may include <code>roles</code> (doctor, nurse, optometrist) and <code>visibleWhen</code> rules. Senior technicians inherit technician field visibility. A rule may use equals, not_equals, or answered and must reference an earlier non-lateral field.</p>
+      <p className="admin-note">Fields may include <code>roles</code> (doctor or nurse) and <code>visibleWhen</code> rules. Senior technicians inherit technician field visibility. A rule may use equals, not_equals, or answered and must reference an earlier non-lateral field.</p>
       {jsonError&&<p className="form-error" role="alert">{jsonError}</p>}
       <div className="admin-actions">
         <button className="primary-button" disabled={busy}>Save draft</button>
@@ -84,7 +84,7 @@ export function ExaminationTemplateAdministration({
         <button type="button" className="secondary-button" onClick={()=>{setSelectedId(null);setPreview(null);}}>Cancel</button>
       </div>
       {preview&&<div className="template-preview">
-        <div className="registry-heading"><h3>Role preview</h3><label>View as<select value={previewRole} onChange={event=>{setPreviewRole(event.target.value as PreviewRole);setPreviewAnswers({});}}><option value="doctor">Doctor</option><option value="nurse">Nurse / technician</option><option value="senior_technician">Senior technician</option><option value="optometrist">Optometrist</option></select></label></div>
+        <div className="registry-heading"><h3>Role preview</h3><label>View as<select value={previewRole} onChange={event=>{setPreviewRole(event.target.value as PreviewRole);setPreviewAnswers({});}}><option value="doctor">Doctor</option><option value="nurse">Nurse / technician</option><option value="senior_technician">Senior technician</option></select></label></div>
         <ExaminationTemplateFields template={{id:selected.id,code:selected.code,version:selected.version,name:selected.name,specialty:selected.specialty,definition:preview}} answers={previewAnswers} disabled={false} roles={[previewRole]} onChange={setPreviewAnswers}/>
       </div>}
     </form>}

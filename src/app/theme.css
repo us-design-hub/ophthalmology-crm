@@ -336,7 +336,7 @@ html[dir=rtl] .sidebar-toggle svg { transform: scaleX(-1); }
 .rq-patient .flag-tag { min-width: 0; }
 .rq-waited svg { flex-shrink: 0; }
 
-/* --- Stage board (technicians, nurses, optometrists) ----------------------- */
+/* --- Stage board (technicians and nurses) ---------------------------------- */
 .queue-board-page { display: grid; gap: 18px; }
 .queue-board-page .queue-toolbar select { min-height: 40px; padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: var(--control-radius); background: var(--white); font-size: var(--text-md); }
 .queue-board-page .queue-board { grid-template-columns: var(--queue-columns); gap: 14px; overflow-x: auto; padding-bottom: 4px; }

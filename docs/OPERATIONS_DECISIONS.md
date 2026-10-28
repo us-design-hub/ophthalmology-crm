@@ -30,7 +30,7 @@ Forced row-level security limits snapshot reads to the transaction tenant. The a
 | Pharmacist | Inventory plus existing signed-prescription access |
 | Inventory officer | Inventory; no prescription access |
 | Cashier | Billing/receipts |
-| Nurse / optometrist | Surgery |
+| Nurse / senior technician | Surgery |
 | Hospital administrator / auditor | All operational previews, staff inspection |
 | Security administrator | Staff/security inspection |
 | Receptionist | No new operational permissions |

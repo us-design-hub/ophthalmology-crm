@@ -9,7 +9,6 @@ const ROLE_PAGES: Record<Role, readonly Page[]> = {
   receptionist: ["overview", "patients", "appointments", "queue"],
   nurse: ["overview", "queue", "patients"],
   senior_technician: ["overview", "queue", "patients"],
-  optometrist: ["overview", "queue", "patients"],
   doctor: ["overview", "clinical", "prescriptions", "surgery", "patients"],
   lab_assistant: ["overview", "laboratory"],
   machine_operator: ["overview", "diagnostics"],

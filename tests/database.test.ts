@@ -151,6 +151,8 @@ test('native registration roles are active and retired integration mappings are 
   try {
     await app.query("SELECT set_config('app.tenant_id',$1,true)", [tenantId]);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('cashier','inventory_officer') OR permission_code IN ('anatomy:use','preview:inventory','preview:billing','preview:surgery','preview:management','preview:admin','inventory:write','pharmacy:dispense','billing:write','billing:discount','billing:approve_refund')")).rows[0].total, 0);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role WHERE code='optometrist'")).rows[0].total, 0);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.user_role WHERE role_code='optometrist'")).rows[0].total, 0);
     assert.equal((await app.query("SELECT array_agg(permission_code ORDER BY permission_code) AS permissions FROM app.role_permission WHERE role_code='pharmacist'")).rows[0].permissions.join(','), 'patient:read,prescription:read');
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('receptionist','hospital_admin') AND permission_code IN ('patient:create','patient:edit')")).rows[0].total, 4);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code='senior_technician' AND permission_code IN ('workup:write','workup:review','queue:handoff')")).rows[0].total, 3);

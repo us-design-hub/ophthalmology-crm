@@ -43,13 +43,14 @@ This roadmap tracks the work required to deliver the ophthalmology workflows the
 - [x] Encounter-linked Doctor Event
 - [x] Complaint, bilateral findings, diagnoses, plan, referral, and follow-up
 - [x] Draft/version conflict protection, review, signing, and addenda
-- [x] Role access for doctors, nurses/technicians, and optometrists
+- [x] Role access for doctors, technicians/nurses, and senior technicians
 - [~] Longitudinal typed-event model comparable to OpenEyes episodes and events
 - [x] Versioned examination templates with specialty, clinic, and visit-type assignment
 - [x] Required, optional, ordered, role-visible, and conditionally visible examination fields
 - [x] Structured ophthalmic history and systemic/ocular disorder sections with attributed amendment history
 - [~] Initial structured anterior-segment, cornea, lens, fundus, optic-disc, gonioscopy, macular imaging, and motility fields are implemented; clinical refinement remains
-- [~] Cataract, glaucoma, and retina assessment templates are published; cornea, paediatric, and optometry templates remain
+- [x] Cataract, glaucoma, retina, cornea, optometry, and general follow-up assessments are published and assigned
+- [ ] Paediatric ophthalmology assessment template
 - [x] Configurable visit outcomes with required next-step notes and recall dates preserved in signed records
 
 ### Anatomy and clinical drawing

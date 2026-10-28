@@ -8,7 +8,7 @@ Application and administrative connections use different roles and separate loca
 
 Tenant directory metadata/global permission definitions contain no patient records. Rate-limit keys are keyed digests. A session token-hash lookup policy resolves the session tenant before normal tenant context is set.
 
-Reception and hospital administrators can create patients. Doctors, nurses, optometrists, pharmacists, and cashiers can read the hospital master patient index. Auditors/security administrators can read audit events without patient-registry access. Inventory-only accounts can access neither dataset. A creating user needs an assigned facility; the master index remains hospital-wide to avoid duplicate identities across clinics.
+Reception and hospital administrators can create patients. Doctors, technicians/nurses, senior technicians, laboratory assistants, machine operators, OT coordinators, and pharmacy reviewers can read the patient data needed for their assigned work. Auditors and security administrators can read audit events according to their permissions. Retired cashier and inventory roles have no application access. A creating user needs an assigned facility; the master index remains hospital-wide to avoid duplicate identities across clinics.
 
 Encounter-level facility, ownership, and signed-state controls will be added with the corresponding workflows.
 
