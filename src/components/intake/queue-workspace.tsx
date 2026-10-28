@@ -11,12 +11,18 @@ import { ErrorNotice, intakeError, LiveStatus, RiskFlags, useLiveData } from "./
 import { WorkupDialog } from "./workup-dialog";
 import { ReasonDialog } from "../reason-dialog";
 import { AssignDoctor, useClinicDoctors } from "./assign-doctor";
+import { ReceptionQueue } from "./reception-queue";
 
 // Emergencies are seen first and are overdue after ten minutes, whatever the clinic target.
 const EMERGENCY_TARGET_MINUTES = 10;
 const WORKUP_STAGES = ["waiting", "workup", "testing", "imaging", "dilation"] as const satisfies readonly Stage[];
 
-export function QueueWorkspace({ workupOnly = false, stageScope }: { workupOnly?: boolean; stageScope?: readonly Stage[] }) {
+export function QueueWorkspace(props: { workupOnly?: boolean; stageScope?: readonly Stage[] }) {
+  // Reception sees a simple list; staff who record workups keep the stage board.
+  const user = useSession();
+  return !props.workupOnly && !props.stageScope && !user.permissions.includes("workup:read") ? <ReceptionQueue/> : <QueueBoard {...props}/>;
+}
+function QueueBoard({ workupOnly = false, stageScope }: { workupOnly?: boolean; stageScope?: readonly Stage[] }) {
   const { t } = useLocale();
   const user = useSession();
   const live = useLiveData<{ encounters: Encounter[]; serverNow: string }>("/api/intake/queue");
