@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { ArrowRight, Clock3, ListOrdered, MoreHorizontal, Siren } from "lucide-react";
+import { ArrowRight, Clock3, ListOrdered, MoreHorizontal, ScanEye, Siren } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { Encounter, Stage } from "@/lib/intake";
 import type { MessageKey } from "@/lib/messages";
@@ -9,6 +9,7 @@ import { useSession } from "../session-provider";
 import { ReasonDialog } from "../reason-dialog";
 import { AssignDoctor, useClinicDoctors } from "./assign-doctor";
 import { LabChips } from "../lab/lab-chips";
+import { ReferralReports } from "../machines/referral-reports";
 import { MachineChips } from "../machines/machine-chips";
 import { ErrorNotice, intakeError, LiveStatus, RiskFlags, useLiveData } from "./shared";
 
@@ -77,15 +78,16 @@ export function ReceptionQueue() {
         return <article key={item.id} className={`reception-queue-row ${emergency ? "is-emergency" : ""}`} data-testid={`queue-${item.id}`}>
           <div className="rq-patient"><span className="patient-avatar">{item.name[0]}</span><div><strong>{item.name}</strong><small>{item.mrn}</small>{item.flags.length > 0 && <RiskFlags flags={item.flags}/>}<LabChips encounterId={item.id} labs={item.labs} onChanged={live.refresh} onError={setError} allowOrder={false}/><MachineChips orders={item.machines}/></div></div>
           <div className="rq-cell"><span className="rq-label">{t("clinicLabel")}</span>{item.clinic}</div>
-          <div className="rq-cell"><span className="rq-label">{t("doctorLabel")}</span>{canAssign && (item.stage !== "consultation" || !item.doctorId) ? <AssignDoctor item={item} doctors={doctors.get(item.facilityId) ?? []} onDone={live.refresh} onError={setError}/> : item.doctor ?? <span className="doctor-unassigned">{t("doctorNotAssigned")}</span>}</div>
-          <div className="rq-cell rq-status">{emergency ? <><strong className="emergency-tag"><Siren size={13}/>{t("emergencyTag")}</strong>{item.emergencyReason && <small className="rq-reason">{t(`emergency_${item.emergencyReason}` as MessageKey)}</small>}</> : <span className={`rq-pill rq-${group(item)}`}>{t(statusKey(item))}</span>}{item.priority === "urgent" && !emergency && <span className="rq-urgent">{t("urgentLabel")}</span>}</div>
+          <div className="rq-cell"><span className="rq-label">{t("doctorLabel")}</span>{item.visitType === "test_only" ? <span>{t("referredBy")} {item.referralDoctor}</span> : canAssign && (item.stage !== "consultation" || !item.doctorId) ? <AssignDoctor item={item} doctors={doctors.get(item.facilityId) ?? []} onDone={live.refresh} onError={setError}/> : item.doctor ?? <span className="doctor-unassigned">{t("doctorNotAssigned")}</span>}</div>
+          <div className="rq-cell rq-status">{emergency ? <><strong className="emergency-tag"><Siren size={13}/>{t("emergencyTag")}</strong>{item.emergencyReason && <small className="rq-reason">{t(`emergency_${item.emergencyReason}` as MessageKey)}</small>}</> : <><span className={`rq-pill rq-${group(item)}`}>{t(statusKey(item))}</span>{item.visitType === "test_only" && <span className="referral-tag"><ScanEye size={12}/>{t("referralTag")}</span>}</>}{item.priority === "urgent" && !emergency && <span className="rq-urgent">{t("urgentLabel")}</span>}</div>
           <div className={`rq-cell rq-waited ${overdue ? "is-overdue" : ""}`}><Clock3 size={14}/><span dir="ltr">{waited(sinceCheckIn)}</span>{overdue && <small>{t("overdue")}</small>}</div>
-          <div className="rq-actions">{item.stage === "waiting" && !emergency && canStart && <button type="button" className="secondary-button" disabled={!!busy || !!live.error} onClick={() => void start(item)}>{t("startWorkup")}<ArrowRight size={13}/></button>}
+          <div className="rq-actions">{item.stage === "waiting" && !emergency && item.visitType !== "test_only" && canStart && <button type="button" className="secondary-button" disabled={!!busy || !!live.error} onClick={() => void start(item)}>{t("startWorkup")}<ArrowRight size={13}/></button>}
             {canManage && <details className="rq-more"><summary aria-label={t("moreActions")}><MoreHorizontal size={18}/></summary><div><button type="button" disabled={!!busy} onClick={() => setPending({ item, action: item.priority === "urgent" ? "routine" : "urgent" })}>{t(item.priority === "urgent" ? "setRoutine" : "markUrgent")}</button>{item.stage !== "consultation" && <button type="button" disabled={!!busy} onClick={() => setPending({ item, action: "left_before_seen" })}>{t("leftBeforeSeen")}</button>}</div></details>}</div>
         </article>;
       })}
       {live.data && !rows.length && <p className="reception-queue-empty"><ListOrdered size={18}/>{t(filter === "all" ? "queueEmptyAll" : "queueEmptyFilter")}</p>}
     </section>
+    <ReferralReports/>
     {pending && <ReasonDialog title="queueChangeReason" busy={busy === pending.item.id} onClose={() => setPending(null)} onConfirm={reason => void manage(pending.item, pending.action, reason)}/>}
   </div>;
 }

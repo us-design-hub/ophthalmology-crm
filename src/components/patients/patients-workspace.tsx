@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, CheckCircle2, ChevronRight, CircleAlert, LockKeyhole, Plus, Search, ShieldCheck, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, ChevronRight, CircleAlert, LockKeyhole, Plus, ScanEye, Search, ShieldCheck, Users, X } from "lucide-react";
 import { useLocale } from "../locale-provider";
 import { useSession } from "../session-provider";
 import { api } from "@/lib/api-client";
@@ -9,6 +9,7 @@ import type { MessageKey } from "@/lib/messages";
 import { PatientHistory } from "./patient-history";
 import { PatientEdit } from "./patient-edit";
 import { PatientRegistration, errorKey, type VisitResult } from "./patient-registration";
+import { ReferralDialog } from "../machines/referral-fields";
 
 export function formatDate(value: string, includeTime = false): string {
   const date = new Date(value.length === 10 ? `${value}T12:00:00Z` : value);
@@ -30,8 +31,9 @@ export function PatientsWorkspace({ onBook, onHistory }: { onBook?: (patient: Pa
   // A queued walk-in is finished at reception, so the record stays closed for the next patient.
   function onCreated(patient: PatientSummary, result: VisitResult) { setRegistering(false); setCreated(patient); setVisit(result); setSubmitted(""); setQuery(""); setPage(1); setRefresh(current => current + 1); if (!result || "error" in result) setSelectedId(patient.id); }
   return <div className="patients-workspace">
-    {created && <div className="registration-success" role="status"><CheckCircle2 size={18}/><span>{visit && "doctor" in visit ? visit.emergency ? t("emergencyQueued") : visit.doctor ? <>{t("patientQueued")} {visit.doctor}:</> : t("patientQueuedUnassigned") : t("patientRegistered")} <strong>{patientName(created)} · {created.mrn}</strong></span><button type="button" className="icon-button" aria-label={t("clearSelection")} onClick={() => { setCreated(null); setVisit(null); }}><X size={16}/></button></div>}
+    {created && <div className="registration-success" role="status"><CheckCircle2 size={18}/><span>{visit && "referral" in visit ? t("referralRegistered") : visit && "doctor" in visit ? visit.emergency ? t("emergencyQueued") : visit.doctor ? <>{t("patientQueued")} {visit.doctor}:</> : t("patientQueuedUnassigned") : t("patientRegistered")} <strong>{patientName(created)} · {created.mrn}</strong></span><button type="button" className="icon-button" aria-label={t("clearSelection")} onClick={() => { setCreated(null); setVisit(null); }}><X size={16}/></button></div>}
     {created && visit && "error" in visit && <div className="form-error" role="alert">{t("queueFailed")} {t(visit.error)}</div>}
+    {created && visit && "referral" in visit && visit.letterError && <div className="form-error" role="alert">{t("referralLetterFailed")} {t(visit.letterError)}</div>}
     <section className="panel patient-registry"><div className="registry-heading"><div><span className="section-icon"><Users size={20}/></span><h2>{t("registeredPatients")}</h2>{data && <span className="count-badge" data-testid="patient-total">{data.total}</span>}</div>{canCreate ? <button type="button" className="primary-button" onClick={() => setRegistering(true)}><Plus size={16}/>{t("registerPatient")}</button> : <span className="read-only-label"><LockKeyhole size={13}/>{t("accessControlled")}</span>}</div>
       <form className="patient-search" onSubmit={event => { event.preventDefault(); setPage(1); setSubmitted(query.trim()); setRefresh(current => current + 1); }}><div><Search size={18}/><input aria-label={t("searchPatients")} value={query} maxLength={100} onChange={event => setQuery(event.target.value)} placeholder={t("patientSearchPlaceholder")}/>{query && <button type="button" aria-label={t("clearSearch")} onClick={() => { setQuery(""); setSubmitted(""); setPage(1); }}><X size={15}/></button>}</div><button className="secondary-button" type="submit">{t("search")}</button></form>
       {!canCreate && <p className="registry-info">{t("readOnlyPatients")}</p>}
@@ -44,6 +46,9 @@ export function PatientsWorkspace({ onBook, onHistory }: { onBook?: (patient: Pa
 
 function PatientRecord({ id, onClose, onBook, onHistory }: { id: string; onClose: () => void; onBook?: (patient: PatientSummary) => void; onHistory?: (id: string) => void }) {
   const user=useSession(); const [editing,setEditing]=useState(false); const [revision,setRevision]=useState(0);
+  // Returning patients sent by an outside doctor for tests only.
+  const canRefer = user.permissions.includes("appointment:create") && user.permissions.includes("appointment:checkin");
+  const [referring, setReferring] = useState(false), [referralNote, setReferralNote] = useState<MessageKey | null>(null), [referralWarning, setReferralWarning] = useState<MessageKey | null>(null);
   const { t } = useLocale(); const dialog = useRef<HTMLDialogElement>(null); const [patient, setPatient] = useState<PatientDetail | null>(null); const [error, setError] = useState<MessageKey | null>(null);
   useEffect(() => {
     dialog.current?.showModal(); const controller = new AbortController();
@@ -58,6 +63,8 @@ function PatientRecord({ id, onClose, onBook, onHistory }: { id: string; onClose
       <section className="record-section"><h3>{t("visitContext")}</h3><dl>{detail("referredBy",patient.referredBy)}{detail("programme",patient.programme)}{detail("patientSafety",patient.medicalConditions.map(value=>value.replaceAll('_',' ')).join(', '))}{detail("previousSurgery",patient.previousSurgery)}{detail("currentMedications",patient.currentMedications)}</dl></section>
       {user.permissions.includes("clinical:read") && <PatientHistory patientId={patient.id} onChanged={()=>setRevision(v=>v+1)}/>}
       {user.permissions.includes("reports:read") && <div className="patient-book-action"><a className="secondary-button" href={`/patients/${patient.id}/summary`} target="_blank" rel="noreferrer">Print patient summary</a></div>}{user.permissions.includes("patient:edit") && <div className="patient-book-action"><button className="secondary-button" onClick={()=>setEditing(!editing)}>Edit patient</button></div>}{editing && <PatientEdit patient={patient} onCancel={()=>setEditing(false)} onSaved={()=>{setEditing(false);setRevision(v=>v+1);}}/>}
-      {onBook && <div className="patient-book-action"><button type="button" className="primary-button" onClick={() => { dialog.current?.close(); onBook(patient); }}>{t("bookAppointment")}</button></div>}{onHistory ? <div className="patient-book-action"><button type="button" className="secondary-button" onClick={() => onHistory(patient.id)}>{t("patient360")}</button></div> : <p className="record-clinical-note"><LockKeyhole size={16}/>{t("noClinicalHistory")}</p>}</>}
+      {(onBook || canRefer) && <div className="patient-book-action">{onBook && <button type="button" className="primary-button" onClick={() => { dialog.current?.close(); onBook(patient); }}>{t("bookAppointment")}</button>}{canRefer && <button type="button" className="secondary-button" onClick={() => setReferring(true)}><ScanEye size={15}/>{t("referralForTests")}</button>}</div>}
+      {referralNote && <p className="registration-success" role="status"><CheckCircle2 size={16}/>{t(referralNote)}</p>}{referralWarning && <div className="form-error" role="alert">{t("referralLetterFailed")} {t(referralWarning)}</div>}
+      {referring && <ReferralDialog patient={patient} onClose={() => setReferring(false)} onSaved={letterError => { setReferring(false); setReferralNote("referralSaved"); setReferralWarning(letterError); }}/>}{onHistory ? <div className="patient-book-action"><button type="button" className="secondary-button" onClick={() => onHistory(patient.id)}>{t("patient360")}</button></div> : <p className="record-clinical-note"><LockKeyhole size={16}/>{t("noClinicalHistory")}</p>}</>}
   </dialog>;
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, ChevronsLeftRight, Clock3, MoreHorizontal, Siren } from "lucide-react";
+import { ArrowRight, ChevronsLeftRight, Clock3, MoreHorizontal, ScanEye, Siren } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { STAGES, type Encounter, type PathwayStep, type Stage } from "@/lib/intake";
 import type { MessageKey } from "@/lib/messages";
@@ -14,6 +14,7 @@ import { AssignDoctor, useClinicDoctors } from "./assign-doctor";
 import { ReceptionQueue, waited } from "./reception-queue";
 import { LabChips } from "../lab/lab-chips";
 import { MachineChips } from "../machines/machine-chips";
+import { ReferralConfirmDialog } from "../machines/referral-confirm";
 
 // Emergencies are seen first and are overdue after ten minutes, whatever the clinic target.
 const EMERGENCY_TARGET_MINUTES = 10;
@@ -36,6 +37,7 @@ function QueueBoard({ stageScope, legacyOnly = false }: { stageScope?: readonly 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<MessageKey | null>(null);
   const [pending, setPending] = useState<{ item: Encounter; action: string } | null>(null);
+  const [confirming, setConfirming] = useState<Encounter | null>(null);
   const canAssign = user.permissions.includes("appointment:create") || user.permissions.includes("queue:manage");
   const clinicDoctors = useClinicDoctors(canAssign);
   const inFilter = live.data?.encounters.filter(value => (!clinic || value.facilityId === clinic) && (!specialty || value.specialty === specialty)) ?? [];
@@ -82,25 +84,27 @@ function QueueBoard({ stageScope, legacyOnly = false }: { stageScope?: readonly 
     <ErrorNotice error={error}/>
     <div className="queue-board-frame" data-more-start={more.start || undefined} data-more-end={more.end || undefined}><div ref={board} className="queue-board" style={{ "--queue-columns": columns } as React.CSSProperties}>{visibleStages.map(stage => <section className={`queue-column stage-${stage} ${collapsed(stage) ? "is-empty" : ""} ${stage === "consultation" && stageCount(stage) && !readyOpen && !stageScope ? "is-collapsed" : ""}`} key={stage}><header><span/><h2>{t(`stage_${stage}`)}</h2><strong>{stageCount(stage)}</strong>{stage === "consultation" && !stageScope && stageCount(stage) > 0 && <button type="button" className="queue-column-toggle" aria-expanded={readyOpen} onClick={toggleReady}><ChevronsLeftRight size={14}/>{t(readyOpen ? "hideColumn" : "showColumn")}</button>}</header><div>{(collapsed(stage) ? [] : encounters.filter(value => value.stage === stage)).map(item => {
       const elapsed = Math.max(0, Math.floor((serverNow - new Date(item.stageAt).getTime()) / 60000));
-      const emergency = item.visitType === "emergency";
+      const emergency = item.visitType === "emergency", referralVisit = item.visitType === "test_only";
       const overdue = elapsed >= (emergency ? EMERGENCY_TARGET_MINUTES : item.pathwayTargetMinutes);
       const pathwayIndex = item.pathwaySteps.indexOf(item.stage as PathwayStep);
       const progress = pathwayIndex >= 0 ? pathwayIndex + 1 : item.stage === "waiting" ? 0 : item.pathwaySteps.length + 1, total = item.pathwaySteps.length + 1;
       const workupStatus: MessageKey = item.workupVersion ? item.workupReviewStatus === "approved" ? "workupApprovedLabel" : item.workupReviewStatus === "returned" ? "workupReturnedLabel" : "workupAwaitingReview" : "workupPending";
       return <article className={`queue-card ${overdue ? "is-overdue" : ""} ${emergency ? "is-emergency" : ""}`} key={item.id} data-testid={`queue-${item.id}`} title={`${t("arrivalLabel")} ${formatDate(item.checkedInAt, true)}`}>
         <header className="qc-head"><div><h3>{item.name}</h3><small>{item.mrn}</small></div>{canManage && <details className="rq-more"><summary aria-label={t("moreActions")}><MoreHorizontal size={18}/></summary><div><button type="button" disabled={!!busy} onClick={() => setPending({ item, action: item.priority === "urgent" ? "routine" : "urgent" })}>{t(item.priority === "urgent" ? "setRoutine" : "markUrgent")}</button>{stage !== "consultation" && <button type="button" disabled={!!busy} onClick={() => setPending({ item, action: "left_before_seen" })}>{t("leftBeforeSeen")}</button>}</div></details>}</header>
+        {referralVisit && <p className="qc-tags"><span className="referral-tag"><ScanEye size={13}/>{t("referralTag")}</span></p>}
         {emergency ? <p className="qc-tags"><strong className="emergency-tag"><Siren size={13}/>{t("emergencyTag")}</strong>{item.emergencyReason && <small className="rq-reason">{t(`emergency_${item.emergencyReason}` as MessageKey)}</small>}</p> : item.priority === "urgent" && <p className="qc-tags"><span className="rq-urgent">{t("urgentLabel")}</span></p>}
         {item.flags.length > 0 && <RiskFlags flags={item.flags}/>}
-        <p className="qc-meta">{item.clinic} · {canAssign && (stage !== "consultation" || !item.doctorId) ? <AssignDoctor item={item} doctors={clinicDoctors.get(item.facilityId) ?? []} onDone={live.refresh} onError={setError}/> : item.doctor ?? <span className="doctor-unassigned">{t("doctorNotAssigned")}</span>}</p>
+        <p className="qc-meta">{item.clinic} · {referralVisit ? <span>{t("referredBy")} {item.referralDoctor}</span> : canAssign && (stage !== "consultation" || !item.doctorId) ? <AssignDoctor item={item} doctors={clinicDoctors.get(item.facilityId) ?? []} onDone={live.refresh} onError={setError}/> : item.doctor ?? <span className="doctor-unassigned">{t("doctorNotAssigned")}</span>}</p>
         <LabChips encounterId={item.id} labs={item.labs} onChanged={live.refresh} onError={setError} allowOrder={false}/>
         <MachineChips orders={item.machines}/>
         <div className="qc-progress" role="img" aria-label={`${t("pathwayProgress")} ${progress}/${total}`}>{Array.from({ length: total }, (_, index) => <span key={index} className={index < progress ? "is-done" : ""}/>)}</div>
         <div className="qc-status"><span className={`qc-time ${overdue ? "is-overdue" : ""}`}><Clock3 size={13}/><span dir="ltr">{waited(elapsed)}</span>{overdue && <small>{t("overdue")}</small>}</span>{stage !== "waiting" && <span className={`qc-workup qc-${item.workupReviewStatus ?? (item.workupVersion ? "pending" : "none")}`}>{t(workupStatus)}</span>}</div>
         {stage === "dilation" && item.dilationReadyAt && <p className="dilation-countdown">{new Date(item.dilationReadyAt) > new Date(live.data!.serverNow) ? `${Math.ceil((new Date(item.dilationReadyAt).getTime() - new Date(live.data!.serverNow).getTime()) / 60000)} ${t("dilationRemaining")}` : t("dilationElapsed")}</p>}
-        <div className="queue-card-actions">{stage === "waiting" && user.permissions.includes("queue:workup") && <button type="button" className="primary-button" disabled={!!busy || !!live.error} onClick={() => start(item)}>{t("startWorkup")}<ArrowRight size={13}/></button>}{user.permissions.includes("workup:read") && (stage !== "waiting" || item.workupVersion > 0) && <button type="button" className={stage === "workup" && user.permissions.includes("workup:write") ? "primary-button" : "secondary-button"} onClick={() => setSelected(item.id)}>{t(user.permissions.includes("workup:write") && stage === "workup" ? "openWorkup" : stage === "testing" || stage === "imaging" || stage === "dilation" ? "openCheckpoint" : "viewWorkup")}</button>}</div>
+        <div className="queue-card-actions">{stage === "waiting" && referralVisit && user.permissions.includes("machine:order") && <button type="button" className="primary-button" disabled={!!busy || !!live.error} onClick={() => setConfirming(item)}>{t("confirmTests")}<ArrowRight size={13}/></button>}{stage === "waiting" && !referralVisit && user.permissions.includes("queue:workup") && <button type="button" className="primary-button" disabled={!!busy || !!live.error} onClick={() => start(item)}>{t("startWorkup")}<ArrowRight size={13}/></button>}{user.permissions.includes("workup:read") && (stage !== "waiting" || item.workupVersion > 0) && <button type="button" className={stage === "workup" && user.permissions.includes("workup:write") ? "primary-button" : "secondary-button"} onClick={() => setSelected(item.id)}>{t(user.permissions.includes("workup:write") && stage === "workup" ? "openWorkup" : stage === "testing" || stage === "imaging" || stage === "dilation" ? "openCheckpoint" : "viewWorkup")}</button>}</div>
       </article>;
     })}{!stageCount(stage) && <p className="queue-empty">{t("emptyQueueShort")}</p>}</div></section>)}</div></div>
     {pending && <ReasonDialog title="queueChangeReason" busy={busy === pending.item.id} onClose={() => setPending(null)} onConfirm={reason => void manage(pending.item, pending.action, reason)}/>}
+    {confirming && <ReferralConfirmDialog item={confirming} onClose={() => setConfirming(null)} onDone={() => { setConfirming(null); live.refresh(); }}/>}
     {selected && <WorkupDialog id={selected} onClose={() => { setSelected(null); live.refresh(); }} onSaved={live.refresh}/>}
   </div>;
 }

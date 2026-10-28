@@ -9,7 +9,8 @@ import { audit, type AuditContext } from "./audit";
 import { ApiError } from "./http";
 
 function parse<T>(schema: z.ZodType<T>, input: unknown): T { const result = schema.safeParse(input); if (!result.success) throw new ApiError(400, "machineInvalid"); return result.data; }
-const OPEN = "('awaiting_approval','ordered')";
+// Open tests: asked for by a referral, waiting for a doctor, or ready to run.
+const OPEN = "('requested','awaiting_approval','ordered')";
 
 /** Machine tests on a visit, with results and report files, for queue cards and the doctor. */
 export const machineSummarySql = (encounter: string) => `(SELECT coalesce(jsonb_agg(jsonb_build_object('id',o.id,'version',o.version,'machineId',o.machine_id,'machine',m.name,'needsDilation',m.needs_dilation,'eye',o.eye,'status',o.status,
@@ -64,7 +65,7 @@ async function reshapePathway(db: PoolClient, encounterId: string, fromReview = 
 }
 
 /** Move a visit to a stage outside the usual next-step rule (doctor sends a patient for tests, or tests finish). */
-async function moveStage(db: PoolClient, user: AuthUser, encounter: { id: string; stage: Stage; version: number }, to: Stage, reason: string, context: AuditContext) {
+async function moveStage(db: PoolClient, user: AuthUser, encounter: { id: string; stage: Stage; version: number }, to: Stage | "completed", reason: string, context: AuditContext) {
   await db.query("UPDATE app.encounter SET stage=$2,version=version+1,stage_at=now(),dilation_ready_at=CASE WHEN $2='dilation' THEN now()+make_interval(mins=>coalesce((SELECT (settings->>'dilationMinutes')::int FROM app.tenant WHERE id=app.encounter.tenant_id),20)) ELSE dilation_ready_at END WHERE id=$1", [encounter.id, to]);
   await db.query("INSERT INTO app.queue_transition(tenant_id,encounter_id,from_stage,to_stage,encounter_version,actor_id,reason) VALUES($1,$2,$3,$4,$5,$6,$7)", [user.tenantId, encounter.id, encounter.stage, to, encounter.version + 1, user.id, reason]);
   await audit(db, { tenantId: user.tenantId, actorId: user.id, action: "queue.transitioned", entityType: "encounter", entityId: encounter.id, metadata: { from: encounter.stage, to, reason }, context });
@@ -107,9 +108,15 @@ export async function doctorOrderMachines(user: AuthUser, input: unknown, contex
 
 /** When the last open test on a visit is finished, the patient moves on by themselves. */
 async function advanceWhenComplete(db: PoolClient, user: AuthUser, encounterId: string, context: AuditContext) {
-  const encounter = (await db.query("SELECT id,stage,version,pathway_steps FROM app.encounter WHERE id=$1 FOR UPDATE", [encounterId])).rows[0];
+  const encounter = (await db.query("SELECT id,stage,version,pathway_steps,visit_type FROM app.encounter WHERE id=$1 FOR UPDATE", [encounterId])).rows[0];
   if (encounter.stage !== "testing") { await reshapePathway(db, encounterId); return; }
   if ((await db.query(`SELECT 1 FROM app.machine_order WHERE encounter_id=$1 AND status IN ${OPEN}`, [encounterId])).rowCount) return;
+  // A referral for tests only has no hospital doctor: the visit ends with the last test.
+  if (encounter.visit_type === "test_only") {
+    await moveStage(db, user, encounter, "completed", "Referral tests complete", context);
+    await db.query("UPDATE app.encounter SET closed_at=now(),closure_reason='Referral tests complete' WHERE id=$1", [encounterId]);
+    return;
+  }
   const next = nextPathwayStage("testing", encounter.pathway_steps) ?? "consultation";
   await moveStage(db, user, encounter, next, "Machine tests complete", context);
 }
@@ -129,7 +136,7 @@ export async function recordMachineResult(user: AuthUser, input: unknown, contex
   const data = parse(resultInput, input);
   return withTenant(user.tenantId, user.id, async db => {
     const order = await lockOrder(db, user, data.id, data.version);
-    if (order.status !== "ordered") throw new ApiError(409, order.status === "awaiting_approval" ? "machineAwaitingApproval" : "machineAlreadyRecorded");
+    if (order.status !== "ordered") throw new ApiError(409, order.status === "awaiting_approval" ? "machineAwaitingApproval" : order.status === "requested" ? "machineAwaitingConfirm" : "machineAlreadyRecorded");
     // The patient must be at the machines: dilated first when the test needs it.
     if (order.encounter_stage !== "testing") throw new ApiError(409, "machinePatientNotReady");
     await db.query("UPDATE app.machine_order SET status='done',findings=$2,key_values=$3,resulted_by=$4,resulted_at=now(),version=version+1 WHERE id=$1", [data.id, data.findings, data.keyValues, user.id]);
@@ -144,7 +151,7 @@ export async function markMachineNotDone(user: AuthUser, input: unknown, context
   const data = parse(z.object({ id: z.uuid(), version: z.number().int().positive(), note: z.string().trim().min(3).max(240) }).strict(), input);
   return withTenant(user.tenantId, user.id, async db => {
     const order = await lockOrder(db, user, data.id, data.version);
-    if (order.status !== "ordered" && order.status !== "awaiting_approval") throw new ApiError(409, "machineAlreadyRecorded");
+    if (!["ordered", "awaiting_approval", "requested"].includes(order.status)) throw new ApiError(409, "machineAlreadyRecorded");
     await db.query("UPDATE app.machine_order SET status='not_done',note=$2,resulted_by=$3,resulted_at=now(),version=version+1 WHERE id=$1", [data.id, data.note, user.id]);
     await audit(db, { tenantId: user.tenantId, actorId: user.id, action: "machine.not_done", entityType: "machine_order", entityId: data.id, metadata: { machine: order.machine, note: data.note }, context });
     await advanceWhenComplete(db, user, order.encounter_id, context);
@@ -196,4 +203,76 @@ export async function pendingApprovals(user: AuthUser): Promise<{ orders: Machin
 export async function machineGate(db: PoolClient, encounterId: string) {
   const row = (await db.query(`SELECT count(*) FILTER (WHERE status IN ${OPEN})::int AS open,count(*)::int AS total FROM app.machine_order WHERE encounter_id=$1`, [encounterId])).rows[0];
   return { ordered: row.total > 0, open: row.open as number };
+}
+
+const referralInput = z.object({
+  patientId: z.uuid(), facilityId: z.uuid(), referralDoctor: z.string().trim().min(2).max(120), referralSource: z.string().trim().max(120).default(""),
+  tests: z.array(machineOrderInput).min(1).max(10),
+}).strict();
+/**
+ * A patient sent by an outside doctor for tests only. The visit joins the
+ * queue with the requested tests; nothing runs until a senior technician confirms.
+ */
+export async function registerReferralVisit(user: AuthUser, input: unknown, context: AuditContext) {
+  if (!user.permissions.includes("appointment:create") || !user.permissions.includes("appointment:checkin")) throw new ApiError(403, "accessDenied");
+  const data = parse(referralInput, input);
+  if (!user.facilityIds.includes(data.facilityId)) throw new ApiError(403, "accessDenied");
+  try {
+    return await withTenant(user.tenantId, user.id, async db => {
+      if (!(await db.query("SELECT 1 FROM app.patient WHERE id=$1", [data.patientId])).rowCount) throw new ApiError(404, "patientNotFound");
+      if (!(await db.query("SELECT 1 FROM app.facility f JOIN app.clinic_schedule s ON s.facility_id=f.id AND s.tenant_id=f.tenant_id WHERE f.id=$1 AND f.active", [data.facilityId])).rowCount) throw new ApiError(400, "slotUnavailable");
+      const appointment = (await db.query("INSERT INTO app.appointment(tenant_id,patient_id,facility_id,doctor_id,appointment_date,slot_time,created_by,status,change_reason) VALUES($1,$2,$3,NULL,(now() AT TIME ZONE 'Asia/Karachi')::date,(now() AT TIME ZONE 'Asia/Karachi')::time,$4,'checked_in','Referral for machine tests') RETURNING id", [user.tenantId, data.patientId, data.facilityId, user.id])).rows[0];
+      const encounter = (await db.query("INSERT INTO app.encounter(tenant_id,appointment_id,patient_id,facility_id,doctor_id,visit_type,referral_doctor,referral_source) VALUES($1,$2,$3,$4,NULL,'test_only',$5,$6) RETURNING id", [user.tenantId, appointment.id, data.patientId, data.facilityId, data.referralDoctor, data.referralSource])).rows[0];
+      await db.query("INSERT INTO app.queue_transition(tenant_id,encounter_id,to_stage,encounter_version,actor_id,reason) VALUES($1,$2,'waiting',1,$3,'Referral for machine tests')", [user.tenantId, encounter.id, user.id]);
+      for (const test of data.tests) {
+        if (!(await db.query("SELECT 1 FROM app.machine WHERE id=$1 AND active", [test.machineId])).rowCount) throw new ApiError(400, "machineUnavailable");
+        await db.query("INSERT INTO app.machine_order(tenant_id,encounter_id,machine_id,eye,status,ordered_by) VALUES($1,$2,$3,$4,'requested',$5) ON CONFLICT DO NOTHING", [user.tenantId, encounter.id, test.machineId, test.eye, user.id]);
+      }
+      await reshapePathway(db, encounter.id);
+      await audit(db, { tenantId: user.tenantId, actorId: user.id, action: "referral.registered", entityType: "encounter", entityId: encounter.id, metadata: { referralDoctor: data.referralDoctor, tests: data.tests.length }, context });
+      return { id: encounter.id as string };
+    });
+  } catch (error) { if ((error as { code?: string }).code === "23505") throw new ApiError(409, "activeEncounterExists"); throw error; }
+}
+
+const confirmInput = z.object({ encounterId: z.uuid(), version: z.number().int().positive(), tests: z.array(machineOrderInput).min(1).max(10) }).strict();
+/**
+ * The senior technician checks the referral (for example, that dilation is safe)
+ * and settles the final list. Kept requests become orders, dropped ones are
+ * declined, additions are ordered; the patient then goes to dilation or the machines.
+ */
+export async function confirmReferral(user: AuthUser, input: unknown, context: AuditContext) {
+  if (!user.permissions.includes("machine:order")) throw new ApiError(403, "accessDenied");
+  const data = parse(confirmInput, input);
+  return withTenant(user.tenantId, user.id, async db => {
+    const encounter = (await db.query("SELECT id,stage,version,visit_type,closed_at FROM app.encounter WHERE id=$1 AND facility_id=ANY($2::uuid[]) FOR UPDATE", [data.encounterId, user.facilityIds])).rows[0];
+    if (!encounter) throw new ApiError(404, "encounterNotFound");
+    if (encounter.visit_type !== "test_only" || encounter.closed_at || encounter.stage !== "waiting") throw new ApiError(409, "referralNotWaiting");
+    if (encounter.version !== data.version) throw new ApiError(409, "queueConflict");
+    const doctor = user.permissions.includes("clinical:write");
+    const requested = (await db.query("SELECT o.id,o.machine_id,o.eye,m.needs_doctor_approval FROM app.machine_order o JOIN app.machine m ON m.id=o.machine_id WHERE o.encounter_id=$1 AND o.status='requested'", [data.encounterId])).rows as { id: string; machine_id: string; eye: string; needs_doctor_approval: boolean }[];
+    const additions = [...data.tests];
+    for (const request of requested) {
+      const index = additions.findIndex(test => test.machineId === request.machine_id && test.eye === request.eye);
+      if (index < 0) { await db.query("UPDATE app.machine_order SET status='declined',note='Removed at confirmation',resulted_by=$2,resulted_at=now(),version=version+1 WHERE id=$1", [request.id, user.id]); continue; }
+      additions.splice(index, 1);
+      const status = request.needs_doctor_approval && !doctor ? "awaiting_approval" : "ordered";
+      await db.query("UPDATE app.machine_order SET status=$2,approved_by=$3,approved_at=CASE WHEN $3::uuid IS NULL THEN NULL ELSE now() END,version=version+1 WHERE id=$1", [request.id, status, status === "ordered" && request.needs_doctor_approval ? user.id : null]);
+    }
+    const { needsDilation } = await orderMachines(db, user, data.encounterId, additions, context);
+    await audit(db, { tenantId: user.tenantId, actorId: user.id, action: "referral.confirmed", entityType: "encounter", entityId: data.encounterId, metadata: { tests: data.tests.length, removed: requested.length - (data.tests.length - additions.length) }, context });
+    const to: Stage = needsDilation ? "dilation" : "testing";
+    await moveStage(db, user, encounter, to, "Referral tests confirmed", context);
+    return { stage: to };
+  });
+}
+
+/** Today's referral visits for reception, with results, so the report can be printed for the patient. */
+export async function referralReports(user: AuthUser) {
+  return withTenant(user.tenantId, user.id, async db => ({ visits: (await db.query(`SELECT e.id,e.stage,e.closed_at AS "closedAt",e.checked_in_at AS "checkedInAt",e.referral_doctor AS "referralDoctor",e.referral_source AS "referralSource",
+    e.patient_id AS "patientId",concat_ws(' ',p.given_name,p.family_name) AS name,p.mrn,p.gender,p.dob::text AS dob,f.name AS clinic,t.name AS hospital,
+    ${machineSummarySql("e")} AS machines,
+    (SELECT coalesce(jsonb_agg(jsonb_build_object('id',d.id,'filename',d.filename,'mime',d.mime) ORDER BY d.captured_at),'[]') FROM app.referral_document d WHERE d.tenant_id=e.tenant_id AND d.encounter_id=e.id) AS letters
+    FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id JOIN app.tenant t ON t.id=e.tenant_id
+    WHERE e.visit_type='test_only' AND e.facility_id=ANY($1::uuid[]) AND (e.closed_at IS NULL OR e.checked_in_at >= ${TODAY}) ORDER BY e.closed_at IS NULL DESC,e.checked_in_at DESC`, [user.facilityIds])).rows }));
 }

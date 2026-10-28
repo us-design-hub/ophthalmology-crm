@@ -7,7 +7,7 @@ export type Machine = {
 };
 export const MACHINE_EYES = ["OD", "OS", "OU"] as const;
 export type MachineEye = typeof MACHINE_EYES[number];
-export type MachineOrderStatus = "awaiting_approval" | "ordered" | "done" | "not_done" | "declined";
+export type MachineOrderStatus = "requested" | "awaiting_approval" | "ordered" | "done" | "not_done" | "declined";
 
 export const machineOrderInput = z.object({ machineId: z.uuid(), eye: z.enum(MACHINE_EYES) }).strict();
 export type MachineOrderInput = z.infer<typeof machineOrderInput>;
