@@ -9,6 +9,7 @@ import { useSession } from "../session-provider";
 import { ReasonDialog } from "../reason-dialog";
 import { AssignDoctor, useClinicDoctors } from "./assign-doctor";
 import { LabChips } from "../lab/lab-chips";
+import { MachineChips } from "../machines/machine-chips";
 import { ErrorNotice, intakeError, LiveStatus, RiskFlags, useLiveData } from "./shared";
 
 /**
@@ -74,7 +75,7 @@ export function ReceptionQueue() {
         const emergency = isEmergency(item), sinceCheckIn = minutes(item.checkedInAt);
         const overdue = minutes(item.stageAt) >= (emergency ? EMERGENCY_TARGET_MINUTES : item.pathwayTargetMinutes);
         return <article key={item.id} className={`reception-queue-row ${emergency ? "is-emergency" : ""}`} data-testid={`queue-${item.id}`}>
-          <div className="rq-patient"><span className="patient-avatar">{item.name[0]}</span><div><strong>{item.name}</strong><small>{item.mrn}</small>{item.flags.length > 0 && <RiskFlags flags={item.flags}/>}<LabChips encounterId={item.id} labs={item.labs} onChanged={live.refresh} onError={setError} allowOrder={false}/></div></div>
+          <div className="rq-patient"><span className="patient-avatar">{item.name[0]}</span><div><strong>{item.name}</strong><small>{item.mrn}</small>{item.flags.length > 0 && <RiskFlags flags={item.flags}/>}<LabChips encounterId={item.id} labs={item.labs} onChanged={live.refresh} onError={setError} allowOrder={false}/><MachineChips orders={item.machines}/></div></div>
           <div className="rq-cell"><span className="rq-label">{t("clinicLabel")}</span>{item.clinic}</div>
           <div className="rq-cell"><span className="rq-label">{t("doctorLabel")}</span>{canAssign && (item.stage !== "consultation" || !item.doctorId) ? <AssignDoctor item={item} doctors={doctors.get(item.facilityId) ?? []} onDone={live.refresh} onError={setError}/> : item.doctor ?? <span className="doctor-unassigned">{t("doctorNotAssigned")}</span>}</div>
           <div className="rq-cell rq-status">{emergency ? <><strong className="emergency-tag"><Siren size={13}/>{t("emergencyTag")}</strong>{item.emergencyReason && <small className="rq-reason">{t(`emergency_${item.emergencyReason}` as MessageKey)}</small>}</> : <span className={`rq-pill rq-${group(item)}`}>{t(statusKey(item))}</span>}{item.priority === "urgent" && !emergency && <span className="rq-urgent">{t("urgentLabel")}</span>}</div>

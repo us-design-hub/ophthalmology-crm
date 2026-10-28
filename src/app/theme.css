@@ -484,3 +484,70 @@ html[dir=rtl] .queue-board-frame::after { background: linear-gradient(to right, 
 .lab-results-panel .lab-chips > svg { display: none; }
 .lab-results-panel .lab-chips { margin-top: 8px; }
 .intake-dialog-body > .lab-results-panel { margin-bottom: 18px; }
+
+/* --- Machine tests ------------------------------------------------------------ */
+.machine-picker { display: grid; gap: 10px; margin: 16px 0; padding: 16px; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); background: var(--white); }
+.machine-picker legend { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; font-weight: var(--weight-semi); color: var(--text-primary); }
+.machine-picker .intake-help { margin: 0; }
+.machine-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.machine-option { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); }
+.machine-option.is-selected { border-color: var(--violet-400); background: var(--violet-50); }
+.intake-dialog .machine-option label, .machine-option label { display: flex; align-items: flex-start; gap: 10px; font-weight: var(--weight-normal); color: var(--text-primary); cursor: pointer; }
+.machine-option label span { display: grid; gap: 2px; }
+.machine-option strong { font-size: var(--text-md); font-weight: var(--weight-semi); }
+.machine-option small { color: var(--text-muted); font-size: var(--text-xs); }
+.machine-option input[type=checkbox] { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--violet-600); }
+.intake-dialog .machine-option select, .machine-option select { min-height: 34px; padding: 4px 8px; font-size: var(--text-sm); }
+
+.machine-results-panel h3 { display: flex; align-items: center; gap: 8px; }
+.machine-results { display: grid; gap: 10px; margin: 12px 0; padding: 0; list-style: none; }
+.machine-results li { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--gray-50); }
+.machine-results-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.machine-results-head strong { font-size: var(--text-md); }
+.machine-results-head > span:not(.machine-status) { color: var(--text-muted); font-size: var(--text-sm); }
+.machine-status { margin-inline-start: auto; padding: 2px 9px; border-radius: var(--radius-full); background: var(--gray-100); color: var(--text-secondary); font-size: var(--text-xs); font-weight: var(--weight-semi); }
+.machine-status.is-done { background: color-mix(in srgb, var(--success-600) 12%, var(--white)); color: var(--success-600); }
+.machine-status.is-awaiting_approval { background: var(--amber-50); color: var(--amber-800); }
+.machine-status.is-not_done, .machine-status.is-declined { background: var(--gray-100); color: var(--text-muted); }
+.machine-findings { white-space: pre-wrap; font-size: var(--text-md); color: var(--text-primary); }
+.machine-key-values { font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--violet-700); }
+.machine-note { font-size: var(--text-sm); color: var(--text-muted); }
+.machine-reports { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.machine-reports a { display: inline-flex; align-items: center; gap: 4px; color: var(--text-link); font-size: var(--text-sm); }
+.machine-meta { color: var(--text-muted); font-size: var(--text-xs); }
+.machine-decide { display: flex; flex-wrap: wrap; gap: 8px; }
+.machine-decide .primary-button, .machine-decide .secondary-button { padding: 7px 14px; font-size: var(--text-sm); }
+.machine-send { display: grid; gap: 8px; }
+
+.machine-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.machine-filter button { padding: 6px 12px; border: 1px solid var(--gray-200); border-radius: var(--radius-full); background: var(--white); color: var(--text-secondary); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.machine-filter button.is-active { border-color: var(--violet-600); background: var(--violet-50); color: var(--violet-700); }
+.machine-group-head { display: flex; align-items: center; gap: 8px; padding: 14px 24px; border-bottom: 1px solid var(--border-subtle); background: var(--gray-50); }
+.machine-group-head h2 { font-size: var(--text-lg); font-weight: var(--weight-semi); }
+.machine-group-head span { padding: 1px 8px; border-radius: var(--radius-full); background: var(--violet-100); color: var(--violet-700); font-size: var(--text-sm); font-weight: var(--weight-semi); }
+.machine-group .lab-visit:first-of-type { border-top: 0; }
+.machine-eye { padding: 2px 9px; border-radius: var(--radius-full); background: var(--violet-50); color: var(--violet-700); font-weight: var(--weight-semi); }
+.machine-entry { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
+.machine-entry label { display: grid; gap: 6px; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-secondary); }
+.machine-entry textarea, .machine-entry input:not([type=file]) { min-height: 40px; padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: var(--control-radius); background: var(--white); font: inherit; font-size: var(--text-md); color: var(--text-primary); }
+.machine-entry textarea { min-height: 76px; resize: vertical; }
+.machine-entry label.machine-file { display: inline-flex; align-items: center; gap: 8px; justify-self: start; padding: 8px 12px; border: 1px dashed var(--gray-300); border-radius: var(--control-radius); color: var(--violet-700); cursor: pointer; }
+.machine-entry label.machine-file input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.machine-entry label.machine-file:focus-within { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.machine-wait { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--gray-50); color: var(--text-secondary); font-size: var(--text-md); }
+.machine-worklist .lab-test.is-recorded { grid-template-columns: minmax(120px, .6fr) minmax(0, 1.6fr) auto; }
+
+.machine-approvals { padding: 18px 22px; margin-bottom: 18px; }
+.machine-approvals h2 { display: flex; align-items: center; gap: 8px; font-size: var(--text-lg); font-weight: var(--weight-semi); }
+.machine-approvals h2 span { padding: 1px 8px; border-radius: var(--radius-full); background: var(--amber-50); color: var(--amber-800); font-size: var(--text-sm); }
+.machine-approvals ul { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.machine-approvals li { display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--gray-50); }
+.machine-approvals li > div:not(.machine-decide) { display: grid; gap: 2px; }
+.machine-approvals small { color: var(--text-muted); font-size: var(--text-sm); }
+.queue-legacy-title { font-size: var(--text-lg); font-weight: var(--weight-semi); color: var(--text-secondary); }
+@media (max-width: 760px) { .machine-approvals li { grid-template-columns: 1fr; } }
+.machine-option input[type=checkbox] { flex-shrink: 0; }
+/* Inside the doctor's panel the picker sits under the panel's own title. */
+.machine-send .machine-picker { margin: 4px 0 0; padding: 0; border: 0; }
+.machine-send .machine-picker legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@media (max-width: 900px) { .machine-worklist .lab-test.is-recorded { grid-template-columns: 1fr; } }

@@ -13,18 +13,20 @@ import { ReasonDialog } from "../reason-dialog";
 import { AssignDoctor, useClinicDoctors } from "./assign-doctor";
 import { ReceptionQueue, waited } from "./reception-queue";
 import { LabChips } from "../lab/lab-chips";
+import { MachineChips } from "../machines/machine-chips";
 
 // Emergencies are seen first and are overdue after ten minutes, whatever the clinic target.
 const EMERGENCY_TARGET_MINUTES = 10;
 // Technicians mostly need a count for patients already handed to the doctor; the column opens on request.
 const READY_KEY = "openeyes.queue.ready";
 
-export function QueueWorkspace(props: { stageScope?: readonly Stage[] }) {
+export function QueueWorkspace(props: { stageScope?: readonly Stage[]; legacyOnly?: boolean }) {
   // Reception sees a simple list; staff who record workups keep the stage board.
   const user = useSession();
   return !props.stageScope && !user.permissions.includes("workup:read") ? <ReceptionQueue/> : <QueueBoard {...props}/>;
 }
-function QueueBoard({ stageScope }: { stageScope?: readonly Stage[] }) {
+/** legacyOnly: only visits at testing/imaging from before machine orders, and nothing at all when there are none. */
+function QueueBoard({ stageScope, legacyOnly = false }: { stageScope?: readonly Stage[]; legacyOnly?: boolean }) {
   const { t } = useLocale();
   const user = useSession();
   const live = useLiveData<{ encounters: Encounter[]; serverNow: string }>("/api/intake/queue");
@@ -40,7 +42,7 @@ function QueueBoard({ stageScope }: { stageScope?: readonly Stage[] }) {
   // Only the stages these clinics actually use: a Retina pathway adds imaging and dilation, General goes straight to the doctor.
   const used = new Set<Stage>(["waiting", "workup", "consultation", ...inFilter.flatMap(value => [...value.pathwaySteps, value.stage])]);
   const visibleStages: readonly Stage[] = stageScope ?? STAGES.filter(stage => used.has(stage));
-  const encounters = inFilter.filter(value => visibleStages.includes(value.stage));
+  const encounters = inFilter.filter(value => visibleStages.includes(value.stage) && (!legacyOnly || !value.machines?.length));
   const [readyOpen, setReadyOpen] = useState(false);
   useEffect(() => { try { setReadyOpen(localStorage.getItem(READY_KEY) === "open"); } catch { /* stays collapsed */ } }, []);
   const toggleReady = () => setReadyOpen(current => { try { localStorage.setItem(READY_KEY, current ? "closed" : "open"); } catch { /* not remembered */ } return !current; });
@@ -73,7 +75,9 @@ function QueueBoard({ stageScope }: { stageScope?: readonly Stage[] }) {
   const columns = visibleStages.map(stage => collapsed(stage) ? "minmax(118px, .4fr)" : "minmax(200px, 1fr)").join(" ");
   const canManage = user.permissions.includes("queue:manage");
 
+  if (legacyOnly && !encounters.length) return null;
   return <div className="intake-workspace queue-board-page">
+    {legacyOnly && <h2 className="queue-legacy-title">{t("legacyTestingTitle")}</h2>}
     <div className="queue-toolbar"><div><label><span className="sr-only">{t("clinicLabel")}</span><select value={clinic} onChange={event => setClinic(event.target.value)}><option value="">{t("allClinics")}</option>{Array.from(new Map(live.data?.encounters.map(value => [value.facilityId, value.clinic])).entries()).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label><label><span className="sr-only">{t("specialtyLabel")}</span><select value={specialty} onChange={event => setSpecialty(event.target.value)}><option value="">{t("allSpecialties")}</option>{Array.from(new Set(live.data?.encounters.map(value => value.specialty))).sort().map(value => <option key={value}>{value}</option>)}</select></label></div><LiveStatus {...live}/></div>
     <ErrorNotice error={error}/>
     <div className="queue-board-frame" data-more-start={more.start || undefined} data-more-end={more.end || undefined}><div ref={board} className="queue-board" style={{ "--queue-columns": columns } as React.CSSProperties}>{visibleStages.map(stage => <section className={`queue-column stage-${stage} ${collapsed(stage) ? "is-empty" : ""} ${stage === "consultation" && stageCount(stage) && !readyOpen && !stageScope ? "is-collapsed" : ""}`} key={stage}><header><span/><h2>{t(`stage_${stage}`)}</h2><strong>{stageCount(stage)}</strong>{stage === "consultation" && !stageScope && stageCount(stage) > 0 && <button type="button" className="queue-column-toggle" aria-expanded={readyOpen} onClick={toggleReady}><ChevronsLeftRight size={14}/>{t(readyOpen ? "hideColumn" : "showColumn")}</button>}</header><div>{(collapsed(stage) ? [] : encounters.filter(value => value.stage === stage)).map(item => {
@@ -89,6 +93,7 @@ function QueueBoard({ stageScope }: { stageScope?: readonly Stage[] }) {
         {item.flags.length > 0 && <RiskFlags flags={item.flags}/>}
         <p className="qc-meta">{item.clinic} · {canAssign && (stage !== "consultation" || !item.doctorId) ? <AssignDoctor item={item} doctors={clinicDoctors.get(item.facilityId) ?? []} onDone={live.refresh} onError={setError}/> : item.doctor ?? <span className="doctor-unassigned">{t("doctorNotAssigned")}</span>}</p>
         <LabChips encounterId={item.id} labs={item.labs} onChanged={live.refresh} onError={setError} allowOrder={false}/>
+        <MachineChips orders={item.machines}/>
         <div className="qc-progress" role="img" aria-label={`${t("pathwayProgress")} ${progress}/${total}`}>{Array.from({ length: total }, (_, index) => <span key={index} className={index < progress ? "is-done" : ""}/>)}</div>
         <div className="qc-status"><span className={`qc-time ${overdue ? "is-overdue" : ""}`}><Clock3 size={13}/><span dir="ltr">{waited(elapsed)}</span>{overdue && <small>{t("overdue")}</small>}</span>{stage !== "waiting" && <span className={`qc-workup qc-${item.workupReviewStatus ?? (item.workupVersion ? "pending" : "none")}`}>{t(workupStatus)}</span>}</div>
         {stage === "dilation" && item.dilationReadyAt && <p className="dilation-countdown">{new Date(item.dilationReadyAt) > new Date(live.data!.serverNow) ? `${Math.ceil((new Date(item.dilationReadyAt).getTime() - new Date(live.data!.serverNow).getTime()) / 60000)} ${t("dilationRemaining")}` : t("dilationElapsed")}</p>}

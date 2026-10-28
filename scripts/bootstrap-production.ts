@@ -41,6 +41,7 @@ async function main() {
     const facilityId = randomUUID();
     await db.query("INSERT INTO app.tenant(id,code,name,mrn_prefix,is_demo) VALUES($1,$2,$3,$4,false)", [tenantId, code, hospitalName, mrnPrefix]);
     await db.query("INSERT INTO app.facility(id,tenant_id,name,type) VALUES($1,$2,$3,'clinic')", [facilityId, tenantId, facilityName]);
+    await db.query("SELECT app.provision_example_machines($1)", [tenantId]);
 
     for (const permission of PERMISSIONS) {
       await db.query("INSERT INTO app.permission(code) VALUES($1) ON CONFLICT DO NOTHING", [permission]);

@@ -9,13 +9,14 @@ import { audit, type AuditContext } from "./audit";
 import { ApiError } from "./http";
 import { hasInvestigation, investigationRows } from './investigation-service';
 import { labSummarySql, orderAutomaticLabs } from './lab-service';
+import { machineGate, machineSummarySql, orderMachines } from './machine-service';
 
 function parse<T>(schema: z.ZodType<T>, input: unknown): T { const result = schema.safeParse(input); if (!result.success) throw new ApiError(400, "intakeInvalid"); return result.data; }
 export function intakeDate(value: unknown) { return parse(dateSchema, value ?? todayKarachi()); }
 async function clinicAccepts(user: AuthUser, facilityId: string) { return withTenant(user.tenantId, user.id, async db => !!(await db.query("SELECT 1 FROM app.facility f JOIN app.clinic_schedule s ON s.facility_id=f.id AND s.tenant_id=f.tenant_id WHERE f.id=$1 AND f.active", [facilityId])).rowCount); }
 function facilityAccess(user: AuthUser, facilityId: string) { if (!user.facilityIds.includes(facilityId)) throw new ApiError(403, "accessDenied"); }
 const flags = `(SELECT coalesce(jsonb_agg(jsonb_build_object('type',pf.type,'value',pf.value)),'[]') FROM app.patient_flag pf WHERE pf.tenant_id=p.tenant_id AND pf.patient_id=p.id AND pf.resolved_at IS NULL)`;
-const encounterSelect = `SELECT e.id,e.patient_id AS "patientId",concat_ws(' ',p.given_name,p.family_name) AS name,p.mrn,e.facility_id AS "facilityId",f.name AS clinic,f.specialty,e.visit_type AS "visitType",e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.pathway_steps AS "pathwaySteps",e.pathway_target_minutes AS "pathwayTargetMinutes",e.priority,e.emergency_reason AS "emergencyReason",${labSummarySql("e")} AS labs,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id),0) AS "workupVersion",(SELECT r.decision FROM app.workup_revision w LEFT JOIN app.workup_review r ON r.tenant_id=w.tenant_id AND r.revision_id=w.id WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id ORDER BY w.version DESC LIMIT 1) AS "workupReviewStatus",${flags} AS flags FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id LEFT JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id`;
+const encounterSelect = `SELECT e.id,e.patient_id AS "patientId",concat_ws(' ',p.given_name,p.family_name) AS name,p.mrn,e.facility_id AS "facilityId",f.name AS clinic,f.specialty,e.visit_type AS "visitType",e.doctor_id AS "doctorId",u.full_name AS doctor,e.stage,e.pathway_steps AS "pathwaySteps",e.pathway_target_minutes AS "pathwayTargetMinutes",e.priority,e.emergency_reason AS "emergencyReason",${labSummarySql("e")} AS labs,${machineSummarySql("e")} AS machines,e.version,e.checked_in_at AS "checkedInAt",e.stage_at AS "stageAt",e.dilation_ready_at AS "dilationReadyAt",coalesce((SELECT max(w.version) FROM app.workup_revision w WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id),0) AS "workupVersion",(SELECT r.decision FROM app.workup_revision w LEFT JOIN app.workup_review r ON r.tenant_id=w.tenant_id AND r.revision_id=w.id WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id ORDER BY w.version DESC LIMIT 1) AS "workupReviewStatus",${flags} AS flags FROM app.encounter e JOIN app.patient p ON p.id=e.patient_id AND p.tenant_id=e.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id LEFT JOIN app.user_account u ON u.id=e.doctor_id AND u.tenant_id=e.tenant_id`;
 async function event(db: PoolClient, user: AuthUser, context: AuditContext, action: string, entityType: string, entityId?: string, metadata?: Record<string, unknown>) { await audit(db, { tenantId: user.tenantId, actorId: user.id, action, entityType, entityId, metadata, context }); }
 async function lockEncounter(db: PoolClient, user: AuthUser, id: string) {
  const result = await db.query('SELECT * FROM app.encounter WHERE id=$1 AND facility_id=ANY($2::uuid[]) FOR UPDATE', [id, user.facilityIds]);
@@ -107,8 +108,11 @@ export async function transition(user: AuthUser, input: unknown, context: AuditC
    if (!user.permissions.includes("workup:review")) throw new ApiError(403, "seniorReviewRequired");
    if (workup?.review?.decision !== "approved") throw new ApiError(409, "workupReviewRequired");
   }
-  if (pathwayEvidenceRequired(encounter.stage) && !(await hasInvestigation(db,data.encounterId,encounter.stage))) throw new ApiError(409,"investigationRequired");
-  if (pathwayEvidenceRequired(encounter.stage) && data.reason.trim().length < 3) throw new ApiError(409, "pathwayEvidenceRequired");
+  // Ordered machine tests govern the testing step; older visits keep the free-form investigation rule.
+  const machines = encounter.stage === "testing" ? await machineGate(db, data.encounterId) : { ordered: false, open: 0 };
+  if (machines.open) throw new ApiError(409, "machineTestsPending");
+  if (!machines.ordered && pathwayEvidenceRequired(encounter.stage) && !(await hasInvestigation(db,data.encounterId,encounter.stage))) throw new ApiError(409,"investigationRequired");
+  if (!machines.ordered && pathwayEvidenceRequired(encounter.stage) && data.reason.trim().length < 3) throw new ApiError(409, "pathwayEvidenceRequired");
   if (encounter.stage === "dilation" && new Date(encounter.dilation_ready_at).getTime() > Date.now() && data.reason.length < 8) throw new ApiError(409, "dilationReasonRequired");
   await db.query("UPDATE app.encounter SET stage=$2,version=version+1,stage_at=now(),dilation_ready_at=CASE WHEN $2='dilation' THEN now()+make_interval(mins=>coalesce((SELECT (settings->>'dilationMinutes')::int FROM app.tenant WHERE id=app.encounter.tenant_id),20)) ELSE dilation_ready_at END WHERE id=$1", [data.encounterId, data.to]);
   await db.query('INSERT INTO app.queue_transition(tenant_id,encounter_id,from_stage,to_stage,encounter_version,actor_id,reason) VALUES($1,$2,$3,$4,$5,$6,$7)', [user.tenantId, data.encounterId, encounter.stage, data.to, data.version + 1, user.id, data.reason]);
@@ -153,6 +157,11 @@ export async function reviewWorkup(user: AuthUser, input: unknown, context: Audi
   if (current.review) throw new ApiError(409, "workupAlreadyReviewed");
   await db.query('INSERT INTO app.workup_review(tenant_id,encounter_id,revision_id,reviewer_id,decision,notes,assessment) VALUES($1,$2,$3,$4,$5,$6,$7)', [user.tenantId, data.encounterId, data.revisionId, user.id, data.decision, data.notes, JSON.stringify(data.assessment)]);
   await event(db, user, context, `workup.${data.decision}`, "encounter", data.encounterId, { revisionId: data.revisionId, notes: data.notes });
+  // Approving with a test selection (even an empty one) sets this visit's own steps.
+  if (data.decision === "approved" && data.machineOrders) {
+   if (data.machineOrders.length && !user.permissions.includes("machine:order")) throw new ApiError(403, "accessDenied");
+   await orderMachines(db, user, data.encounterId, data.machineOrders, context, true);
+  }
   return { workup: await latestWorkup(db, data.encounterId) };
  });
 }

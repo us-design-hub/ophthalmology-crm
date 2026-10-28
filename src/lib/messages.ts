@@ -1,5 +1,6 @@
 import { expansionMessages } from "./expansion-messages";
 import { intakeMessages } from "./intake-messages";
+import { machineMessages } from "./machine-messages";
 import { clinicalMessages } from "./clinical-messages";
 import { operationsMessages } from "./operations-messages";
 import { administrationMessages } from "./administration-messages";
@@ -13,6 +14,7 @@ export const en = {
   ...operationsMessages,
   ...clinicalMessages,
   ...intakeMessages,
+  ...machineMessages,
   appName: "OpenEyes", hospital: "Demo Eye Hospital", brandCaption: "OPHTHALMOLOGY WORKSPACE",
   care: "CLINICAL CARE", operations: "HOSPITAL OPERATIONS", platform: "PLATFORM",
   overview: "Home", patients: "Patients", appointments: "Appointments", queue: "Live queue",
@@ -159,6 +161,7 @@ export const ur: Partial<Record<MessageKey, string>> = {
   chemicalInjuryAdvice: "ابھی آنکھ کو صاف پانی یا سیلائن سے دھونا شروع کریں۔ رجسٹریشن مکمل ہونے کا انتظار نہ کریں۔", approximateAge: "اندازاً عمر", identifierPending: "شناخت باقی",
   doctorNotAssigned: "ابھی ڈاکٹر مقرر نہیں", registerEmergency: "ایمرجنسی رجسٹر کریں", emergencyReasonRequired: "ایمرجنسی کی وجہ منتخب کریں۔", doctorRequired: "معائنے سے پہلے ڈاکٹر مقرر کریں۔",
   showColumn: "دکھائیں", hideColumn: "چھپائیں", queueAll: "سب", queueWaiting: "انتظار میں", queueWithTechnician: "ٹیکنیشن کے پاس", queueReadyForDoctor: "ڈاکٹر کے لیے تیار", queueEmergencies: "ایمرجنسی", queueStatus: "حالت", queueWaited: "آمد سے اب تک", urgentLabel: "فوری", markUrgent: "فوری قرار دیں", setRoutine: "معمول پر کریں", leftBeforeSeen: "معائنے سے پہلے چلے گئے", queueEmptyAll: "اس وقت قطار میں کوئی مریض نہیں۔",
+  adminTabMachines: "مشینیں", machineTestsLabel: "مشین ٹیسٹ", eye_OD: "دائیں آنکھ", eye_OS: "بائیں آنکھ", eye_OU: "دونوں آنکھیں", sendForTests: "ٹیسٹ کے لیے بھیجیں", approveTest: "منظور کریں", declineTest: "مسترد کریں", machineToDo: "ابھی تیار", machineComing: "آنے والے", machineDoneToday: "آج مکمل", saveResult: "نتیجہ محفوظ کریں", machineFindings: "نتائج",
   labShort_bp: "بی پی", labShort_sugar: "شوگر", labToDo: "باقی ٹیسٹ", labDoneToday: "آج مکمل", labTest_bp: "بلڈ پریشر", labTest_sugar: "شوگر", labReason_diabetes: "ذیابیطس", labReason_hypertension: "ہائی بلڈ پریشر", labReason_age_40: "عمر ۴۰+", labReason_glaucoma: "گلوکوما کلینک", labReason_pre_op: "آپریشن سے پہلے", labReason_manual: "عملے کی درخواست", sugarRandom: "رینڈم", sugarFasting: "فاسٹنگ", labOutOfRange: "حد سے باہر", labNotDone: "نہیں ہوا", labSave: "محفوظ کریں", labResults: "وائٹلز اور لیب",
   assignDoctor: "ڈاکٹر مقرر کریں", takePatient: "یہ مریض لیں", emergencyTag: "ایمرجنسی",
   collapseMenu: "مینو چھوٹا کریں", expandMenu: "مینو بڑا کریں",
