@@ -22,6 +22,7 @@ const accounts: DemoRoleAccount[] = [
   { name: "Imran Shah", email: "imran.shah@demo.openeyes.local", role: "machine_operator", designation: "Diagnostic machine operator", facilities: "imaging" },
   { name: "Rabia Aslam", email: "rabia.aslam@demo.openeyes.local", role: "ot_coordinator", designation: "Operating theatre coordinator", facilities: "theatres" },
   { name: "Kamran Yousaf", email: "kamran.yousaf@demo.openeyes.local", role: "pharmacist", designation: "Prescription review pharmacist", facilities: "clinics" },
+  { name: "Farhan Malik", email: "farhan.malik@demo.openeyes.local", role: "optician", designation: "Optician / optical dispenser", facilities: "clinics" },
 ];
 
 function required(name: string) {

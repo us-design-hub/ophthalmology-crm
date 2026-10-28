@@ -17,6 +17,7 @@ const staff: { name: string; email: string; role: Role; designation: string }[] 
   { name: "Imran Shah", email: "imran.shah@demo.openeyes.local", role: "machine_operator", designation: "Diagnostic machine operator" },
   { name: "Rabia Aslam", email: "rabia.aslam@demo.openeyes.local", role: "ot_coordinator", designation: "Operating theatre coordinator" },
   { name: "Kamran Yousaf", email: "kamran.yousaf@demo.openeyes.local", role: "pharmacist", designation: "Prescription review pharmacist" },
+  { name: "Farhan Malik", email: "farhan.malik@demo.openeyes.local", role: "optician", designation: "Optician / optical dispenser" },
   { name: "Omar Siddiqui", email: "omar.siddiqui@demo.openeyes.local", role: "hospital_admin", designation: "Hospital administrator" },
   { name: "Faisal Noor", email: "faisal.noor@demo.openeyes.local", role: "security_admin", designation: "Security administrator" },
   { name: "Maryam Saeed", email: "maryam.saeed@demo.openeyes.local", role: "auditor", designation: "Clinical systems auditor" },

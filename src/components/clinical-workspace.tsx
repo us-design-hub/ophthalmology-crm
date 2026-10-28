@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, ChevronDown, Eye as EyeIcon, FileText, FlaskConical, Globe2, KeyRound, LayoutDashboard, ListOrdered, LogOut, Menu, PanelLeftClose, PanelLeftOpen, ScanEye, ScanLine, ShieldCheck, Stethoscope, Users } from "lucide-react";
+import { CalendarDays, ChevronDown, Eye as EyeIcon, FileText, FlaskConical, Glasses, Globe2, KeyRound, LayoutDashboard, ListOrdered, LogOut, Menu, PanelLeftClose, PanelLeftOpen, ScanEye, ScanLine, ShieldCheck, Stethoscope, Users } from "lucide-react";
 import { useLocale } from "@/components/locale-provider";
 import type { MessageKey } from "@/lib/messages";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import { AppointmentsWorkspace } from "./intake/appointments-workspace";
 import { QueueWorkspace } from "./intake/queue-workspace";
 import { LabWorklist } from "./lab/lab-worklist";
 import { MachineWorklist } from "./machines/machine-worklist";
+import { OpticsWorklist } from "./optics/optics-worklist";
 import { OverviewWorkspace } from "./overview/overview-workspace";
 import { ClinicalWorkspace as DoctorWorkspace, PatientTimelineDialog } from "./clinical/clinical-workspace";
 import { PrescriptionInbox } from "./clinical/prescription-inbox";
@@ -31,6 +32,7 @@ const NAV: Record<Page, { key: MessageKey; icon: typeof EyeIcon }> = {
   queue: { key: "queue", icon: ListOrdered },
   laboratory: { key: "laboratory", icon: FlaskConical },
   diagnostics: { key: "diagnostics", icon: ScanLine },
+  optics: { key: "optics", icon: Glasses },
   patients: { key: "patients", icon: Users },
   appointments: { key: "appointments", icon: CalendarDays },
   prescriptions: { key: "prescriptions", icon: FileText },
@@ -123,7 +125,7 @@ export function ClinicalWorkspace() {
         {passwordOpen && <PasswordForm onClose={() => setPasswordOpen(false)}/>}
         {signOutError && <p className="form-error" role="alert">{t("serviceUnavailable")}</p>}
 
-        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate} canOpen={canOpen}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <LabWorklist/> : page === "diagnostics" ? <><MachineWorklist/><QueueWorkspace stageScope={["testing", "imaging"]} legacyOnly/></> : page === "queue" ? <QueueWorkspace/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={canOpen("appointments") ? patient => { setBookingPatient(patient); navigate("appointments"); } : undefined}/> : page === "audit" ? <AuditWorkspace /> : <OverviewWorkspace navigate={navigate} canOpen={canOpen}/>}
+        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate} canOpen={canOpen}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <LabWorklist/> : page === "diagnostics" ? <><MachineWorklist/><QueueWorkspace stageScope={["testing", "imaging"]} legacyOnly/></> : page === "optics" ? <OpticsWorklist/> : page === "queue" ? <QueueWorkspace/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={canOpen("appointments") ? patient => { setBookingPatient(patient); navigate("appointments"); } : undefined}/> : page === "audit" ? <AuditWorkspace /> : <OverviewWorkspace navigate={navigate} canOpen={canOpen}/>}
         {historyPatient && <PatientTimelineDialog patientId={historyPatient} onClose={() => setHistoryPatient(null)}/>}
         {(page === "overview" || page === "management") && <ReportLinks/>}
       </main>

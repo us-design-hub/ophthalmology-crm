@@ -1,6 +1,6 @@
 # OpenEyes clinical workspace
 
-OpenEyes provides native patient registration with ophthalmology appointments, clinical queues, bilateral workup, signed clinical documentation, digital prescriptions, surgery tracking, administration, audit, and operational reporting on PostgreSQL. The frontend supports the existing partial Urdu/RTL interface and iPad-sized layouts.
+OpenEyes provides native patient registration with ophthalmology appointments, clinical queues, bilateral workup, signed clinical documentation, digital and spectacle prescriptions, optics fulfilment, surgery tracking, administration, audit, and operational reporting on PostgreSQL. The frontend supports the existing partial Urdu/RTL interface and iPad-sized layouts.
 
 See [production readiness](docs/PRODUCTION_READINESS.md), [current implementation](docs/USABLE_SYSTEM_IMPLEMENTATION.md), and [current verification](docs/USABLE_SYSTEM_VERIFICATION.md). Earlier milestone documents describe historical demo boundaries and are superseded by these records. Planning documents remain in the project folder, outside the client interface.
 
@@ -18,7 +18,7 @@ In another terminal:
 npm run dev
 ```
 
-The normal development address is **http://127.0.0.1:3000**. Choose a named demo account, then sign in. Reception registers patients, books appointments, and confirms arrival. Technicians save bilateral workups; senior technicians review and release them. Doctors review saved measurements and document care. Auditors read the audit trail. Do not start a second database process if it is already running.
+The normal development address is **http://127.0.0.1:3000**. Choose a named demo account, then sign in. Reception registers patients, books appointments, and confirms arrival. Technicians save bilateral workups; senior technicians review and release them. Doctors review saved measurements, document care, and issue spectacle prescriptions. Opticians prepare and record collection of prescribed glasses. Auditors read the audit trail. Do not start a second database process if it is already running.
 
 For the optimized preview, use `npm run build` then `npm start`.
 
@@ -47,7 +47,7 @@ Initialization generates unique secrets in ignored files: `.env.local` for the a
 
 Database files persist under `.data/postgres`, listening on `127.0.0.1:55432`. The app connects as a non-owner database role without superuser or RLS-bypass privileges. A separately managed PostgreSQL server can provide the same schema and runtime role through `DATABASE_URL`.
 
-The idempotent seed creates one fictional hospital, six facilities, thirteen named accounts, and sixty synthetic patients. Re-running it preserves registrations. The additive intake seed adds three clinic rosters, 24 appointments, eight arrivals, and two saved workups. The clinical seed adds 246 explicitly synthetic historical visits and eight example formulary entries, without changing the active queue. No presentation-database reset is included.
+The idempotent seed creates one fictional hospital, six facilities, fourteen named accounts, and sixty synthetic patients. Re-running it preserves registrations. The additive intake seed adds three clinic rosters, 24 appointments, eight arrivals, and two saved workups. The clinical seed adds 246 explicitly synthetic historical visits and eight example formulary entries, without changing the active queue. No presentation-database reset is included.
 
 ## Working now
 
@@ -58,6 +58,7 @@ The idempotent seed creates one fictional hospital, six facilities, thirteen nam
 - Appointments, rescheduling, cancellations, no-shows, walk-ins, check-in, queue priority, departure, and clinical visit completion.
 - Bilateral VA/IOP, refraction, optional logMAR values, immutable workup revisions, and configurable dilation timing.
 - Patient 360, Doctor Events, configurable general, cataract, glaucoma, and retina examinations, coded diagnoses, anatomy plans, persistent bilateral drawing sheets, longitudinal comparison, separate event/prescription signatures, handwritten-prescription evidence, addenda, and prescription PDFs with limited QR verification.
+- Immutable spectacle prescriptions linked to signed Doctor Events, with an optician worklist for preparation, readiness, collection, and attributed cancellation.
 - Eye-specific surgery cases with stored consent documents and gated preoperative, scheduled, operated, discharged and follow-up stages.
 - Live attendance, queue timing, documentation and surgery dashboards; CSV and printable operational reports.
 - Attributed audit records and forced row-level security on tenant-owned data.
