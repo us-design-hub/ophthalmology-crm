@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const config: NextConfig = {
   poweredByHeader: false,
+  // Playwright reads package-owned runtime assets such as browsers.json.
+  // Keeping it external prevents Turbopack from producing an incomplete copy.
+  serverExternalPackages: ["playwright-core"],
   async headers() {
     return [{ source: "/(.*)", headers: [
       { key: "X-Content-Type-Options", value: "nosniff" },
