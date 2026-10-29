@@ -9,6 +9,7 @@ import { useLocale } from "../locale-provider";
 import { ReasonDialog } from "../reason-dialog";
 import { ErrorNotice, intakeError, LiveStatus, RiskFlags, useLiveData } from "../intake/shared";
 import { waited } from "../intake/reception-queue";
+import { WorkflowDocumentUpload } from "../patients/workflow-document-upload";
 
 /**
  * The lab assistant's to-do list: BP and blood sugar for patients already in
@@ -57,7 +58,7 @@ export function LabWorklist() {
           <div><strong>{first.name}</strong><small>{first.mrn} · {ageFromDob(first.dob)} {t("years")} · {t(`gender_${first.gender}` as MessageKey)}</small>{first.flags.length > 0 && <RiskFlags flags={first.flags}/>}</div>
           <div className="lab-visit-meta">{emergency && <strong className="emergency-tag"><Siren size={13}/>{t("emergencyTag")}</strong>}<span>{first.clinic}</span><span className="qc-time"><Clock3 size={13}/><span dir="ltr">{waited(Math.max(0, Math.floor((now - new Date(first.checkedInAt).getTime()) / 60000)))}</span></span></div>
         </div>
-        <div className="lab-tests">{group.map(order => <LabTestRow key={order.id} order={order} busy={busy === order.id} onSave={result => void save(order, result)} onSkip={() => setSkipping(order)}/>)}</div>
+        <div className="lab-tests">{group.map(order => <LabTestRow key={order.id} order={order} busy={busy === order.id} onSave={result => void save(order, result)} onSkip={() => setSkipping(order)}/>)}</div><WorkflowDocumentUpload patientId={first.patientId} encounterId={first.encounterId} category="lab_result" defaultTitle="Handwritten laboratory result"/>
       </article>; })}
       {live.data && !visits.length && <p className="reception-queue-empty"><FlaskConical size={18}/>{t(tab === "todo" ? "labNothingToDo" : "labNothingDone")}</p>}
     </section>

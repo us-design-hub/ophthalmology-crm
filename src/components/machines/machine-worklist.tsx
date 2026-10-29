@@ -9,6 +9,7 @@ import { useLocale } from "../locale-provider";
 import { ReasonDialog } from "../reason-dialog";
 import { ErrorNotice, intakeError, LiveStatus, RiskFlags, useLiveData } from "../intake/shared";
 import { waited } from "../intake/reception-queue";
+import { uploadWorkflowDocument } from "../patients/workflow-document-upload";
 
 /**
  * The machine operator's worklist. "Ready now" only lists patients who are at
@@ -37,7 +38,7 @@ export function MachineWorklist() {
     setBusy(order.id); setError(null);
     try {
       // The report goes up first, so a failed upload never leaves a result without its file.
-      if (file) { const form = new FormData(); form.set("orderId", order.id); form.set("file", file); const response = await fetch("/api/machines/report", { method: "POST", body: form }); if (!response.ok) { const body = await response.json().catch(() => ({})); throw new ClientApiError(body.error ?? "serviceUnavailable", response.status, body); } }
+      if (file) { await uploadWorkflowDocument({patientId:order.patientId,encounterId:order.encounterId,category:"machine_test",title:`${order.machine} ${order.eye} diagnostic report`,remarks:findings,file}); const form = new FormData(); form.set("orderId", order.id); form.set("file", file); const response = await fetch("/api/machines/report", { method: "POST", body: form }); if (!response.ok) { const body = await response.json().catch(() => ({})); throw new ClientApiError(body.error ?? "serviceUnavailable", response.status, body); } }
       await api("/api/machines/result", { id: order.id, version: order.version, findings, keyValues }); live.refresh();
     } catch (value) { setError(intakeError(value)); live.refresh(); }
     finally { setBusy(null); }
