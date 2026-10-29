@@ -30,7 +30,7 @@ const PAGE_PERMISSION: Record<Page, Permission | null> = {
   queue: "intake:read",
   laboratory: "lab:write",
   diagnostics: "intake:read",
-  optics: "optics:write",
+  optics: "optics:read",
   patients: "patient:read",
   appointments: "intake:read",
   prescriptions: "prescription:read",

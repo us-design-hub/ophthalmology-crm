@@ -1,6 +1,6 @@
 # OpenEyes clinical workspace
 
-OpenEyes provides native patient registration with ophthalmology appointments, clinical queues, bilateral workup, signed clinical documentation, digital and spectacle prescriptions, optics fulfilment, surgery tracking, administration, audit, and operational reporting on PostgreSQL. The frontend supports the existing partial Urdu/RTL interface and iPad-sized layouts.
+OpenEyes provides native patient registration with ophthalmology appointments, clinical queues, bilateral workup, signed clinical documentation, digital prescriptions and optics referrals, surgery tracking, administration, audit, and operational reporting on PostgreSQL. The frontend supports the existing partial Urdu/RTL interface and iPad-sized layouts.
 
 See [production readiness](docs/PRODUCTION_READINESS.md), [current implementation](docs/USABLE_SYSTEM_IMPLEMENTATION.md), and [current verification](docs/USABLE_SYSTEM_VERIFICATION.md). Earlier milestone documents describe historical demo boundaries and are superseded by these records. Planning documents remain in the project folder, outside the client interface.
 
@@ -18,7 +18,7 @@ In another terminal:
 npm run dev
 ```
 
-The normal development address is **http://127.0.0.1:3000**. Choose a named demo account, then sign in. Reception registers patients, books appointments, and confirms arrival. Technicians save bilateral workups; senior technicians review and release them. Doctors review saved measurements, document care, and issue spectacle prescriptions. Opticians prepare and record collection of prescribed glasses. Auditors read the audit trail. Do not start a second database process if it is already running.
+The normal development address is **http://127.0.0.1:3000**. Choose a named demo account, then sign in. Reception registers patients, books appointments, and confirms arrival. Technicians save bilateral workups; senior technicians review and release them. Doctors review saved measurements, document care, and mark patients who require optics. Opticians review those patients, their approved workup readings, and optional doctor suggestions. Auditors read the audit trail. Do not start a second database process if it is already running.
 
 For the optimized preview, use `npm run build` then `npm start`.
 
@@ -58,7 +58,7 @@ The idempotent seed creates one fictional hospital, six facilities, fourteen nam
 - Appointments, rescheduling, cancellations, no-shows, walk-ins, check-in, queue priority, departure, and clinical visit completion.
 - Bilateral VA/IOP, refraction, optional logMAR values, immutable workup revisions, and configurable dilation timing.
 - Patient 360, Doctor Events, configurable general, cataract, glaucoma, and retina examinations, coded diagnoses, anatomy plans, persistent bilateral drawing sheets, longitudinal comparison, separate event/prescription signatures, handwritten-prescription evidence, addenda, and prescription PDFs with limited QR verification.
-- Immutable spectacle prescriptions linked to signed Doctor Events, with prior-versus-current readings and an optician worklist for preparation, readiness, collection, and attributed cancellation.
+- Optics Required referrals linked to signed Doctor Events, with senior-approved or technician workup readings and optional doctor-suggested glasses measurements.
 - Eye-specific surgery cases with stored consent documents and gated preoperative, scheduled, operated, discharged and follow-up stages.
 - Live attendance, queue timing, documentation and surgery dashboards; CSV and printable operational reports.
 - Attributed audit records and forced row-level security on tenant-owned data.
