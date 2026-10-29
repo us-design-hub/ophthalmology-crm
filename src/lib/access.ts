@@ -15,7 +15,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   optician: ["patient:read", "optics:read", "optics:dispense"],
   cashier: [],
   inventory_officer: [],
-  hospital_admin: ["surgery:read", "surgery:write", "management:read", "reports:read", "appointment:manage", "queue:manage", "admin:read", "staff:write", "account:create", "settings:write", "patient:read", "patient:create", "patient:edit", "audit:read", "intake:read", "appointment:create", "appointment:checkin", "queue:workup"],
+  hospital_admin: ["surgery:read", "surgery:write", "management:read", "reports:read", "appointment:manage", "queue:manage", "admin:read", "staff:write", "account:create", "account:manage", "settings:write", "patient:read", "patient:create", "patient:edit", "audit:read", "intake:read", "appointment:create", "appointment:checkin", "queue:workup"],
   security_admin: ["reports:read", "admin:read", "staff:write", "account:create", "account:manage", "audit:read"],
   auditor: ["surgery:read", "management:read", "reports:read", "admin:read", "audit:read"],
 };

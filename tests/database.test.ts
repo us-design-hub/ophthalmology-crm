@@ -156,6 +156,7 @@ test('native registration roles are active and retired integration mappings are 
     assert.equal((await app.query("SELECT array_agg(permission_code ORDER BY permission_code) AS permissions FROM app.role_permission WHERE role_code='pharmacist'")).rows[0].permissions.join(','), 'patient:read,prescription:read');
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code IN ('receptionist','hospital_admin') AND permission_code IN ('patient:create','patient:edit')")).rows[0].total, 4);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code='senior_technician' AND permission_code IN ('workup:write','workup:review','queue:handoff')")).rows[0].total, 3);
+    assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code='hospital_admin' AND permission_code='account:manage'")).rows[0].total, 1);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.role_permission WHERE role_code='nurse' AND permission_code IN ('workup:review','queue:handoff')")).rows[0].total, 0);
     assert.equal((await app.query("SELECT count(*)::int AS total FROM app.permission WHERE code IN ('surgery:read','management:read')")).rows[0].total, 2);
     assert.equal((await admin.query("SELECT has_table_privilege('openeyes_app','app.invoice','SELECT') AS allowed")).rows[0].allowed, false);

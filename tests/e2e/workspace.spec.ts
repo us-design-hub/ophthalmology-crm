@@ -35,7 +35,7 @@ test("each role's sidebar lists only that role's pages", async ({ browser, baseU
     "sara.khan": ["Home", "Doctor Event", "Patients", "Prescriptions", "Surgery lifecycle"],
     "aisha.malik": ["Home", "Live queue", "Patients", "Appointments"],
     "sana.qureshi": ["Home", "Live queue", "Patients"],
-    "omar.siddiqui": ["Home", "Patients", "Appointments", "Management", "Administration"],
+    "omar.siddiqui": ["Home", "Patients", "Appointments", "Management", "Administration", "Audit trail"],
     "faisal.noor": ["Home", "Administration", "Audit trail"],
   };
   for (const [account, pages] of Object.entries(expected)) {

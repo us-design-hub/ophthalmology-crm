@@ -17,7 +17,7 @@ const ROLE_PAGES: Record<Role, readonly Page[]> = {
   optician: ["overview", "optics", "patients"],
   cashier: ["overview"],
   inventory_officer: ["overview"],
-  hospital_admin: ["overview", "management", "administration", "patients", "appointments"],
+  hospital_admin: ["overview", "management", "administration", "audit", "patients", "appointments"],
   security_admin: ["overview", "administration", "audit"],
   auditor: ["overview", "audit", "management"],
 };
