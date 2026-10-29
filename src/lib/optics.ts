@@ -17,8 +17,11 @@ export const spectacleInputSchema = z.object({
 });
 export type SpectacleInput = z.infer<typeof spectacleInputSchema>;
 
+export type SpectacleReading = Pick<SpectacleInput, "odSphere" | "odCylinder" | "odAxis" | "odAdd" | "odPrism" | "osSphere" | "osCylinder" | "osAxis" | "osAdd" | "osPrism" | "pd" | "lensType" | "instructions">;
+export type PreviousSpectacleOrder = SpectacleReading & { id: string; collectedAt: string; dispensingNote: string };
+
 export type SpectacleOrder = Omit<SpectacleInput, "encounterVersion"> & {
   id: string; version: number; patientId: string; doctorEventId: string; patient: string; mrn: string;
   dob: string; gender: string; phone: string; clinic: string; doctor: string; prescribedAt: string;
-  status: OpticsStatus; dispensingNote: string; statusBy: string | null; statusAt: string; flags: { type: "allergy" | "risk"; value: string }[];
+  status: OpticsStatus; dispensingNote: string; statusBy: string | null; statusAt: string; previous: PreviousSpectacleOrder | null; flags: { type: "allergy" | "risk"; value: string }[];
 };

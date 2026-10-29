@@ -17,11 +17,22 @@ const orderSelect = `SELECT o.id,o.encounter_id AS "encounterId",o.patient_id AS
   concat_ws(' ',p.given_name,p.family_name) AS patient,p.mrn,p.dob::text AS dob,p.gender,p.phone_e164 AS phone,f.name AS clinic,d.full_name AS doctor,
   o.prescribed_at AS "prescribedAt",o.status,o.od_sphere::float AS "odSphere",o.od_cylinder::float AS "odCylinder",o.od_axis AS "odAxis",o.od_add::float AS "odAdd",o.od_prism AS "odPrism",
   o.os_sphere::float AS "osSphere",o.os_cylinder::float AS "osCylinder",o.os_axis AS "osAxis",o.os_add::float AS "osAdd",o.os_prism AS "osPrism",o.pd::float AS pd,
-  o.lens_type AS "lensType",o.instructions,o.dispensing_note AS "dispensingNote",s.full_name AS "statusBy",o.status_at AS "statusAt",
+  o.lens_type AS "lensType",o.instructions,o.dispensing_note AS "dispensingNote",s.full_name AS "statusBy",o.status_at AS "statusAt",previous.value AS previous,
   (SELECT coalesce(jsonb_agg(jsonb_build_object('type',pf.type,'value',pf.value)),'[]') FROM app.patient_flag pf WHERE pf.tenant_id=p.tenant_id AND pf.patient_id=p.id AND pf.resolved_at IS NULL) AS flags
   FROM app.spectacle_order o JOIN app.encounter e ON e.id=o.encounter_id AND e.tenant_id=o.tenant_id
   JOIN app.patient p ON p.id=o.patient_id AND p.tenant_id=o.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id
-  JOIN app.user_account d ON d.id=o.prescribed_by AND d.tenant_id=o.tenant_id LEFT JOIN app.user_account s ON s.id=o.status_by AND s.tenant_id=o.tenant_id`;
+  JOIN app.user_account d ON d.id=o.prescribed_by AND d.tenant_id=o.tenant_id LEFT JOIN app.user_account s ON s.id=o.status_by AND s.tenant_id=o.tenant_id
+  LEFT JOIN LATERAL (
+    SELECT jsonb_build_object(
+      'id',prior.id,'collectedAt',prior.status_at,'dispensingNote',prior.dispensing_note,
+      'odSphere',prior.od_sphere::float,'odCylinder',prior.od_cylinder::float,'odAxis',prior.od_axis,'odAdd',prior.od_add::float,'odPrism',prior.od_prism,
+      'osSphere',prior.os_sphere::float,'osCylinder',prior.os_cylinder::float,'osAxis',prior.os_axis,'osAdd',prior.os_add::float,'osPrism',prior.os_prism,
+      'pd',prior.pd::float,'lensType',prior.lens_type,'instructions',prior.instructions
+    ) AS value
+    FROM app.spectacle_order prior
+    WHERE prior.tenant_id=o.tenant_id AND prior.patient_id=o.patient_id AND prior.status='collected' AND prior.id<>o.id AND prior.status_at<o.prescribed_at
+    ORDER BY prior.status_at DESC LIMIT 1
+  ) previous ON true`;
 
 export async function encounterOrders(user: AuthUser, encounterId: string | null, context: AuditContext) {
   const id = parse(z.uuid(), encounterId);

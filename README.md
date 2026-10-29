@@ -58,7 +58,7 @@ The idempotent seed creates one fictional hospital, six facilities, fourteen nam
 - Appointments, rescheduling, cancellations, no-shows, walk-ins, check-in, queue priority, departure, and clinical visit completion.
 - Bilateral VA/IOP, refraction, optional logMAR values, immutable workup revisions, and configurable dilation timing.
 - Patient 360, Doctor Events, configurable general, cataract, glaucoma, and retina examinations, coded diagnoses, anatomy plans, persistent bilateral drawing sheets, longitudinal comparison, separate event/prescription signatures, handwritten-prescription evidence, addenda, and prescription PDFs with limited QR verification.
-- Immutable spectacle prescriptions linked to signed Doctor Events, with an optician worklist for preparation, readiness, collection, and attributed cancellation.
+- Immutable spectacle prescriptions linked to signed Doctor Events, with prior-versus-current readings and an optician worklist for preparation, readiness, collection, and attributed cancellation.
 - Eye-specific surgery cases with stored consent documents and gated preoperative, scheduled, operated, discharged and follow-up stages.
 - Live attendance, queue timing, documentation and surgery dashboards; CSV and printable operational reports.
 - Attributed audit records and forced row-level security on tenant-owned data.
