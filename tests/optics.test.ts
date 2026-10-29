@@ -19,7 +19,7 @@ test("optics referral accepts an optional doctor suggestion", () => {
 });
 
 test("optician sees optics referrals and patients without write access", () => {
-  assert.deepEqual(ROLE_PERMISSIONS.optician, ["patient:read", "optics:read", "optics:dispense"]);
+  assert.deepEqual(ROLE_PERMISSIONS.optician, ["document:read", "patient:read", "optics:read", "optics:dispense"]);
   assert.deepEqual(visiblePages({ roles: ["optician"], permissions: [...ROLE_PERMISSIONS.optician] }), ["overview", "optics", "patients"]);
   assert.equal(ROLE_PERMISSIONS.doctor.includes("optics:order"), true);
 });

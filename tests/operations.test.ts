@@ -4,6 +4,7 @@ import { ROLE_PERMISSIONS, PERMISSIONS } from "../src/lib/access";
 import { STAGES } from "../src/lib/intake";
 import { karachiDate, surgeryReadiness } from "../src/lib/surgery-worklist";
 import { procedureDefinitionSchema } from "../src/lib/administration";
+import { uploadDocumentCategories, visibleDocumentCategories } from "../src/lib/patient-documents";
 
 test("active queue stages include specialty checkpoints and end at consultation", () => {
   assert.deepEqual(STAGES, ["waiting", "workup", "testing", "imaging", "dilation", "consultation"]);
@@ -11,7 +12,7 @@ test("active queue stages include specialty checkpoints and end at consultation"
 
 test("retired finance and inventory permissions are absent while pharmacy remains review only", () => {
   for (const permission of ["anatomy:use", "preview:inventory", "preview:billing", "preview:surgery", "preview:management", "preview:admin", "inventory:write", "pharmacy:dispense", "billing:write", "billing:discount", "billing:approve_refund"]) assert.equal(PERMISSIONS.includes(permission as never), false);
-  assert.deepEqual(ROLE_PERMISSIONS.pharmacist, ['patient:read','prescription:read']);
+  assert.deepEqual(ROLE_PERMISSIONS.pharmacist, ['document:read','patient:read','prescription:read']);
   assert.deepEqual(ROLE_PERMISSIONS.cashier, []);
   assert.deepEqual(ROLE_PERMISSIONS.inventory_officer, []);
 });
@@ -21,6 +22,13 @@ test("surgery and management use explicit production read permissions", () => {
   assert.equal(ROLE_PERMISSIONS.doctor.includes("management:read"), true);
   assert.equal(ROLE_PERMISSIONS.auditor.includes("surgery:read"), true);
   assert.equal(ROLE_PERMISSIONS.auditor.includes("management:read"), true);
+});
+
+test("patient documents are uploaded and viewed according to department scope", () => {
+  assert.deepEqual(uploadDocumentCategories(["machine_operator"]), ["machine_test"]);
+  assert.deepEqual(uploadDocumentCategories(["lab_assistant"]), ["lab_result"]);
+  assert.deepEqual(visibleDocumentCategories(["pharmacist"]), ["prescription"]);
+  assert.equal(visibleDocumentCategories(["hospital_admin"]).length, 9);
 });
 
 test("theatre readiness names each missing surgical prerequisite", () => {

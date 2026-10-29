@@ -401,7 +401,7 @@ export type Timeline = {
 };
 export type PatientTimelineActivity = {
   id: string;
-  kind: 'appointment' | 'checkin' | 'workup' | 'investigation' | 'investigation_evidence' | 'doctor_event' | 'drawing' | 'prescription' | 'prescription_evidence' | 'addendum' | 'consent' | 'surgery' | 'operation_note' | 'surgery_followup' | 'problem' | 'history';
+  kind: 'appointment' | 'checkin' | 'workup' | 'investigation' | 'investigation_evidence' | 'clinical_document' | 'lab_result' | 'doctor_event' | 'drawing' | 'prescription' | 'prescription_evidence' | 'optics_referral' | 'optics_dispense' | 'addendum' | 'consent' | 'surgery' | 'operation_note' | 'surgery_followup' | 'problem' | 'history';
   at: string;
   summary: string;
   clinic: string;

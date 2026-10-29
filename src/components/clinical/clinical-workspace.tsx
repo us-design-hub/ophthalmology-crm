@@ -13,6 +13,7 @@ import { MachineApprovals } from '../machines/machine-approvals';
 import { PatientProblemList } from './patient-problem-list';
 import { PatientComparison } from './patient-comparison';
 import { StructuredPatientHistory } from '../patients/structured-patient-history';
+import { PatientDocuments } from '../patients/patient-documents';
 
 export function ClinicalWorkspace(){const {t}=useLocale(),user=useSession();const live=useLiveData<ClinicalList>('/api/clinical/list');const [selected,setSelected]=useState<string|null>(null),[taking,setTaking]=useState<string|null>(null),[error,setError]=useState<MessageKey|null>(null);
  // An unassigned visit (often an emergency) is claimed by the doctor who opens it.
@@ -27,10 +28,14 @@ const activityLabels:Record<PatientTimelineActivity['kind'],MessageKey>={
   workup:'timelineWorkup',
   investigation:'timelineInvestigation',
   investigation_evidence:'timelineInvestigationEvidence',
+  clinical_document:'timelineInvestigationEvidence',
+  lab_result:'timelineInvestigation',
   doctor_event:'timelineDoctorEvent',
   drawing:'timelineDrawing',
   prescription:'timelinePrescription',
   prescription_evidence:'timelineEvidence',
+  optics_referral:'timelinePrescription',
+  optics_dispense:'timelinePrescription',
   addendum:'timelineAddendum',
   consent:'timelineConsent',
   surgery:'timelineSurgery',
@@ -42,11 +47,11 @@ const activityLabels:Record<PatientTimelineActivity['kind'],MessageKey>={
 function ActivityIcon({kind}:{kind:PatientTimelineActivity['kind']}){
   const props={size:18,'aria-hidden':true as const};
   if(kind==='appointment')return <CalendarDays {...props}/>;
-  if(kind==='checkin'||kind==='workup'||kind==='investigation')return <HeartPulse {...props}/>;
+  if(kind==='checkin'||kind==='workup'||kind==='investigation'||kind==='lab_result')return <HeartPulse {...props}/>;
   if(kind==='doctor_event')return <Stethoscope {...props}/>;
   if(kind==='drawing')return <PenTool {...props}/>;
-  if(kind==='prescription')return <Pill {...props}/>;
-  if(kind==='prescription_evidence'||kind==='investigation_evidence')return <Paperclip {...props}/>;
+  if(kind==='prescription'||kind==='optics_referral'||kind==='optics_dispense')return <Pill {...props}/>;
+  if(kind==='prescription_evidence'||kind==='investigation_evidence'||kind==='clinical_document')return <Paperclip {...props}/>;
   if(kind==='addendum')return <MessageSquarePlus {...props}/>;
   if(kind==='consent')return <FileSignature {...props}/>;
   if(kind==='surgery')return <Scissors {...props}/>;
@@ -75,4 +80,4 @@ function PatientActivityTimeline({patientId,onOpen,refresh=0}:{patientId:string;
   </section>;
 }
 
-export function PatientTimelineDialog({patientId,onClose}:{patientId:string;onClose:()=>void}){const {t}=useLocale(),ref=useRef<HTMLDialogElement>(null),[selected,setSelected]=useState<string|null>(null),[revision,setRevision]=useState(0);useEffect(()=>{ref.current?.showModal();},[]);return <><dialog ref={ref} className="intake-dialog history-dialog" aria-label={t('patient360')} onCancel={onClose}><div className="patient-record-header"><h2>{t('patient360')}</h2><button type="button" className="icon-button" aria-label={t('closeClinical')} onClick={onClose}><X size={20}/></button></div><div className="intake-dialog-body"><StructuredPatientHistory patientId={patientId} onChanged={()=>setRevision(value=>value+1)}/><PatientProblemList patientId={patientId} onChanged={()=>setRevision(value=>value+1)}/><PatientComparison patientId={patientId}/><PatientActivityTimeline patientId={patientId} onOpen={setSelected} refresh={revision}/></div></dialog>{selected&&<DoctorEditor id={selected} patientId={patientId} onClose={()=>setSelected(null)}/>}</>;}
+export function PatientTimelineDialog({patientId,onClose}:{patientId:string;onClose:()=>void}){const {t}=useLocale(),user=useSession(),ref=useRef<HTMLDialogElement>(null),[selected,setSelected]=useState<string|null>(null),[revision,setRevision]=useState(0),canReadClinical=user.permissions.includes('clinical:read');useEffect(()=>{ref.current?.showModal();},[]);return <><dialog ref={ref} className="intake-dialog history-dialog" aria-label={t('patient360')} onCancel={onClose}><div className="patient-record-header"><h2>{t('patient360')}</h2><button type="button" className="icon-button" aria-label={t('closeClinical')} onClick={onClose}><X size={20}/></button></div><div className="intake-dialog-body"><PatientDocuments patientId={patientId} onChanged={()=>setRevision(value=>value+1)}/>{canReadClinical&&<><StructuredPatientHistory patientId={patientId} onChanged={()=>setRevision(value=>value+1)}/><PatientProblemList patientId={patientId} onChanged={()=>setRevision(value=>value+1)}/><PatientComparison patientId={patientId}/><PatientActivityTimeline patientId={patientId} onOpen={setSelected} refresh={revision}/></>}</div></dialog>{selected&&canReadClinical&&<DoctorEditor id={selected} patientId={patientId} onClose={()=>setSelected(null)}/>}</>;}

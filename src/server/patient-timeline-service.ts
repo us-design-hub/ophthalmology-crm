@@ -3,12 +3,14 @@ import 'server-only';
 import type { PoolClient } from 'pg';
 import type { AuthUser } from '@/lib/access';
 import type { PatientTimelineActivity } from '@/lib/clinical';
+import { visibleDocumentCategories } from '@/lib/patient-documents';
 
 export async function patientTimelineActivities(
   db: PoolClient,
   user: AuthUser,
   patientId: string,
 ): Promise<PatientTimelineActivity[]> {
+  const documentCategories = visibleDocumentCategories(user.roles);
   const result = await db.query<PatientTimelineActivity>(`
     WITH accessible_appointments AS (
       SELECT a.*, f.name AS clinic, u.full_name AS doctor
@@ -80,6 +82,48 @@ export async function patientTimelineActivities(
       JOIN app.investigation_result r ON r.id=v.investigation_id AND r.tenant_id=v.tenant_id
       JOIN accessible_encounters e ON e.id=r.encounter_id AND e.tenant_id=r.tenant_id
       JOIN app.user_account u ON u.id=v.actor_id AND u.tenant_id=v.tenant_id
+
+      UNION ALL
+      SELECT
+        'clinical-document:'||v.id::text,'clinical_document',v.captured_at,
+        (v.title||' - '||replace(v.category,'_',' '))::text,
+        e.clinic,u.full_name,'attached',e.id,
+        jsonb_build_object('documentId',v.id,'category',v.category,'filename',v.filename,'mime',v.mime,'hash',v.hash)
+      FROM app.clinical_document v
+      JOIN accessible_encounters e ON e.id=v.encounter_id AND e.tenant_id=v.tenant_id
+      JOIN app.user_account u ON u.id=v.actor_id AND u.tenant_id=v.tenant_id
+      WHERE v.category=ANY($3::text[])
+
+      UNION ALL
+      SELECT
+        'lab:'||l.id::text,'lab_result',coalesce(l.resulted_at,l.ordered_at),
+        ('Laboratory '||CASE l.test WHEN 'bp' THEN 'blood pressure' ELSE 'blood sugar' END||' - '||replace(l.status,'_',' '))::text,
+        e.clinic,coalesce(u.full_name,'Automated clinical rule'),l.status,e.id,
+        jsonb_build_object('test',l.test,'reasons',l.reasons,'result',l.result,'abnormal',l.abnormal,'note',l.note)
+      FROM app.lab_order l
+      JOIN accessible_encounters e ON e.id=l.encounter_id AND e.tenant_id=l.tenant_id
+      LEFT JOIN app.user_account u ON u.id=coalesce(l.resulted_by,l.ordered_by) AND u.tenant_id=l.tenant_id
+
+      UNION ALL
+      SELECT
+        'optics-referral:'||o.id::text,'optics_referral',o.prescribed_at,
+        ('Optics required - '||replace(o.lens_type,'_',' '))::text,
+        e.clinic,u.full_name,o.status,e.id,
+        jsonb_build_object('referralId',o.id,'lensType',o.lens_type,'pd',o.pd,'odSphere',o.od_sphere,'osSphere',o.os_sphere)
+      FROM app.spectacle_order o
+      JOIN accessible_encounters e ON e.id=o.encounter_id AND e.tenant_id=o.tenant_id
+      JOIN app.user_account u ON u.id=o.prescribed_by AND u.tenant_id=o.tenant_id
+
+      UNION ALL
+      SELECT
+        'optics-dispense:'||x.id::text,'optics_dispense',(x.dispensed_at::timestamp AT TIME ZONE 'Asia/Karachi'),
+        ('Hospital glasses supplied - '||replace(x.lens_type,'_',' '))::text,
+        e.clinic,u.full_name,'dispensed',e.id,
+        jsonb_build_object('dispenseId',x.id,'referralId',x.referral_id,'lensType',x.lens_type,'pd',x.pd,'odSphere',x.od_sphere,'osSphere',x.os_sphere,'note',x.note)
+      FROM app.spectacle_dispense x
+      JOIN app.spectacle_order o ON o.id=x.referral_id AND o.tenant_id=x.tenant_id
+      JOIN accessible_encounters e ON e.id=o.encounter_id AND e.tenant_id=o.tenant_id
+      JOIN app.user_account u ON u.id=x.dispensed_by AND u.tenant_id=x.tenant_id
 
       UNION ALL
       SELECT
@@ -220,6 +264,6 @@ export async function patientTimelineActivities(
     FROM activity
     ORDER BY at DESC,id DESC
     LIMIT 300
-  `, [patientId, user.facilityIds]);
+  `, [patientId, user.facilityIds, documentCategories]);
   return result.rows;
 }

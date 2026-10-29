@@ -52,6 +52,7 @@ export function ClinicalWorkspace() {
   const pages = visiblePages(user);
   const canOpen = (next: Page) => pages.includes(next);
   const canReadClinical = user.permissions.includes("clinical:read");
+  const canOpenPatientFile = canReadClinical || user.permissions.includes("document:read");
   const [historyPatient, setHistoryPatient] = useState<string | null>(null);
   const [bookingPatient, setBookingPatient] = useState<PatientSummary | null>(null);
   const [page, setPage] = useState<Page>(() => landingPage(user));
@@ -125,7 +126,7 @@ export function ClinicalWorkspace() {
         {passwordOpen && <PasswordForm onClose={() => setPasswordOpen(false)}/>}
         {signOutError && <p className="form-error" role="alert">{t("serviceUnavailable")}</p>}
 
-        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate} canOpen={canOpen}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <LabWorklist/> : page === "diagnostics" ? <><MachineWorklist/><QueueWorkspace stageScope={["testing", "imaging"]} legacyOnly/></> : page === "optics" ? <OpticsWorklist/> : page === "queue" ? <QueueWorkspace/> : page === "patients" ? <PatientsWorkspace onHistory={canReadClinical ? setHistoryPatient : undefined} onBook={canOpen("appointments") ? patient => { setBookingPatient(patient); navigate("appointments"); } : undefined}/> : page === "audit" ? <AuditWorkspace /> : <OverviewWorkspace navigate={navigate} canOpen={canOpen}/>}
+        {page === "surgery" ? <SurgeryWorkspace/> : page === "management" ? <ManagementWorkspace navigate={navigate} canOpen={canOpen}/> : page === "administration" ? <AdministrationWorkspace/> : page === "clinical" ? <DoctorWorkspace/> : page === "prescriptions" ? <PrescriptionInbox/> : page === "appointments" ? <AppointmentsWorkspace initialPatient={bookingPatient} onBooked={() => setBookingPatient(null)}/> : page === "laboratory" ? <LabWorklist/> : page === "diagnostics" ? <><MachineWorklist/><QueueWorkspace stageScope={["testing", "imaging"]} legacyOnly/></> : page === "optics" ? <OpticsWorklist/> : page === "queue" ? <QueueWorkspace/> : page === "patients" ? <PatientsWorkspace onHistory={canOpenPatientFile ? setHistoryPatient : undefined} onBook={canOpen("appointments") ? patient => { setBookingPatient(patient); navigate("appointments"); } : undefined}/> : page === "audit" ? <AuditWorkspace /> : <OverviewWorkspace navigate={navigate} canOpen={canOpen}/>}
         {historyPatient && <PatientTimelineDialog patientId={historyPatient} onClose={() => setHistoryPatient(null)}/>}
         {(page === "overview" || page === "management") && <ReportLinks/>}
       </main>
