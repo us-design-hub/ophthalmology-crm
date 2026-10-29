@@ -50,6 +50,7 @@ function drawingSectionsValid(drawings:ClinicalDrawings,template:ExaminationTemp
 async function lockedEncounter(db:PoolClient,user:AuthUser,id:string,write=false) {
  const row=(await db.query('SELECT e.*,f.specialty FROM app.encounter e JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id WHERE e.id=$1 AND e.facility_id=ANY($2::uuid[]) FOR UPDATE OF e',[id,user.facilityIds])).rows[0];
  if(!row)throw new ApiError(404,'encounterNotFound');
+ if(!write && !row.closed_at && row.stage==='consultation' && row.doctor_id!==user.id)throw new ApiError(404,'clinicalNotFound');
  if(write && (row.doctor_id!==user.id))throw new ApiError(403,'clinicalOwner');
  if(write && (row.closed_at || row.stage!=='consultation'))throw new ApiError(409,'consultationRequired');return row;
 }
@@ -72,7 +73,7 @@ async function loadDetail(db:PoolClient,user:AuthUser,id:string):Promise<Clinica
 }
 const medicationColumns='id,quantity,drug_id AS "drugId",name,strength,therapy_group AS "therapyGroup",eye,dose,route,frequency,duration,instructions,instructions_ur AS "instructionsUr",taper_schedule AS "taperSchedule"';
 async function items(db:PoolClient,id:string){return(await db.query(`SELECT ${medicationColumns} FROM app.prescription_item WHERE prescription_id=$1 ORDER BY position`,[id])).rows;}
-export async function clinicalList(user:AuthUser,context:AuditContext){return withTenant(user.tenantId,user.id,async db=>{const encounters=(await db.query(`${encounterSelect} WHERE e.closed_at IS NULL AND e.stage='consultation' AND e.facility_id=ANY($1::uuid[]) ORDER BY (e.priority='urgent') DESC,(e.doctor_id=$2) DESC,e.checked_in_at`,[user.facilityIds,user.id])).rows;await log(db,user,context,'clinical.list','encounter',undefined,{count:encounters.length});return {encounters};});}
+export async function clinicalList(user:AuthUser,context:AuditContext){return withTenant(user.tenantId,user.id,async db=>{const encounters=(await db.query(`${encounterSelect} WHERE e.closed_at IS NULL AND e.stage='consultation' AND e.facility_id=ANY($1::uuid[]) AND e.doctor_id=$2 ORDER BY (e.priority='urgent') DESC,e.checked_in_at`,[user.facilityIds,user.id])).rows;await log(db,user,context,'clinical.list','encounter',undefined,{count:encounters.length});return {encounters};});}
 export async function clinicalDetail(user:AuthUser,id:unknown,context:AuditContext){const encounterId=parse(z.uuid(),id);return withTenant(user.tenantId,user.id,async db=>{const result=await loadDetail(db,user,encounterId);await log(db,user,context,'clinical.read','encounter',encounterId);return result;});}
 export async function timeline(user:AuthUser,id:unknown,context:AuditContext){const patientId=parse(z.uuid(),id);return withTenant(user.tenantId,user.id,async db=>{
  if(!(await db.query('SELECT id FROM app.patient WHERE id=$1',[patientId])).rowCount)throw new ApiError(404,'patientNotFound');
