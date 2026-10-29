@@ -18,7 +18,7 @@ In another terminal:
 npm run dev
 ```
 
-The normal development address is **http://127.0.0.1:3000**. Choose a named demo account, then sign in. Reception registers patients, books appointments, and confirms arrival. Technicians save bilateral workups; senior technicians review and release them. Doctors review saved measurements, document care, and mark patients who require optics. Opticians review those patients, their approved workup readings, and optional doctor suggestions. Auditors read the audit trail. Do not start a second database process if it is already running.
+The normal development address is **http://127.0.0.1:3000**. Choose a named demo account, then sign in. Reception registers patients, books appointments, and confirms arrival. Technicians save bilateral workups; senior technicians review and release them. Doctors review saved measurements, document care, and mark patients who require optics. Opticians review those patients, their approved workup readings, and optional doctor suggestions. If hospital optics supplies the glasses, the optician records the exact dated prescription in the patient's append-only hospital dispensing history; outside purchases remain unrecorded. Auditors read the audit trail. Do not start a second database process if it is already running.
 
 For the optimized preview, use `npm run build` then `npm start`.
 

@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { AuthUser } from "@/lib/access";
-import { opticsReferralInputSchema, type OpticsReferral } from "@/lib/optics";
+import { opticsDispenseInputSchema, opticsReferralInputSchema, type OpticsReferral } from "@/lib/optics";
 import { audit, type AuditContext } from "./audit";
 import { withTenant } from "./db";
 import { ApiError } from "./http";
@@ -17,7 +17,7 @@ const referralSelect = `SELECT o.id,o.encounter_id AS "encounterId",o.patient_id
   o.prescribed_at AS "markedAt",o.doctor_suggestion AS "doctorSuggestion",o.referral_note AS "referralNote",
   o.od_sphere::float AS "odSphere",o.od_cylinder::float AS "odCylinder",o.od_axis AS "odAxis",o.od_add::float AS "odAdd",o.od_prism AS "odPrism",
   o.os_sphere::float AS "osSphere",o.os_cylinder::float AS "osCylinder",o.os_axis AS "osAxis",o.os_add::float AS "osAdd",o.os_prism AS "osPrism",o.pd::float AS pd,
-  o.lens_type AS "lensType",o.instructions,workup.value AS workup,
+  o.lens_type AS "lensType",o.instructions,workup.value AS workup,dispensing.value AS "dispensingHistory",
   (SELECT coalesce(jsonb_agg(jsonb_build_object('type',pf.type,'value',pf.value)),'[]') FROM app.patient_flag pf WHERE pf.tenant_id=p.tenant_id AND pf.patient_id=p.id AND pf.resolved_at IS NULL) AS flags
   FROM app.spectacle_order o JOIN app.encounter e ON e.id=o.encounter_id AND e.tenant_id=o.tenant_id
   JOIN app.patient p ON p.id=o.patient_id AND p.tenant_id=o.tenant_id JOIN app.facility f ON f.id=e.facility_id AND f.tenant_id=e.tenant_id
@@ -36,7 +36,22 @@ const referralSelect = `SELECT o.id,o.encounter_id AS "encounterId",o.patient_id
     LEFT JOIN app.workup_eye os ON os.tenant_id=w.tenant_id AND os.revision_id=w.id AND os.eye='OS'
     LEFT JOIN app.workup_review r ON r.tenant_id=w.tenant_id AND r.revision_id=w.id
     WHERE w.tenant_id=e.tenant_id AND w.encounter_id=e.id ORDER BY w.version DESC LIMIT 1
-  ) workup ON true`;
+  ) workup ON true
+  LEFT JOIN LATERAL (
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+      'id',history.id,'sequence',history.sequence,'optician',history.optician,'dispensedAt',history.dispensed_at,
+      'recordedAt',history.recorded_at,'odSphere',history.od_sphere::float,'odCylinder',history.od_cylinder::float,
+      'odAxis',history.od_axis,'odAdd',history.od_add::float,'odPrism',history.od_prism,
+      'osSphere',history.os_sphere::float,'osCylinder',history.os_cylinder::float,'osAxis',history.os_axis,
+      'osAdd',history.os_add::float,'osPrism',history.os_prism,'pd',history.pd::float,
+      'lensType',history.lens_type,'note',history.note
+    ) ORDER BY history.dispensed_at DESC,history.recorded_at DESC),'[]'::jsonb) AS value
+    FROM (
+      SELECT sd.*,u.full_name AS optician,row_number() OVER (ORDER BY sd.dispensed_at,sd.recorded_at,sd.id)::int AS sequence
+      FROM app.spectacle_dispense sd JOIN app.user_account u ON u.tenant_id=sd.tenant_id AND u.id=sd.dispensed_by
+      WHERE sd.tenant_id=o.tenant_id AND sd.patient_id=o.patient_id
+    ) history
+  ) dispensing ON true`;
 
 export async function encounterReferrals(user: AuthUser, encounterId: string | null, context: AuditContext) {
   const id = parse(z.uuid(), encounterId);
@@ -73,6 +88,27 @@ export async function markRequired(user: AuthUser, input: unknown, context: Audi
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id`, values);
     const id = inserted.rows[0].id as string;
     await audit(db, { tenantId: user.tenantId, actorId: user.id, action: "optics.required", entityType: "spectacle_order", entityId: id, metadata: { encounterId: data.encounterId, patientId: encounter.patient_id, doctorSuggestion: suggestion }, context });
+    return { id };
+  });
+}
+
+export async function recordDispense(user: AuthUser, input: unknown, context: AuditContext) {
+  if (!user.permissions.includes("optics:dispense")) throw new ApiError(403, "accessDenied");
+  const data = parse(opticsDispenseInputSchema, input);
+  return withTenant(user.tenantId, user.id, async db => {
+    const referral = (await db.query(`SELECT o.id,o.patient_id
+      FROM app.spectacle_order o JOIN app.encounter e ON e.tenant_id=o.tenant_id AND e.id=o.encounter_id
+      WHERE o.id=$1 AND o.status<>'cancelled' AND e.facility_id=ANY($2::uuid[])`, [data.referralId, user.facilityIds])).rows[0];
+    if (!referral) throw new ApiError(404, "opticsOrderNotFound");
+    const inserted = await db.query(`INSERT INTO app.spectacle_dispense(
+      tenant_id,referral_id,patient_id,dispensed_by,dispensed_at,
+      od_sphere,od_cylinder,od_axis,od_add,od_prism,os_sphere,os_cylinder,os_axis,os_add,os_prism,pd,lens_type,note
+    ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`, [
+      user.tenantId,data.referralId,referral.patient_id,user.id,data.dispensedAt,
+      data.odSphere,data.odCylinder,data.odAxis,data.odAdd,data.odPrism,data.osSphere,data.osCylinder,data.osAxis,data.osAdd,data.osPrism,data.pd,data.lensType,data.note,
+    ]);
+    const id = inserted.rows[0].id as string;
+    await audit(db, { tenantId: user.tenantId, actorId: user.id, action: "optics.dispensed", entityType: "spectacle_dispense", entityId: id, metadata: { referralId: data.referralId, patientId: referral.patient_id, dispensedAt: data.dispensedAt }, context });
     return { id };
   });
 }

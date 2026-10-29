@@ -18,9 +18,10 @@ export async function POST(request: Request, context: Context) {
   try {
     checkOrigin(request);
     const { resource } = await context.params;
-    if (resource !== "required") throw new ApiError(404, "invalidRequest");
-    const { user } = await requestSession(request, "optics:order");
+    if (!["required", "dispense"].includes(resource)) throw new ApiError(404, "invalidRequest");
+    const { user } = await requestSession(request, resource === "dispense" ? "optics:dispense" : "optics:order");
     await consumeLimit(`optics-write:${user.tenantId}:${user.id}`, 60, 60);
-    return json(await optics.markRequired(user, await readJson(request, 16_384), requestContext(request)));
+    const input = await readJson(request, 16_384);
+    return json(resource === "dispense" ? await optics.recordDispense(user, input, requestContext(request)) : await optics.markRequired(user, input, requestContext(request)));
   } catch (error) { return errorResponse(error); }
 }

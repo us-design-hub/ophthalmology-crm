@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ROLE_PERMISSIONS } from "../src/lib/access";
-import { opticsReferralInputSchema } from "../src/lib/optics";
+import { opticsDispenseInputSchema, opticsReferralInputSchema } from "../src/lib/optics";
 import { visiblePages } from "../src/lib/navigation";
 
 const validSuggestion = {
@@ -19,7 +19,14 @@ test("optics referral accepts an optional doctor suggestion", () => {
 });
 
 test("optician sees optics referrals and patients without write access", () => {
-  assert.deepEqual(ROLE_PERMISSIONS.optician, ["patient:read", "optics:read"]);
+  assert.deepEqual(ROLE_PERMISSIONS.optician, ["patient:read", "optics:read", "optics:dispense"]);
   assert.deepEqual(visiblePages({ roles: ["optician"], permissions: [...ROLE_PERMISSIONS.optician] }), ["overview", "optics", "patients"]);
   assert.equal(ROLE_PERMISSIONS.doctor.includes("optics:order"), true);
+});
+
+test("hospital dispense captures immutable dated glasses readings", () => {
+  const dispense = { referralId: validSuggestion.encounterId, dispensedAt: "2026-10-20", odSphere: -1.25, odCylinder: -0.5, odAxis: 90, odAdd: null, odPrism: "", osSphere: -1, osCylinder: null, osAxis: null, osAdd: null, osPrism: "", pd: 62.5, lensType: "distance" as const, note: "First pair supplied" };
+  assert.equal(opticsDispenseInputSchema.safeParse(dispense).success, true);
+  assert.equal(opticsDispenseInputSchema.safeParse({ ...dispense, pd: 20 }).success, false);
+  assert.equal(opticsDispenseInputSchema.safeParse({ ...dispense, odAxis: null }).success, false);
 });
