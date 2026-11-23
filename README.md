@@ -107,6 +107,23 @@ Database and browser tests use **openeyes_demo_test**, not the preview registry.
 
 Tests cover validation, RLS, immutable records, permissions, session revocation, patient identity handling, appointment/queue races, clinical signing, consent/laterality, live reports, and frontend/RTL interactions. Screenshots and traces go to ignored `test-results/`.
 
+## Urdu interface generation
+
+The application never translates interface text at runtime. English messages live in the typed catalogues under `src/lib`; existing manual Urdu entries are treated as locked overrides, and locally generated entries are saved in `src/lib/locales/ur.generated.json`. Human-entered patient, clinical, prescription, and investigation content is never sent for translation.
+
+Install and start LibreTranslate locally with only the English and Urdu Argos models, then run the generator:
+
+```sh
+python -m venv .runtime/libretranslate-venv
+.runtime/libretranslate-venv/Scripts/python -m pip install libretranslate
+.runtime/libretranslate-venv/Scripts/libretranslate --load-only en,ur
+npm run i18n:audit
+npm run i18n:translate:ur
+npm run i18n:check
+```
+
+`i18n:audit` identifies visible JSX text that still bypasses the message catalogue. `i18n:translate:ur` calls `http://127.0.0.1:5000` by default and batches only missing messages and messages whose English source hash changed; cached translations are not sent again. Set `LIBRETRANSLATE_URL` only when using another local endpoint. To protect a manually corrected generated entry, set its `locked` property to `true`. If its English source later changes, the check reports it for human review instead of overwriting it. LibreTranslate and its language model are development tools and must not be installed or configured on Hostinger.
+
 ## Project map
 
 - `src/app`: pages, route handlers, styles, error boundary.

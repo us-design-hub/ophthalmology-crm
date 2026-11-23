@@ -6,6 +6,7 @@ import { operationsMessages } from "./operations-messages";
 import { administrationMessages } from "./administration-messages";
 import { operationsLiveMessages } from "./operations-live-messages";
 import { overviewMessages } from "./overview-messages";
+import generatedUrdu from "./locales/ur.generated.json";
 export const en = {
   ...expansionMessages,
   ...overviewMessages,
@@ -88,7 +89,7 @@ export const en = {
   signIn: "Sign in securely", signingIn: "Signing in…", signOut: "Sign out", signingOut: "Signing out…", signOutPracticeWarning: "Sign out and discard the current unsaved anatomy practice plan?",
   chooseDemoAccount: "Explore a demo role", demoAccountHelp: "Choose a named synthetic account to fill the form, then sign in. Each account has its own permissions.",
   loginSecurityNote: "Demo access uses real password verification. Hospital identity and MFA are planned for production.",
-  role_receptionist: "Receptionist", role_nurse: "Technician / nurse", role_senior_technician: "Senior technician", role_doctor: "Doctor", role_lab_assistant: "Lab assistant", role_machine_operator: "Machine operator", role_ot_coordinator: "OT coordinator", role_pharmacist: "Pharmacy review", role_optician: "Optician / optics",
+  role_receptionist: "Receptionist", role_nurse: "Technician / nurse", role_senior_technician: "Senior technician", role_doctor: "Doctor", role_lab_assistant: "Lab assistant", role_machine_operator: "Machine operator", role_ot_coordinator: "OT coordinator", role_pharmacist: "Pharmacy", role_optician: "Optician / optics",
   role_cashier: "Cashier", role_inventory_officer: "Inventory officer", role_hospital_admin: "Hospital admin", role_security_admin: "Security admin", role_auditor: "Auditor",
   invalidCredentials: "The email or password is incorrect.", serviceUnavailable: "We couldn't complete that request. Please try again.", opticsInvalid: "Check the optional doctor suggestion and try again.", opticsDispenseInvalid: "Check the supplied date and exact glasses readings, then try again.", opticsSignedEventRequired: "Sign the Doctor Event before marking Optics Required.", opticsAlreadyIssued: "This consultation is already marked as requiring optics.", opticsOrderNotFound: "This optics referral could not be found.", opticsConflict: "This referral changed while you were viewing it. Refresh and try again.", opticsInvalidTransition: "This referral cannot move to that status.",
   tooManyAttempts: "Too many attempts. Please wait a few minutes and try again.", sessionExpired: "Your session has expired. Please sign in again.",
@@ -147,6 +148,8 @@ export const en = {
 
 export type MessageKey = keyof typeof en;
 export type Locale = "en" | "ur";
+type GeneratedUrduEntry = { source: string; sourceHash: string; translation: string; locked?: boolean };
+const generatedUrduEntries = generatedUrdu.entries as Partial<Record<MessageKey, GeneratedUrduEntry>>;
 export const ur: Partial<Record<MessageKey, string>> = {
   hospital: "نمونہ آئی ہسپتال", overview: "جائزہ", patients: "مریض", appointments: "ملاقاتیں", queue: "مریضوں کی قطار",
   care: "طبی نگہداشت", operations: "ہسپتال کے امور", platform: "پلیٹ فارم", workspace: "طبی ورک اسپیس",
@@ -172,5 +175,5 @@ export const ur: Partial<Record<MessageKey, string>> = {
 };
 
 export function translate(locale: Locale, key: MessageKey): string {
-  return locale === "ur" ? ur[key] ?? en[key] : en[key];
+  return locale === "ur" ? ur[key] ?? generatedUrduEntries[key]?.translation ?? en[key] : en[key];
 }
