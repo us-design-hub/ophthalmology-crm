@@ -218,9 +218,6 @@
 .registration-form .visit-queue legend + * { clear: both; }
 .visit-queue .queue-toggle { margin-bottom: 14px; font-weight: var(--weight-medium); }
 .medical-history-options { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 16px 0; }
-/* The sidebar sits on the right in Urdu, so the toggle icon mirrors with it. */
-html[dir=rtl] .sidebar-toggle svg { transform: scaleX(-1); }
-
 /* --- Registration: MR number, arrival type and emergency triage ------------ */
 .registration-heading-side { display: flex; align-items: flex-start; gap: 12px; flex-shrink: 0; }
 .mrn-badge { display: grid; gap: 2px; padding: 8px 14px; border-radius: var(--radius-lg); background: var(--violet-50); text-align: end; }
@@ -397,8 +394,6 @@ html[dir=rtl] .sidebar-toggle svg { transform: scaleX(-1); }
 .queue-board-frame::after { content: ""; position: absolute; inset-block: 0; z-index: 2; width: 48px; pointer-events: none; opacity: 0; transition: opacity var(--duration-base) var(--ease); }
 .queue-board-frame::before { inset-inline-start: 0; background: linear-gradient(to right, var(--lavender-page), transparent); }
 .queue-board-frame::after { inset-inline-end: 0; background: linear-gradient(to left, var(--lavender-page), transparent); }
-html[dir=rtl] .queue-board-frame::before { background: linear-gradient(to left, var(--lavender-page), transparent); }
-html[dir=rtl] .queue-board-frame::after { background: linear-gradient(to right, var(--lavender-page), transparent); }
 .queue-board-frame[data-more-start]::before,
 .queue-board-frame[data-more-end]::after { opacity: 1; }
 

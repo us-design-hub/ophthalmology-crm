@@ -9,7 +9,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<Locale>("en");
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "ur" ? "rtl" : "ltr";
+    document.documentElement.dir = "ltr";
   }, [locale]);
   return <LocaleContext.Provider value={{ locale, setLocale, t: key => translate(locale, key) }}>{children}</LocaleContext.Provider>;
 }

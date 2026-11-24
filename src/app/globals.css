@@ -188,12 +188,10 @@ h1:focus { outline: none; }
 .secondary-button:hover:not(:disabled) { background: var(--violet-50); border-color: var(--violet-200); color: var(--violet-700); }
 .locale-banner { padding: 9px 13px; background: var(--amber-100); border-radius: var(--radius-sm); font-size: var(--text-md); color: var(--amber-600); margin-bottom: 19px; }
 .mobile-menu, .close-mobile, .sidebar-scrim { display: none; }
-html[dir=rtl] body { font-family: var(--font-arabic); }
-html[dir=rtl] h1, html[dir=rtl] h2, html[dir=rtl] h3 { font-family: var(--font-arabic); letter-spacing: 0; }
-/* Latin runs inside RTL copy (MRN, OD/OS, emails) keep the Latin face. */
-html[dir=rtl] [dir=ltr], html[dir=rtl] .patient-table small, html[dir=rtl] input, html[dir=rtl] select, html[dir=rtl] textarea { font-family: var(--font-sans); }
-html[dir=rtl] .eye-card-header, html[dir=rtl] .eye-selection { direction: rtl; }
-html[dir=rtl] .eye-selection>svg { margin-left: 0; margin-right: auto; }
+html[lang=ur] body { font-family: var(--font-arabic); }
+html[lang=ur] h1, html[lang=ur] h2, html[lang=ur] h3 { font-family: var(--font-arabic); letter-spacing: 0; }
+/* Latin and human-entered clinical fields keep the Latin interface face. */
+html[lang=ur] [dir=ltr], html[lang=ur] .patient-table small, html[lang=ur] input, html[lang=ur] select, html[lang=ur] textarea { font-family: var(--font-sans); }
 @media (min-width: 1600px) {
   .workspace-grid { grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; }
   .structure { font-size: var(--text-base); padding: 9px; }
@@ -235,8 +233,7 @@ html[dir=rtl] .eye-selection>svg { margin-left: 0; margin-right: auto; }
 }
 @media (max-width: 760px) {
   .sidebar { transform: translateX(-100%); width: var(--sidebar-width); transition: transform var(--duration-base) var(--ease); }
-  html[dir=rtl] .sidebar { transform: translateX(100%); }
-  .sidebar.is-open, html[dir=rtl] .sidebar.is-open { transform: translateX(0); }
+  .sidebar.is-open { transform: translateX(0); }
   .sidebar-scrim { display: block; position: fixed; inset: 0; background: color-mix(in srgb, var(--brand-900) 37%, transparent); border: 0; z-index: 25; }
   .close-mobile { display: grid; place-items: center; position: absolute; top: 8px; right: 5px; padding: 5px; background: transparent; color: var(--text-faint); border: 0; }
   .main-shell { margin-inline-start: 0; }
